@@ -94,7 +94,8 @@
   gap:13px;
   min-width:0;
   padding:18px;
-  background:#FFFFFF;
+  background:rgba(255,255,255,0.88);
+  backdrop-filter:blur(8px);
   border:1px solid #D9D9D9;
   border-radius:12px;
   box-shadow:0 6px 18px rgba(12,18,12,.04);
@@ -126,7 +127,8 @@
 }
 .workspace-card{
   min-width:0;
-  background:#FFFFFF;
+  background:rgba(255,255,255,0.88);
+  backdrop-filter:blur(8px);
   border:1px solid #D9D9D9;
   border-radius:13px;
   padding:23px;

@@ -1,0 +1,294 @@
+/* =========================================================
+   TECHINS WORK PORTAL — Button Text Visibility Fix
+   Ensures all buttons have clearly visible text in all states
+   ========================================================= */
+
+/* Primary/Action Buttons */
+button,
+.button,
+.gold-btn,
+.action-complete,
+.submit-activity-btn,
+.update-btn,
+.login-submit {
+  font-weight: 700 !important;
+  color: #FFFFFF !important;
+  text-shadow: none !important;
+}
+
+/* Ensure minimum contrast for dark backgrounds */
+button:where([class*="gold"], [class*="submit"], [class*="complete"], [class*="update"]),
+.gold-btn,
+.action-complete,
+.submit-activity-btn,
+.update-btn,
+.login-submit {
+  background: #0C120C !important;
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+  min-height: 42px;
+  padding: 11px 16px;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+}
+
+.gold-btn:hover,
+.action-complete:hover,
+.submit-activity-btn:hover:not(:disabled),
+.update-btn:hover:not(:disabled) {
+  background: #182018 !important;
+  color: #FFFFFF !important;
+}
+
+.gold-btn:disabled,
+.action-complete:disabled,
+.submit-activity-btn:disabled,
+.update-btn:disabled {
+  background: #5F625F !important;
+  color: #D9D9D9 !important;
+  opacity: 1 !important;
+  cursor: not-allowed;
+}
+
+/* Secondary/Progress Buttons */
+.action-progress,
+.refresh-button,
+.refresh-btn {
+  background: #F7F7F7 !important;
+  color: #0C120C !important;
+  border: 1px solid #D0D0D0 !important;
+  font-weight: 700 !important;
+  min-height: 42px;
+  padding: 11px 16px;
+  font-size: 13px;
+}
+
+.action-progress:hover:not(:disabled),
+.refresh-button:hover:not(:disabled),
+.refresh-btn:hover:not(:disabled) {
+  background: #FFFFFF !important;
+  color: #0C120C !important;
+  border-color: #FA9A02 !important;
+}
+
+.action-progress:disabled {
+  background: #F0F0F0 !important;
+  color: #999999 !important;
+  border-color: #E0E0E0 !important;
+  opacity: 1 !important;
+  cursor: not-allowed;
+}
+
+/* Orange/Warning Buttons */
+button:where([style*="background: #FA9A02"], [class*="orange"]),
+.refresh-btn {
+  background: #FA9A02 !important;
+  color: #0C120C !important;
+  font-weight: 800 !important;
+  text-shadow: none !important;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: #0C120C !important;
+  color: #FFFFFF !important;
+}
+
+/* Upload/File Buttons */
+.upload-button {
+  background: #FFFFFF !important;
+  color: #0C120C !important;
+  border: 1px solid #D0D0D0 !important;
+  font-weight: 700 !important;
+  padding: 10px 14px;
+  font-size: 12px;
+}
+
+.upload-button:hover {
+  background: #F7F7F7 !important;
+  color: #0C120C !important;
+  border-color: #FA9A02 !important;
+}
+
+/* Chart Tab Buttons */
+.chart-tabs button {
+  color: #5F625F !important;
+  font-weight: 800 !important;
+  padding: 9px 12px;
+  font-size: 12px;
+  background: transparent !important;
+}
+
+.chart-tabs button.active {
+  background: #0C120C !important;
+  color: #FFFFFF !important;
+  font-weight: 800 !important;
+}
+
+.chart-tabs button:hover:not(.active) {
+  background: rgba(250, 154, 2, 0.1) !important;
+  color: #0C120C !important;
+}
+
+/* Quick Action Links/Buttons */
+.quick-actions a,
+.quick-actions button {
+  background: #0C120C !important;
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+  padding: 11px 14px;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.quick-actions a:hover,
+.quick-actions button:hover {
+  background: #182018 !important;
+  color: #FFFFFF !important;
+}
+
+/* Panel/Form Buttons */
+.panel-head button {
+  background: #FFFFFF !important;
+  color: #0C120C !important;
+  border: 1px solid #D0D0D0 !important;
+  font-weight: 700 !important;
+  padding: 9px 13px;
+  font-size: 12px;
+}
+
+.panel-head button:hover {
+  background: #F7F7F7 !important;
+  color: #0C120C !important;
+  border-color: #FA9A02 !important;
+}
+
+/* Notification Button */
+.notification-button {
+  background: #FFFFFF !important;
+  color: #0C120C !important;
+  border: 1px solid #D9D9D9 !important;
+  font-size: 18px !important;
+}
+
+.notification-button:hover {
+  background: #F7F7F7 !important;
+  color: #FA9A02 !important;
+  border-color: #FA9A02 !important;
+}
+
+/* Password Show/Hide Button */
+.password-field button {
+  background: #F1F3F5 !important;
+  color: #0C120C !important;
+  font-weight: 800 !important;
+  font-size: 11px;
+  padding: 0 11px;
+}
+
+.password-field button:hover {
+  background: #E4E7EA !important;
+  color: #0C120C !important;
+}
+
+/* Submission Actions */
+.submission-actions button {
+  background: #FFFFFF !important;
+  color: #0C120C !important;
+  border: 1px solid #D0D0D0 !important;
+  font-weight: 700 !important;
+  font-size: 11px;
+  padding: 8px 11px;
+}
+
+.submission-actions button:hover {
+  background: #F7F7F7 !important;
+  color: #0C120C !important;
+  border-color: #FA9A02 !important;
+}
+
+/* Logout Buttons */
+.student-logout,
+.role-logout,
+.navbar-logout {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  font-weight: 700 !important;
+}
+
+.student-logout:hover,
+.role-logout:hover,
+.navbar-logout:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #FA9A02 !important;
+  border-color: #FA9A02 !important;
+}
+
+/* Close/Cancel Buttons */
+.mobile-close-button,
+.navbar-close {
+  background: transparent !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(183, 183, 183, 0.45) !important;
+  font-size: 24px !important;
+}
+
+.mobile-close-button:hover,
+.navbar-close:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #FA9A02 !important;
+  border-color: #FA9A02 !important;
+}
+
+/* Loading State */
+button:where([disabled]) {
+  cursor: not-allowed !important;
+}
+
+.button-loader {
+  color: #FFFFFF !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  border-top-color: #FA9A02 !important;
+}
+
+/* Focus State for Accessibility */
+button:focus-visible,
+.button:focus-visible {
+  outline: 3px solid rgba(250, 154, 2, 0.4) !important;
+  outline-offset: 2px !important;
+}
+
+/* Active/Pressed State */
+button:active:not(:disabled),
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* Ensure Text Never Disappears */
+button *,
+.button * {
+  color: inherit !important;
+  font-weight: inherit !important;
+}
+
+/* Fix for any remaining visibility issues */
+button,
+.button,
+a[role="button"] {
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 600px) {
+  button,
+  .button,
+  .gold-btn,
+  .action-complete,
+  .action-progress {
+    min-height: 44px;
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+}

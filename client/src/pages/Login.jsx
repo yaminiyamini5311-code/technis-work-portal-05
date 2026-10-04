@@ -7,17 +7,11 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function Login() {
   const navigate = useNavigate();
-  const [splash, setSplash] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setSplash(false), 1200);
-    return () => clearTimeout(timer);
-  }, []);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -50,19 +44,6 @@ export default function Login() {
       setLoading(false);
     }
   };
-
-  if (splash) {
-    return (
-      <div className="techins-splash" aria-label="TECHINS loading">
-        <div className="splash-glow" />
-        <div className="splash-core">
-          <img src="/techins-logo-full.jpg" alt="TECHINS — Where Learning Becomes Ideas" />
-          <span className="splash-line" />
-          <p>WORK PORTAL</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <main className="login-page">

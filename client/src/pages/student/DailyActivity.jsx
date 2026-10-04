@@ -45,7 +45,7 @@ function DailyActivity() {
             }
 
             const response = await axios.get(
-                `${API_URL}/api/activity/me`,
+                `${API_URL}/api/activities/me`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`
@@ -133,7 +133,7 @@ function DailyActivity() {
             }
 
             await axios.post(
-                `${API_URL}/api/activity`,
+                `${API_URL}/api/activities`,
                 {
                     work_title: form.work_title.trim(),
                     description: form.description.trim(),

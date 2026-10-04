@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import LoadingPage from "./components/LoadingPage";
 import Login from "./pages/Login";
 import StudentLayout from "./components/StudentLayout";
 import RoleLayout from "./components/RoleLayout";
@@ -32,9 +33,10 @@ function Protected({ role, children }) {
 }
 
 export default function App() {
-  return <BrowserRouter><Routes>
-    <Route path="/" element={<Navigate to="/login" replace />} />
-    <Route path="/login" element={<Login />} />
+  return (
+    <BrowserRouter><Routes>
+      <Route path="/" element={<LoadingPage redirectTo="/login" duration={5000} />} />
+      <Route path="/login" element={<Login />} />
 
     <Route element={<Protected role="student"><StudentLayout /></Protected>}>
       <Route path="/student" element={<StudentDashboard />} />
@@ -62,6 +64,7 @@ export default function App() {
       <Route path="/admin/audit" element={<AuditLogs />} />
     </Route>
 
-    <Route path="*" element={<Navigate to="/login" replace />} />
-  </Routes></BrowserRouter>;
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes></BrowserRouter>
+  );
 }

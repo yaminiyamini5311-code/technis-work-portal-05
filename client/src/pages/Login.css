@@ -3,55 +3,6 @@
    Brand: #B7B7B7 / #0C120C / #FA9A02
 ========================================================= */
 
-.techins-splash{
-  position:fixed;
-  inset:0;
-  background:#0C120C;
-  display:grid;
-  place-items:center;
-  overflow:hidden;
-  z-index:100;
-}
-.splash-glow{
-  position:absolute;
-  width:520px;
-  height:520px;
-  border-radius:50%;
-  background:radial-gradient(circle,rgba(250,154,2,.12),transparent 65%);
-}
-.splash-core{
-  position:relative;
-  z-index:2;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  text-align:center;
-  animation:splash-in .7s ease both;
-}
-.splash-core img{
-  width:min(360px,72vw);
-  height:auto;
-  aspect-ratio:1;
-  object-fit:contain;
-  border-radius:24px;
-  background:#fff;
-  box-shadow:0 30px 80px rgba(0,0,0,.35);
-}
-.splash-line{
-  display:block;
-  width:64px;
-  height:2px;
-  background:#FA9A02;
-  margin:22px auto 12px;
-}
-.splash-core p{
-  margin:0;
-  color:#B7B7B7;
-  font-size:11px;
-  font-weight:700;
-  letter-spacing:3px;
-}
-
 .login-page{
   min-height:100vh;
   min-height:100svh;
@@ -143,6 +94,7 @@
   line-height:1.02;
   letter-spacing:-2.8px;
   font-weight:800;
+  color:#fff;
 }
 .hero-copy h1 em{
   color:#FA9A02;
@@ -358,7 +310,6 @@
   .login-card{padding:26px 17px 22px}
   .login-heading h2{font-size:27px}
 }
-@keyframes splash-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
 @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){

@@ -1,0 +1,195 @@
+/* =========================================================
+   TECHINS WORK PORTAL — 3D Hover Effects for Text Boxes
+   Hover: Shift right | Leave: Restore position
+   ========================================================= */
+
+/* Apply 3D effects to card-like elements */
+.task-card,
+.workspace-card,
+.summary-card,
+.admin-stat,
+.mission-card,
+.panel,
+.student-profile-card,
+.activity-card,
+.feedback-item,
+.notification-item,
+.list-row,
+.overall-progress,
+.login-card {
+  transform-style: preserve-3d;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.4s ease;
+  will-change: transform;
+  position: relative;
+}
+
+/* Hover Effect: Shift to the right with 3D perspective */
+.task-card:hover,
+.workspace-card:hover,
+.summary-card:hover,
+.admin-stat:hover,
+.mission-card:hover,
+.panel:hover,
+.student-profile-card:hover,
+.activity-card:hover,
+.feedback-item:hover,
+.list-row:hover,
+.overall-progress:hover {
+  transform: translateX(12px) translateZ(20px) rotateY(-2deg);
+  box-shadow: -8px 12px 40px rgba(12, 18, 12, 0.15),
+              -4px 6px 20px rgba(250, 154, 2, 0.1);
+  border-color: rgba(250, 154, 2, 0.3);
+}
+
+[data-theme="dark"] .task-card:hover,
+[data-theme="dark"] .workspace-card:hover,
+[data-theme="dark"] .summary-card:hover,
+[data-theme="dark"] .admin-stat:hover,
+[data-theme="dark"] .mission-card:hover,
+[data-theme="dark"] .panel:hover,
+[data-theme="dark"] .student-profile-card:hover {
+  box-shadow: -12px 16px 50px rgba(0, 0, 0, 0.6),
+              -6px 8px 25px rgba(250, 154, 2, 0.2);
+}
+
+/* Notification items: lighter shift */
+.notification-item:hover {
+  transform: translateX(8px) translateZ(15px);
+  box-shadow: -4px 8px 20px rgba(12, 18, 12, 0.1);
+}
+
+/* Login Card: Subtle effect */
+.login-card:hover {
+  transform: translateY(-4px) translateZ(10px);
+  box-shadow: 0 20px 60px rgba(12, 18, 12, 0.18);
+}
+
+/* Ensure text remains readable during transform */
+.task-card *,
+.workspace-card *,
+.summary-card *,
+.admin-stat *,
+.mission-card *,
+.panel *,
+.student-profile-card * {
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+}
+
+/* Inner content subtle depth */
+.task-card:hover .task-index,
+.task-card:hover .task-icon,
+.workspace-card:hover .workspace-icon,
+.summary-card:hover .summary-icon,
+.admin-stat:hover .section-icon {
+  transform: translateZ(10px);
+}
+
+.task-card:hover h2,
+.task-card:hover h3,
+.workspace-card:hover h3,
+.panel:hover h3 {
+  transform: translateZ(5px);
+}
+
+/* Smooth return to original position */
+.task-card:not(:hover),
+.workspace-card:not(:hover),
+.summary-card:not(:hover),
+.admin-stat:not(:hover),
+.mission-card:not(:hover),
+.panel:not(:hover),
+.student-profile-card:not(:hover),
+.activity-card:not(:hover),
+.feedback-item:not(:hover),
+.notification-item:not(:hover),
+.list-row:not(:hover),
+.overall-progress:not(:hover),
+.login-card:not(:hover) {
+  transform: translateX(0) translateY(0) translateZ(0) rotateY(0deg);
+  box-shadow: var(--shadow-md);
+}
+
+/* Active/Click state: subtle press down */
+.task-card:active,
+.workspace-card:active,
+.summary-card:active,
+.admin-stat:active,
+.panel:active {
+  transform: translateX(12px) translateZ(5px) rotateY(-2deg) scale(0.98);
+  transition: transform 0.1s ease;
+}
+
+/* Ensure smooth transitions for all child elements */
+.task-card > *,
+.workspace-card > *,
+.summary-card > *,
+.admin-stat > *,
+.mission-card > *,
+.panel > * {
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Mobile: Reduce 3D effects for better performance */
+@media (max-width: 768px) {
+  .task-card:hover,
+  .workspace-card:hover,
+  .summary-card:hover,
+  .admin-stat:hover,
+  .mission-card:hover,
+  .panel:hover {
+    transform: translateX(8px) translateZ(10px) rotateY(-1deg);
+  }
+}
+
+/* Touch devices: Simplify effects */
+@media (hover: none) and (pointer: coarse) {
+  .task-card:hover,
+  .workspace-card:hover,
+  .summary-card:hover,
+  .admin-stat:hover,
+  .mission-card:hover,
+  .panel:hover,
+  .student-profile-card:hover {
+    transform: translateX(4px);
+    box-shadow: -4px 8px 24px rgba(12, 18, 12, 0.1);
+  }
+}
+
+/* Reduced motion: Disable 3D effects */
+@media (prefers-reduced-motion: reduce) {
+  .task-card:hover,
+  .workspace-card:hover,
+  .summary-card:hover,
+  .admin-stat:hover,
+  .mission-card:hover,
+  .panel:hover,
+  .student-profile-card:hover,
+  .activity-card:hover,
+  .feedback-item:hover,
+  .notification-item:hover,
+  .list-row:hover,
+  .overall-progress:hover,
+  .login-card:hover {
+    transform: none !important;
+  }
+  
+  .task-card > *,
+  .workspace-card > *,
+  .summary-card > *,
+  .admin-stat > *,
+  .mission-card > *,
+  .panel > * {
+    transform: none !important;
+  }
+}
+
+/* Perspective container for pages */
+.student-content,
+.role-content,
+.my-tasks-page,
+.admin-simple {
+  perspective: 1000px;
+  perspective-origin: center center;
+}

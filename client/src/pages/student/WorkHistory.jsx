@@ -44,7 +44,7 @@ function WorkHistory() {
              */
             requests.push(
                 axios.get(
-                    `${API_URL}/api/activity/my`,
+                    `${API_URL}/api/activities/my`,
                     authConfig
                 ).catch(() => ({ data: [] }))
             );

@@ -37,6 +37,10 @@ let missionRoutes;
 let activityRoutes;
 let performanceRoutes;
 let adminRoutes;
+let studentRoutes;
+let notificationRoutes;
+let auditRoutes;
+let studentsRoutes;
 
 try {
   taskRoutes = require("./routes/taskRoutes");
@@ -66,6 +70,30 @@ try {
   adminRoutes = require("./routes/adminRoutes");
 } catch (error) {
   console.log("adminRoutes not loaded:", error.message);
+}
+
+try {
+  studentRoutes = require("./routes/studentRoutes");
+} catch (error) {
+  console.log("studentRoutes not loaded:", error.message);
+}
+
+try {
+  notificationRoutes = require("./routes/notificationRoutes");
+} catch (error) {
+  console.log("notificationRoutes not loaded:", error.message);
+}
+
+try {
+  auditRoutes = require("./routes/auditRoutes");
+} catch (error) {
+  console.log("auditRoutes not loaded:", error.message);
+}
+
+try {
+  studentsRoutes = require("./routes/studentsRoutes");
+} catch (error) {
+  console.log("studentsRoutes not loaded:", error.message);
 }
 
 /* =========================================================
@@ -460,6 +488,39 @@ app.use(
 );
 
 /* =========================================================
+   STUDENT ROUTES
+   ========================================================= */
+
+if (studentRoutes) {
+  app.use(
+    "/api/student",
+    studentRoutes
+  );
+}
+
+/* =========================================================
+   STUDENTS ROUTES (LIST)
+   ========================================================= */
+
+if (studentsRoutes) {
+  app.use(
+    "/api/students",
+    studentsRoutes
+  );
+}
+
+/* =========================================================
+   NOTIFICATION ROUTES
+   ========================================================= */
+
+if (notificationRoutes) {
+  app.use(
+    "/api/notifications",
+    notificationRoutes
+  );
+}
+
+/* =========================================================
    TASK ROUTES
    ========================================================= */
 
@@ -511,6 +572,17 @@ if (adminRoutes) {
   app.use(
     "/api/admin",
     adminRoutes
+  );
+}
+
+/* =========================================================
+   AUDIT ROUTES
+   ========================================================= */
+
+if (auditRoutes) {
+  app.use(
+    "/api/audit-logs",
+    auditRoutes
   );
 }
 
