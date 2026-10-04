@@ -1,4 +1,3 @@
-
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -13,11 +12,20 @@ const router = express.Router();
 
 /* =========================================================
    LOGIN
-   ========================================================= */
-
+   POST /api/auth/login
+========================================================= */
 router.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body || {};
+    const email = String(req.body?.email || "")
+      .trim()
+      .toLowerCase();
+
+    const password = String(req.body?.password || "");
+
+    console.log("LOGIN REQUEST:", {
+      email,
+      passwordReceived: Boolean(password),
+    });
 
     if (!email || !password) {
       return res.status(400).json({
@@ -28,9 +36,14 @@ router.post("/login", async (req, res) => {
 
     const db = req.app.locals.db;
 
-    const cleanEmail = String(email)
-      .trim()
-      .toLowerCase();
+    if (!db) {
+      console.error("LOGIN ERROR: Database unavailable");
+
+      return res.status(500).json({
+        success: false,
+        message: "Database connection unavailable",
+      });
+    }
 
     const user = db
       .prepare(`
@@ -40,28 +53,74 @@ router.post("/login", async (req, res) => {
           email,
           password,
           role,
-          department
+          department,
+          active
         FROM users
-        WHERE LOWER(email) = ?
-          AND active = 1
+        WHERE LOWER(TRIM(email)) = ?
         LIMIT 1
       `)
-      .get(cleanEmail);
+      .get(email);
 
-    if (
-      !user ||
-      !(await bcrypt.compare(String(password), user.password))
-    ) {
+    console.log("LOGIN USER FOUND:", Boolean(user));
+
+    if (!user) {
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
       });
     }
 
+    console.log("LOGIN USER:", {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      active: user.active,
+      hashExists: Boolean(user.password),
+    });
+
+    if (Number(user.active) !== 1) {
+      return res.status(401).json({
+        success: false,
+        message: "Account is inactive",
+      });
+    }
+
+    if (!user.password) {
+      console.error(
+        "LOGIN ERROR: User has no password hash"
+      );
+
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    const passwordMatch = await bcrypt.compare(
+      password,
+      String(user.password)
+    );
+
+    console.log(
+      "LOGIN PASSWORD MATCH:",
+      passwordMatch
+    );
+
+    if (!passwordMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    const role = String(
+      user.role || ""
+    ).trim().toLowerCase();
+
     const token = jwt.sign(
       {
-        id: user.id,
-        role: user.role,
+        id: Number(user.id),
+        role,
       },
       getSecret(),
       {
@@ -69,7 +128,13 @@ router.post("/login", async (req, res) => {
       }
     );
 
-    return res.json({
+    console.log(
+      "LOGIN SUCCESS:",
+      email,
+      role
+    );
+
+    return res.status(200).json({
       success: true,
       message: "Login successful",
       token,
@@ -77,41 +142,55 @@ router.post("/login", async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role,
+        role,
         department: user.department,
       },
     });
   } catch (error) {
-    console.error("Login error:", error);
+    console.error("LOGIN ERROR:", error);
 
     return res.status(500).json({
       success: false,
       message: "Login failed",
+      error:
+        process.env.NODE_ENV === "production"
+          ? undefined
+          : error.message,
     });
   }
 });
 
-
 /* =========================================================
    REGISTER STUDENT
+   POST /api/auth/register
    ADMIN ONLY
-   ========================================================= */
-
+========================================================= */
 router.post(
   "/register",
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
     try {
-      const {
-        name,
-        email,
-        password,
-        role = "student",
-        department = "Techins",
-      } = req.body || {};
+      const name = String(req.body?.name || "").trim();
+      const email = String(req.body?.email || "")
+        .trim()
+        .toLowerCase();
+      const password = String(req.body?.password || "");
+      const department = String(
+        req.body?.department || "Techins"
+      ).trim();
 
-      const requestedRole = String(role)
+      if (!name || !email || !password) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Name, email and password are required",
+        });
+      }
+
+      const requestedRole = String(
+        req.body?.role || "student"
+      )
         .trim()
         .toLowerCase();
 
@@ -123,26 +202,26 @@ router.post(
         });
       }
 
-      if (!name || !email || !password) {
-        return res.status(400).json({
+      const db = req.app.locals.db;
+
+      if (!db) {
+        return res.status(500).json({
           success: false,
           message:
-            "Name, email and password are required",
+            "Database connection unavailable",
         });
       }
-
-      const db = req.app.locals.db;
 
       const studentCount = db
         .prepare(`
           SELECT COUNT(*) AS count
           FROM users
           WHERE LOWER(role) = 'student'
-            AND active = 1
+          AND active = 1
         `)
-        .get().count;
+        .get();
 
-      if (studentCount >= 25) {
+      if (Number(studentCount?.count || 0) >= 25) {
         return res.status(409).json({
           success: false,
           message:
@@ -150,18 +229,14 @@ router.post(
         });
       }
 
-      const cleanEmail = String(email)
-        .trim()
-        .toLowerCase();
-
       const existingUser = db
         .prepare(`
           SELECT id
           FROM users
-          WHERE LOWER(email) = ?
+          WHERE LOWER(TRIM(email)) = ?
           LIMIT 1
         `)
-        .get(cleanEmail);
+        .get(email);
 
       if (existingUser) {
         return res.status(409).json({
@@ -172,7 +247,7 @@ router.post(
       }
 
       const passwordHash = await bcrypt.hash(
-        String(password),
+        password,
         10
       );
 
@@ -190,39 +265,53 @@ router.post(
           VALUES (?, ?, ?, 'student', ?, 1)
         `)
         .run(
-          String(name).trim(),
-          cleanEmail,
+          name,
+          email,
           passwordHash,
-          String(department || "Techins").trim()
+          department || "Techins"
         );
 
       return res.status(201).json({
         success: true,
-        message: "Student created successfully",
-        userId: result.lastInsertRowid,
+        message:
+          "Student created successfully",
+        userId: Number(
+          result.lastInsertRowid
+        ),
       });
     } catch (error) {
-      console.error("Register error:", error);
+      console.error(
+        "REGISTER ERROR:",
+        error
+      );
 
       return res.status(500).json({
         success: false,
-        message: "Unable to create student",
+        message:
+          "Unable to create student",
       });
     }
   }
 );
 
-
 /* =========================================================
    CURRENT USER
-   ========================================================= */
-
+   GET /api/auth/me
+========================================================= */
 router.get(
   "/me",
   authenticateToken,
   (req, res) => {
     try {
       const db = req.app.locals.db;
+
+      if (!db) {
+        return res.status(500).json({
+          success: false,
+          message:
+            "Database connection unavailable",
+        });
+      }
 
       const user = db
         .prepare(`
@@ -231,42 +320,47 @@ router.get(
             name,
             email,
             role,
-            department
+            department,
+            active
           FROM users
           WHERE id = ?
-            AND active = 1
           LIMIT 1
         `)
-        .get(req.user.id);
+        .get(Number(req.user.id));
 
-      if (!user) {
+      if (
+        !user ||
+        Number(user.active) !== 1
+      ) {
         return res.status(404).json({
           success: false,
           message: "User not found",
         });
       }
 
-      return res.json({
+      return res.status(200).json({
         success: true,
-        user,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          department: user.department,
+        },
       });
     } catch (error) {
       console.error(
-        "Get current user error:",
+        "ME ERROR:",
         error
       );
 
       return res.status(500).json({
         success: false,
-        message: "Unable to get user",
+        message:
+          "Unable to fetch user",
       });
     }
   }
 );
-
-
-/* =========================================================
-   EXPORT
-   ========================================================= */
 
 module.exports = router;
