@@ -1,0 +1,366 @@
+/* =========================================================
+   TECHINS WORK PORTAL — Professional Login
+   Brand: #B7B7B7 / #0C120C / #FA9A02
+========================================================= */
+
+.techins-splash{
+  position:fixed;
+  inset:0;
+  background:#0C120C;
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+  z-index:100;
+}
+.splash-glow{
+  position:absolute;
+  width:520px;
+  height:520px;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(250,154,2,.12),transparent 65%);
+}
+.splash-core{
+  position:relative;
+  z-index:2;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  text-align:center;
+  animation:splash-in .7s ease both;
+}
+.splash-core img{
+  width:min(360px,72vw);
+  height:auto;
+  aspect-ratio:1;
+  object-fit:contain;
+  border-radius:24px;
+  background:#fff;
+  box-shadow:0 30px 80px rgba(0,0,0,.35);
+}
+.splash-line{
+  display:block;
+  width:64px;
+  height:2px;
+  background:#FA9A02;
+  margin:22px auto 12px;
+}
+.splash-core p{
+  margin:0;
+  color:#B7B7B7;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:3px;
+}
+
+.login-page{
+  min-height:100vh;
+  min-height:100svh;
+  background:#F4F5F7;
+  color:#0C120C;
+  overflow:hidden;
+}
+.login-hero{
+  position:relative;
+  min-height:500px;
+  display:flex;
+  align-items:center;
+  background:#07142F;
+  color:#fff;
+  overflow:hidden;
+}
+.login-hero::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:radial-gradient(circle at 90% 10%,rgba(250,154,2,.15),transparent 28%);
+  pointer-events:none;
+}
+.hero-grid{
+  position:absolute;
+  inset:0;
+  opacity:.18;
+  background-image:linear-gradient(rgba(255,255,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.08) 1px,transparent 1px);
+  background-size:72px 72px;
+}
+.hero-content{
+  position:relative;
+  z-index:2;
+  width:min(1120px,100%);
+  margin:0 auto;
+  padding:42px 32px 48px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  text-align:center;
+}
+.hero-brand{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:14px;
+  margin-bottom:48px;
+}
+.hero-brand img{
+  width:68px;
+  height:68px;
+  object-fit:contain;
+  background:#fff;
+  border-radius:15px;
+  padding:5px;
+}
+.hero-brand div{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+}
+.hero-brand strong{
+  font-size:24px;
+  line-height:1;
+  letter-spacing:3px;
+}
+.hero-brand span{
+  margin-top:7px;
+  color:#FA9A02;
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:3px;
+}
+.hero-copy{
+  max-width:820px;
+}
+.hero-eyebrow{
+  display:block;
+  margin-bottom:16px;
+  color:#FA9A02;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:3px;
+}
+.hero-copy h1{
+  margin:0;
+  font-family:"Plus Jakarta Sans",Inter,system-ui,sans-serif;
+  font-size:clamp(42px,6vw,72px);
+  line-height:1.02;
+  letter-spacing:-2.8px;
+  font-weight:800;
+}
+.hero-copy h1 em{
+  color:#FA9A02;
+  font-style:normal;
+}
+.hero-copy p{
+  max-width:720px;
+  margin:24px auto 0;
+  color:#D4DAE7;
+  font-size:17px;
+  line-height:1.75;
+}
+.hero-features{
+  display:flex;
+  justify-content:center;
+  flex-wrap:wrap;
+  gap:34px;
+  margin-top:40px;
+}
+.hero-features span{
+  color:#D7DCE6;
+  font-size:13px;
+}
+.hero-features b{
+  color:#FA9A02;
+  margin-right:9px;
+  font-size:11px;
+  letter-spacing:1px;
+}
+
+.login-section{
+  display:flex;
+  justify-content:center;
+  padding:38px 20px 60px;
+}
+.login-card{
+  width:min(560px,100%);
+  background:#fff;
+  border:1px solid #D9DDE3;
+  border-radius:24px;
+  padding:42px 42px 32px;
+  box-shadow:0 24px 65px rgba(12,18,12,.12);
+  animation:rise .55s ease both;
+}
+.login-brand{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:13px;
+  margin-bottom:30px;
+}
+.login-brand img{
+  width:58px;
+  height:58px;
+  object-fit:contain;
+  border-radius:13px;
+  background:#fff;
+  box-shadow:0 8px 22px rgba(12,18,12,.08);
+}
+.login-brand span{
+  color:#9A6500;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:2.5px;
+}
+.login-heading{
+  text-align:center;
+  margin-bottom:30px;
+}
+.login-heading h2{
+  margin:0;
+  color:#07142F;
+  font-family:"Plus Jakarta Sans",Inter,system-ui,sans-serif;
+  font-size:36px;
+  line-height:1.15;
+  letter-spacing:-1.2px;
+  font-weight:800;
+}
+.login-heading p{
+  margin:11px auto 0;
+  color:#68717D;
+  font-size:15px;
+  line-height:1.65;
+  max-width:420px;
+}
+.login-card form{
+  display:grid;
+  gap:9px;
+}
+.login-card label{
+  color:#18202A;
+  font-size:13px;
+  font-weight:700;
+  margin-top:6px;
+  text-align:left;
+}
+.login-card input{
+  width:100%;
+  min-height:54px;
+  border:1px solid #CDD3DB;
+  border-radius:11px;
+  padding:13px 15px;
+  background:#fff;
+  color:#0C120C;
+  outline:none;
+  font-size:14px;
+  transition:border-color .2s,box-shadow .2s;
+}
+.login-card input::placeholder{color:#8B929B}
+.login-card input:focus{
+  border-color:#FA9A02;
+  box-shadow:0 0 0 4px rgba(250,154,2,.12);
+}
+.password-field{position:relative}
+.password-field input{padding-right:76px}
+.password-field button{
+  position:absolute;
+  right:7px;
+  top:8px;
+  height:38px;
+  border:0;
+  background:#F1F3F5;
+  color:#27303A;
+  border-radius:8px;
+  padding:0 11px;
+  font-size:11px;
+  font-weight:800;
+}
+.password-field button:hover{background:#E4E7EA}
+.login-submit{
+  width:100%;
+  min-height:54px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  margin-top:13px;
+  border:1px solid #0C120C;
+  border-radius:11px;
+  background:#0C120C;
+  color:#fff;
+  padding:14px 16px;
+  font-size:14px;
+  font-weight:800;
+  transition:background .2s,transform .2s,box-shadow .2s;
+}
+.login-submit span{color:#FA9A02;font-size:19px}
+.login-submit:hover:not(:disabled){
+  background:#172117;
+  transform:translateY(-1px);
+  box-shadow:0 10px 22px rgba(12,18,12,.16);
+}
+.login-submit:disabled{opacity:.65}
+.button-loader{
+  width:18px;
+  height:18px;
+  border:2px solid rgba(255,255,255,.35);
+  border-top-color:#FA9A02;
+  border-radius:50%;
+  animation:spin .7s linear infinite;
+}
+.login-error{
+  padding:11px 12px;
+  margin-top:5px;
+  border-radius:9px;
+  background:#FFF7E8;
+  border:1px solid rgba(250,154,2,.45);
+  color:#624300;
+  font-size:12px;
+  text-align:center;
+}
+.login-footer-line{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:27px;
+}
+.login-footer-line span{height:1px;background:#E0E3E7;flex:1}
+.login-footer-line small{
+  color:#818892;
+  font-size:8px;
+  font-weight:700;
+  letter-spacing:1.3px;
+  white-space:nowrap;
+}
+
+@media(max-width:700px){
+  .login-hero{min-height:auto}
+  .hero-content{padding:30px 20px 38px}
+  .hero-brand{margin-bottom:34px}
+  .hero-brand img{width:58px;height:58px}
+  .hero-brand strong{font-size:20px}
+  .hero-copy h1{font-size:clamp(38px,12vw,54px);letter-spacing:-1.8px}
+  .hero-copy p{font-size:14px;line-height:1.65}
+  .hero-features{gap:15px 22px;margin-top:28px}
+  .hero-features span{font-size:11px}
+  .login-section{padding:20px 12px 36px}
+  .login-card{border-radius:18px;padding:30px 20px 24px}
+  .login-brand{margin-bottom:24px}
+  .login-heading{margin-bottom:24px}
+  .login-heading h2{font-size:29px}
+  .login-heading p{font-size:13px}
+}
+@media(max-width:390px){
+  .hero-brand{gap:10px}
+  .hero-brand img{width:52px;height:52px}
+  .hero-brand strong{font-size:18px;letter-spacing:2px}
+  .hero-brand span{font-size:8px}
+  .hero-eyebrow{font-size:9px;letter-spacing:2px}
+  .hero-copy h1{font-size:36px}
+  .hero-features{display:grid;grid-template-columns:1fr;gap:10px}
+  .hero-features span{font-size:12px}
+  .login-card{padding:26px 17px 22px}
+  .login-heading h2{font-size:27px}
+}
+@keyframes splash-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){
+  *,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}

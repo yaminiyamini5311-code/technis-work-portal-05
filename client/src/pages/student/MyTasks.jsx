@@ -1,0 +1,131 @@
+import { useEffect, useRef, useState } from "react";
+import axios from "axios";
+import "./MyTasks.css";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
+
+export default function MyTasks() {
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState({});
+  const [comments, setComments] = useState({});
+  const previousApproved = useRef(null);
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      const { data } = await axios.get(`${API_URL}/api/tasks/my`, { headers: auth() });
+      const next = data.tasks || [];
+      const approved = next.filter((task) => task.workflow_status === "Approved" || task.status === "completed").length;
+      previousApproved.current = approved;
+      setTasks(next);
+      setError("");
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to load your tasks.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 20000);
+    return () => clearInterval(id);
+  }, []);
+
+  const startTask = async (id) => {
+    try {
+      setBusy(id);
+      await axios.patch(`${API_URL}/api/tasks/${id}/status`, { workflow_status: "In Progress" }, { headers: auth() });
+      setMessage("Task started.");
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to start task.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const submitTask = async (task) => {
+    const files = selectedFiles[task.id] || [];
+    const comment = String(comments[task.id] || "").trim();
+    if (!files.length && !comment) {
+      setError("Add at least one file or a submission comment before submitting.");
+      return;
+    }
+    try {
+      setBusy(task.id);
+      const form = new FormData();
+      files.forEach((file) => form.append("files", file));
+      if (comment) form.append("comment", comment);
+      await axios.post(`${API_URL}/api/tasks/${task.id}/submit`, form, { headers: auth() });
+      setSelectedFiles((value) => ({ ...value, [task.id]: [] }));
+      setComments((value) => ({ ...value, [task.id]: "" }));
+      setMessage("Submission recorded with a server timestamp.");
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to submit the task.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const completed = tasks.filter((t) => t.workflow_status === "Approved" || t.status === "completed").length;
+  const pending = tasks.filter((t) => ["Assigned", "Scheduled", "pending"].includes(t.workflow_status) || t.status === "pending").length;
+  const inProgress = tasks.filter((t) => ["In Progress", "Acknowledged", "Revision Required"].includes(t.workflow_status) || t.status === "in_progress").length;
+  const review = tasks.filter((t) => ["Submitted", "Under Review", "Resubmitted"].includes(t.workflow_status)).length;
+  const percent = tasks.length ? Math.round((completed / tasks.length) * 100) : 0;
+
+  if (loading && !tasks.length) return <div className="portal-loading"><div className="loader-dot" /><h2>Loading your tasks</h2><p>Syncing your latest assignments.</p></div>;
+
+  return (
+    <div className="my-tasks-page page-enter">
+      <div className="tasks-container">
+        <div className="page-header">
+          <div><p className="page-label">STUDENT WORKSPACE</p><h1>My Tasks</h1><p className="page-description">Execute assignments, submit proof and follow every review step.</p></div>
+          <button className="refresh-button" onClick={load} disabled={loading}>↻ Refresh</button>
+        </div>
+        {error && <div className="task-alert">{error}</div>}
+        {message && <div className="info-msg">{message}</div>}
+
+        <div className="task-summary">
+          {[["Total Tasks", tasks.length, "⌁"], ["Pending", pending, "◷"], ["In Progress", inProgress, "◒"], ["Under Review", review, "◌"], ["Approved", completed, "✓"]].map(([label, value, icon]) => (
+            <div className="summary-card" key={label}><div className="summary-icon">{icon}</div><div><span>{label}</span><strong>{value}</strong></div></div>
+          ))}
+        </div>
+
+        <div className="overall-progress"><div className="progress-heading"><div><h2>Verified Task Progress</h2><p>Only approved tasks count as completed.</p></div><strong>{percent}%</strong></div><div className="progress-track"><div className="progress-fill" style={{ width: `${percent}%` }} /></div></div>
+
+        <div className="tasks-list">
+          {tasks.length ? tasks.map((task) => {
+            const workflow = task.workflow_status || (task.status === "completed" ? "Approved" : task.status === "in_progress" ? "In Progress" : "Assigned");
+            const canSubmit = ["In Progress", "Revision Required", "Acknowledged", "Assigned"].includes(workflow);
+            return (
+              <article className={`task-card ${task.status}`} key={task.id}>
+                <div className="task-card-top"><div><span className="task-label">{task.task_code || "TASK"}</span><h2>{task.title}</h2><p>{task.description || "No description provided."}</p></div><span className={`status ${task.status}`}>{workflow}</span></div>
+                <div className="task-meta-grid"><div><span>Priority</span><strong className={`priority ${task.priority}`}>{task.priority || "medium"}</strong></div><div><span>Due date</span><strong>{task.due_date || "No deadline"}</strong></div><div><span>Assigned by</span><strong>{task.assigned_by_name || "Management"}</strong></div><div><span>Versions</span><strong>{task.latest_version || 0}</strong></div></div>
+                <div className="task-actions">
+                  {(workflow === "Assigned" || task.status === "pending") && <button className="action-progress" disabled={busy === task.id} onClick={() => startTask(task.id)}>{busy === task.id ? "Updating…" : "Start Task"}</button>}
+                  {workflow === "Under Review" || workflow === "Submitted" || workflow === "Resubmitted" ? <div className="completed-label">Submission received · awaiting review</div> : null}
+                  {workflow === "Approved" && <div className="completed-label">✓ Task approved and recorded</div>}
+                </div>
+                {task.workflow_status === "Revision Required" && <div className="feedback-box"><strong>Revision requested</strong><p>{task.feedback || "Review the manager feedback and submit a new version."}</p></div>}
+                {canSubmit && <div className="upload-box">
+                  <div><strong>{workflow === "Revision Required" ? "Submit revised work" : "Submit task work"}</strong><small>PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, ZIP, PNG, JPG · max 10 MB each</small></div>
+                  <textarea value={comments[task.id] || ""} onChange={(e) => setComments((value) => ({ ...value, [task.id]: e.target.value }))} placeholder="Submission comment / outcome (optional if files are selected)" />
+                  <label className="upload-button">{selectedFiles[task.id]?.length ? `${selectedFiles[task.id].length} file(s) selected` : "Choose files"}<input type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.png,.jpg,.jpeg" onChange={(e) => setSelectedFiles((value) => ({ ...value, [task.id]: Array.from(e.target.files || []) }))} /></label>
+                  <button className="gold-btn" disabled={busy === task.id} onClick={() => submitTask(task)}>{busy === task.id ? "Submitting…" : "Submit for Review"}</button>
+                </div>}
+                {task.feedback && workflow !== "Revision Required" && <div className="feedback-box"><strong>Feedback</strong><p>{task.feedback}</p></div>}
+              </article>
+            );
+          }) : <div className="empty-state">No tasks assigned yet.</div>}
+        </div>
+      </div>
+    </div>
+  );
+}

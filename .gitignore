@@ -1,0 +1,15 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+dist/
+client/dist/
+server/uploads/
+server/*.db
+server/*.db-wal
+server/*.db-shm
+.DS_Store
+.vscode/
+coverage/

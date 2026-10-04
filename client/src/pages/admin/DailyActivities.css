@@ -1,0 +1,168 @@
+/* =========================================
+   DAILY ACTIVITIES - ADMIN
+   ========================================= */
+
+.daily-activities-page {
+  min-height: 100vh;
+  padding: 32px;
+  background: #F3F3F3;
+  color: #1e293b;
+}
+
+/* =========================================
+   PAGE HEADER
+   ========================================= */
+
+.daily-activities-page h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.4px;
+}
+
+.daily-activities-page > p {
+  margin: 8px 0 0;
+  font-size: 15px;
+  color: #5F625F;
+}
+
+/* =========================================
+   ACTIVITIES CONTAINER
+   ========================================= */
+
+.activities-container {
+  margin-top: 28px;
+  padding: 24px;
+  background: #FFFFFFFFF;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+}
+
+/* =========================================
+   ACTIVITY ITEM
+   ========================================= */
+
+.activity-item {
+  position: relative;
+  padding: 20px;
+  margin-bottom: 16px;
+  background: #FFFFFFFFF;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.activity-item:last-child {
+  margin-bottom: 0;
+}
+
+.activity-item:hover {
+  transform: translateY(-2px);
+  border-color: #B7B7B7;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+/* =========================================
+   ACTIVITY TITLE
+   ========================================= */
+
+.activity-item h3 {
+  margin: 0 0 10px;
+  font-size: 17px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+/* =========================================
+   ACTIVITY DETAILS
+   ========================================= */
+
+.activity-item p {
+  margin: 6px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #5F625F;
+}
+
+.activity-item p strong {
+  color: #334155;
+  font-weight: 600;
+}
+
+/* =========================================
+   LOADING STATE
+   ========================================= */
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  padding: 30px;
+  font-size: 15px;
+  color: #5F625F;
+}
+
+/* =========================================
+   EMPTY STATE
+   ========================================= */
+
+.empty-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  padding: 30px;
+  text-align: center;
+  font-size: 15px;
+  color: #5F625F;
+  background: #F3F3F3;
+  border: 1px dashed #B7B7B7;
+  border-radius: 12px;
+}
+
+/* =========================================
+   RESPONSIVE DESIGN
+   ========================================= */
+
+@media (max-width: 768px) {
+  .daily-activities-page {
+    padding: 20px;
+  }
+
+  .daily-activities-page h1 {
+    font-size: 24px;
+  }
+
+  .activities-container {
+    padding: 18px;
+    margin-top: 20px;
+  }
+
+  .activity-item {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .daily-activities-page {
+    padding: 16px;
+  }
+
+  .daily-activities-page h1 {
+    font-size: 22px;
+  }
+
+  .daily-activities-page > p {
+    font-size: 14px;
+  }
+
+  .activities-container {
+    padding: 14px;
+  }
+}

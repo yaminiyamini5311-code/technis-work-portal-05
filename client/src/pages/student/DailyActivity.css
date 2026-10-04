@@ -1,0 +1,352 @@
+.daily-activity-page {
+    min-height: 100vh;
+    padding: 32px;
+    background: #F3F3F3;
+    color: #182018;
+}
+
+.daily-activity-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 28px;
+}
+
+.page-label {
+    margin: 0 0 6px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 1.4px;
+    color: #0C120C;
+}
+
+.daily-activity-header h1 {
+    margin: 0;
+    font-size: 32px;
+    font-weight: 800;
+}
+
+.page-description {
+    margin: 8px 0 0;
+    color: #5F625F;
+    font-size: 15px;
+}
+
+.student-badge {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: white;
+    border: 1px solid #D9D9D9;
+    border-radius: 14px;
+    box-shadow: 0 4px 15px rgba(20, 30, 60, 0.05);
+}
+
+.student-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0C120C;
+    color: white;
+    font-weight: 800;
+}
+
+.student-badge strong {
+    display: block;
+    font-size: 14px;
+}
+
+.student-badge span {
+    display: block;
+    margin-top: 3px;
+    font-size: 12px;
+    color: #5F625F;
+}
+
+.daily-activity-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+}
+
+.activity-form-card,
+.activity-history-card {
+    background: white;
+    border: 1px solid #D9D9D9;
+    border-radius: 18px;
+    padding: 24px;
+    box-shadow: 0 6px 24px rgba(20, 30, 60, 0.06);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.card-header h2 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.card-header p {
+    margin: 6px 0 0;
+    color: #5F625F;
+    font-size: 13px;
+}
+
+.today-badge,
+.activity-count {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: #EEEEEE;
+    color: #0C120C;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.activity-count {
+    min-width: 34px;
+    text-align: center;
+}
+
+.form-group {
+    margin-bottom: 18px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #303430;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 14px;
+    border: 1px solid #d9dee8;
+    border-radius: 10px;
+    outline: none;
+    background: #FFFFFFFFF;
+    color: #182018;
+    font-family: inherit;
+    font-size: 14px;
+    transition: 0.2s;
+}
+
+.form-group textarea {
+    resize: vertical;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    border-color: #0C120C;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.submit-activity-btn {
+    width: 100%;
+    border: 0;
+    border-radius: 11px;
+    padding: 13px 18px;
+    background: #0C120C;
+    color: white;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.submit-activity-btn:hover {
+    background: #0C120C;
+}
+
+.submit-activity-btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.activity-message {
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.activity-message.error {
+    background: #fef2f2;
+    color: #0C120C;
+    border: 1px solid #fecaca;
+}
+
+.activity-message.success {
+    background: #EEEEEE;
+    color: #0C120C;
+    border: 1px solid #D9D9D9;
+}
+
+.activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-height: 600px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.activity-item {
+    padding: 17px;
+    border: 1px solid #E6E6E6;
+    border-radius: 14px;
+    background: #fbfcfe;
+}
+
+.activity-item-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+}
+
+.activity-item h3 {
+    margin: 0;
+    font-size: 15px;
+}
+
+.activity-date {
+    display: block;
+    margin-top: 5px;
+    color: #777777;
+    font-size: 11px;
+}
+
+.activity-description {
+    margin: 13px 0;
+    color: #454945;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.activity-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    color: #5F625F;
+    font-size: 11px;
+}
+
+.status-badge {
+    height: fit-content;
+    padding: 5px 8px;
+    border-radius: 7px;
+    font-size: 9px;
+    font-weight: 800;
+}
+
+.status-badge.completed {
+    background: #EAEAEA;
+    color: #0C120C;
+}
+
+.status-badge.in_progress {
+    background: #F2F2F2;
+    color: #92400e;
+}
+
+.status-badge.blocked {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.activity-empty {
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #5F625F;
+}
+
+.empty-icon {
+    font-size: 38px;
+    margin-bottom: 12px;
+}
+
+.activity-empty h3 {
+    margin: 0;
+    color: #303430;
+}
+
+.activity-empty p {
+    max-width: 300px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.loader {
+    width: 30px;
+    height: 30px;
+    margin-bottom: 14px;
+    border: 3px solid #D9D9D9;
+    border-top-color: #0C120C;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (max-width: 900px) {
+    .daily-activity-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .daily-activity-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .student-badge {
+        width: 100%;
+        box-sizing: border-box;
+    }
+}
+
+@media (max-width: 600px) {
+    .daily-activity-page {
+        padding: 18px;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .daily-activity-header h1 {
+        font-size: 26px;
+    }
+}
