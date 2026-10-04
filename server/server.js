@@ -12,6 +12,7 @@ if (!process.env.JWT_SECRET) {
 }
 
 const db = require("./database");
+const bcrypt = require("bcryptjs");
 
 const authRoutes = require("./routes/authRoutes");
 const taskRoutes = require("./routes/taskRoutes");
@@ -30,18 +31,118 @@ const app = express();
 const PORT = Number(process.env.PORT) || 5000;
 
 /* =========================================================
+   AUTOMATIC ADMIN SETUP
+   ========================================================= */
+
+function ensureAdminAccount() {
+  try {
+    const adminEmail = String(
+      process.env.ADMIN_EMAIL || "admin@techins.com"
+    )
+      .trim()
+      .toLowerCase();
+
+    const adminPassword = String(
+      process.env.ADMIN_PASSWORD || "Admin@123"
+    );
+
+    const adminName = String(
+      process.env.ADMIN_NAME || "TECHINS Admin"
+    ).trim();
+
+    const adminDepartment = String(
+      process.env.ADMIN_DEPARTMENT || "Administration"
+    ).trim();
+
+    if (!adminEmail || !adminPassword) {
+      console.error("Admin email or password is missing.");
+      return;
+    }
+
+    const existingAdmin = db
+      .prepare(
+        `
+        SELECT id
+        FROM users
+        WHERE LOWER(email)=?
+        LIMIT 1
+        `
+      )
+      .get(adminEmail);
+
+    const hashedPassword = bcrypt.hashSync(
+      adminPassword,
+      10
+    );
+
+    if (existingAdmin) {
+      db.prepare(
+        `
+        UPDATE users
+        SET
+          name=?,
+          password=?,
+          role='admin',
+          department=?,
+          active=1
+        WHERE id=?
+        `
+      ).run(
+        adminName,
+        hashedPassword,
+        adminDepartment,
+        existingAdmin.id
+      );
+
+      console.log(
+        `Admin account updated: ${adminEmail}`
+      );
+    } else {
+      db.prepare(
+        `
+        INSERT INTO users
+        (
+          name,
+          email,
+          password,
+          role,
+          department,
+          active
+        )
+        VALUES (?,?,?,?,?,1)
+        `
+      ).run(
+        adminName,
+        adminEmail,
+        hashedPassword,
+        "admin",
+        adminDepartment
+      );
+
+      console.log(
+        `Admin account created: ${adminEmail}`
+      );
+    }
+  } catch (error) {
+    console.error(
+      "Automatic admin setup failed:",
+      error
+    );
+  }
+}
+
+ensureAdminAccount();
+
+/* =========================================================
    CORS CONFIGURATION
-========================================================= */
+   ========================================================= */
 
 const configuredOrigins = [
-  // Local development
   "http://localhost:5173",
   "http://localhost:5174",
 
-  // Production Vercel application
   "https://technis-work-portal-05.vercel.app",
 
-  // Optional environment-based frontend URLs
   ...(process.env.CLIENT_URL
     ? process.env.CLIENT_URL
         .split(",")
@@ -60,8 +161,6 @@ console.log(configuredOrigins);
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no Origin header
-      // Example: Postman, server-to-server requests
       if (!origin) {
         return callback(null, true);
       }
@@ -73,7 +172,9 @@ app.use(
       console.log("Blocked CORS origin:", origin);
 
       return callback(
-        new Error(`CORS blocked origin: ${origin}`)
+        new Error(
+          `CORS blocked origin: ${origin}`
+        )
       );
     },
 
@@ -99,9 +200,13 @@ app.use(
 
 /* =========================================================
    MIDDLEWARE
-========================================================= */
+   ========================================================= */
 
-app.use(express.json({ limit: "1mb" }));
+app.use(
+  express.json({
+    limit: "1mb",
+  })
+);
 
 app.use(
   express.urlencoded({
@@ -113,12 +218,13 @@ app.locals.db = db;
 
 /* =========================================================
    ROOT / HEALTH
-========================================================= */
+   ========================================================= */
 
 app.get("/", (req, res) => {
   res.json({
     success: true,
-    message: "TECHINS Work Portal API is running",
+    message:
+      "TECHINS Work Portal API is running",
     timestamp: new Date().toISOString(),
   });
 });
@@ -133,7 +239,7 @@ app.get("/api/health", (req, res) => {
 
 /* =========================================================
    NOTIFICATIONS
-========================================================= */
+   ========================================================= */
 
 app.get(
   "/api/notifications",
@@ -161,7 +267,9 @@ app.get(
     res.json({
       success: true,
       notifications: rows,
-      unread: rows.filter((item) => !item.read_at).length,
+      unread: rows.filter(
+        (item) => !item.read_at
+      ).length,
     });
   }
 );
@@ -192,14 +300,18 @@ app.patch(
 
 /* =========================================================
    ADMIN PROGRESS
-========================================================= */
+   ========================================================= */
 
 app.get(
   "/api/admin/progress",
   authenticateToken,
   authorizeRoles("admin"),
   (req, res) => {
-    const period = ["week", "month", "year"].includes(
+    const period = [
+      "week",
+      "month",
+      "year",
+    ].includes(
       String(req.query.period).toLowerCase()
     )
       ? String(req.query.period).toLowerCase()
@@ -221,9 +333,12 @@ app.get(
       for (let i = 11; i >= 0; i--) {
         const d = new Date();
 
-        d.setMonth(d.getMonth() - i);
+        d.setMonth(
+          d.getMonth() - i
+        );
 
-        const label = d.toISOString().slice(0, 7);
+        const label =
+          d.toISOString().slice(0, 7);
 
         labels.push(label);
 
@@ -248,9 +363,12 @@ app.get(
       for (let i = days - 1; i >= 0; i--) {
         const d = new Date();
 
-        d.setDate(d.getDate() - i);
+        d.setDate(
+          d.getDate() - i
+        );
 
-        const label = d.toISOString().slice(0, 10);
+        const label =
+          d.toISOString().slice(0, 10);
 
         labels.push(label);
 
@@ -284,7 +402,7 @@ app.get(
 
 /* =========================================================
    AUDIT LOGS
-========================================================= */
+   ========================================================= */
 
 app.get(
   "/api/audit-logs",
@@ -316,25 +434,46 @@ app.get(
 
 /* =========================================================
    API ROUTES
-========================================================= */
+   ========================================================= */
 
-app.use("/api/auth", authRoutes);
+app.use(
+  "/api/auth",
+  authRoutes
+);
 
-app.use("/api/tasks", taskRoutes);
+app.use(
+  "/api/tasks",
+  taskRoutes
+);
 
-app.use("/api/missions", missionRoutes);
+app.use(
+  "/api/missions",
+  missionRoutes
+);
 
-app.use("/api/activity", activityRoutes);
+app.use(
+  "/api/activity",
+  activityRoutes
+);
 
-app.use("/api/activities", activityRoutes);
+app.use(
+  "/api/activities",
+  activityRoutes
+);
 
-app.use("/api/performance", performanceRoutes);
+app.use(
+  "/api/performance",
+  performanceRoutes
+);
 
-app.use("/api/student", studentRoutes);
+app.use(
+  "/api/student",
+  studentRoutes
+);
 
 /* =========================================================
    STUDENTS
-========================================================= */
+   ========================================================= */
 
 app.get(
   "/api/students",
@@ -410,8 +549,6 @@ app.post(
   authorizeRoles("admin"),
   async (req, res) => {
     try {
-      const bcrypt = require("bcryptjs");
-
       const {
         name,
         email,
@@ -419,7 +556,11 @@ app.post(
         department,
       } = req.body || {};
 
-      if (!name || !email || !password) {
+      if (
+        !name ||
+        !email ||
+        !password
+      ) {
         return res.status(400).json({
           success: false,
           message:
@@ -446,9 +587,10 @@ app.post(
         });
       }
 
-      const cleanEmail = String(email)
-        .trim()
-        .toLowerCase();
+      const cleanEmail =
+        String(email)
+          .trim()
+          .toLowerCase();
 
       const existingUser = db
         .prepare(
@@ -464,10 +606,11 @@ app.post(
         });
       }
 
-      const hash = await bcrypt.hash(
-        String(password),
-        10
-      );
+      const hash =
+        await bcrypt.hash(
+          String(password),
+          10
+        );
 
       const inserted = db
         .prepare(
@@ -517,7 +660,7 @@ app.post(
 
 /* =========================================================
    MANAGER MANAGEMENT
-========================================================= */
+   ========================================================= */
 
 app.get(
   "/api/admin/managers",
@@ -554,8 +697,6 @@ app.post(
   authorizeRoles("admin"),
   async (req, res) => {
     try {
-      const bcrypt = require("bcryptjs");
-
       const {
         name,
         email,
@@ -575,9 +716,10 @@ app.post(
         });
       }
 
-      const cleanEmail = String(email)
-        .trim()
-        .toLowerCase();
+      const cleanEmail =
+        String(email)
+          .trim()
+          .toLowerCase();
 
       const existingUser = db
         .prepare(
@@ -593,10 +735,11 @@ app.post(
         });
       }
 
-      const hash = await bcrypt.hash(
-        String(password),
-        10
-      );
+      const hash =
+        await bcrypt.hash(
+          String(password),
+          10
+        );
 
       const result = db
         .prepare(
@@ -627,7 +770,9 @@ app.post(
         message:
           "Manager created successfully",
         userId:
-          Number(result.lastInsertRowid),
+          Number(
+            result.lastInsertRowid
+          ),
       });
     } catch (error) {
       console.error(
@@ -649,7 +794,8 @@ app.patch(
   authenticateToken,
   authorizeRoles("admin"),
   (req, res) => {
-    const id = Number(req.params.id);
+    const id =
+      Number(req.params.id);
 
     if (!id) {
       return res.status(400).json({
@@ -679,7 +825,9 @@ app.patch(
       });
     }
 
-    if (target.id === req.user.id) {
+    if (
+      target.id === req.user.id
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -687,7 +835,8 @@ app.patch(
       });
     }
 
-    const active = target.active ? 0 : 1;
+    const active =
+      target.active ? 0 : 1;
 
     db.prepare(
       `
@@ -736,12 +885,15 @@ app.patch(
 
 /* =========================================================
    FEEDBACK
-========================================================= */
+   ========================================================= */
 
 app.get(
   "/api/feedback",
   authenticateToken,
-  authorizeRoles("student", "member"),
+  authorizeRoles(
+    "student",
+    "member"
+  ),
   (req, res) => {
     const rows = db
       .prepare(
@@ -843,10 +995,12 @@ app.get(
     res.json({
       success: true,
       feedback: [
-        ...performance.map((item) => ({
-          ...item,
-          type: "performance",
-        })),
+        ...performance.map(
+          (item) => ({
+            ...item,
+            type: "performance",
+          })
+        ),
 
         ...tasks.map((item) => ({
           ...item,
@@ -890,20 +1044,29 @@ app.post(
       });
     }
 
-    if (!String(feedback || "").trim()) {
+    if (
+      !String(feedback || "").trim()
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Feedback is required",
+        message:
+          "Feedback is required",
       });
     }
 
     let normalizedScore = null;
 
-    if (score !== "" && score != null) {
-      normalizedScore = Number(score);
+    if (
+      score !== "" &&
+      score != null
+    ) {
+      normalizedScore =
+        Number(score);
 
       if (
-        !Number.isInteger(normalizedScore) ||
+        !Number.isInteger(
+          normalizedScore
+        ) ||
         normalizedScore < 0 ||
         normalizedScore > 100
       ) {
@@ -915,19 +1078,22 @@ app.post(
       }
     }
 
-    const completedMissions = db
-      .prepare(
-        `
-        SELECT COUNT(*) AS c
-        FROM missions
-        WHERE assigned_to=?
-        AND (
-          LOWER(status)='completed'
-          OR progress>=100
+    const completedMissions =
+      db
+        .prepare(
+          `
+          SELECT COUNT(*) AS c
+          FROM missions
+          WHERE assigned_to=?
+          AND (
+            LOWER(status)='completed'
+            OR progress>=100
+          )
+          `
         )
-        `
-      )
-      .get(Number(user_id)).c;
+        .get(
+          Number(user_id)
+        ).c;
 
     const result = db
       .prepare(
@@ -948,15 +1114,21 @@ app.post(
       )
       .run(
         Number(user_id),
-        String(period || "general"),
+        String(
+          period || "general"
+        ),
         normalizedScore,
         JSON.stringify(
-          Array.isArray(strengths)
+          Array.isArray(
+            strengths
+          )
             ? strengths
             : []
         ),
         JSON.stringify(
-          Array.isArray(improvements)
+          Array.isArray(
+            improvements
+          )
             ? improvements
             : []
         ),
@@ -967,15 +1139,17 @@ app.post(
 
     res.status(201).json({
       success: true,
-      message: "Feedback saved",
-      id: result.lastInsertRowid,
+      message:
+        "Feedback saved",
+      id:
+        result.lastInsertRowid,
     });
   }
 );
 
 /* =========================================================
    ADMIN STATS
-========================================================= */
+   ========================================================= */
 
 app.get(
   "/api/admin/stats",
@@ -999,15 +1173,16 @@ app.get(
       )
       .get().c;
 
-    const completedTasks = db
-      .prepare(
-        `
-        SELECT COUNT(*) c
-        FROM tasks
-        WHERE LOWER(status)='completed'
-        `
-      )
-      .get().c;
+    const completedTasks =
+      db
+        .prepare(
+          `
+          SELECT COUNT(*) c
+          FROM tasks
+          WHERE LOWER(status)='completed'
+          `
+        )
+        .get().c;
 
     const missions = db
       .prepare(
@@ -1015,19 +1190,20 @@ app.get(
       )
       .get().c;
 
-    const activitiesToday = db
-      .prepare(
-        `
-        SELECT COUNT(*) c
-        FROM daily_activities
-        WHERE date=?
-        `
-      )
-      .get(
-        new Date()
-          .toISOString()
-          .slice(0, 10)
-      ).c;
+    const activitiesToday =
+      db
+        .prepare(
+          `
+          SELECT COUNT(*) c
+          FROM daily_activities
+          WHERE date=?
+          `
+        )
+        .get(
+          new Date()
+            .toISOString()
+            .slice(0, 10)
+        ).c;
 
     res.json({
       success: true,
@@ -1044,7 +1220,7 @@ app.get(
 
 /* =========================================================
    404 HANDLER
-========================================================= */
+   ========================================================= */
 
 app.use((req, res) => {
   res.status(404).json({
@@ -1056,7 +1232,7 @@ app.use((req, res) => {
 
 /* =========================================================
    ERROR HANDLER
-========================================================= */
+   ========================================================= */
 
 app.use(
   (error, req, res, next) => {
@@ -1065,7 +1241,6 @@ app.use(
       error
     );
 
-    // CORS error
     if (
       error &&
       error.message &&
@@ -1075,20 +1250,22 @@ app.use(
     ) {
       return res.status(403).json({
         success: false,
-        message: error.message,
+        message:
+          error.message,
       });
     }
 
     res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message:
+        "Internal server error",
     });
   }
 );
 
 /* =========================================================
    START SERVER
-========================================================= */
+   ========================================================= */
 
 app.listen(
   PORT,
@@ -1100,13 +1277,14 @@ app.listen(
 
     console.log(
       `Environment: ${
-        process.env.NODE_ENV || "development"
+        process.env.NODE_ENV ||
+        "development"
       }`
     );
 
     console.log(
-      `CORS production URL:
-https://technis-work-portal-05.vercel.app`
+      "Production frontend:",
+      "https://technis-work-portal-05.vercel.app"
     );
   }
 );
