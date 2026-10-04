@@ -39,7 +39,7 @@ function ensureDefaultAccounts() {
   try {
     const accounts = [
       {
-        name: "TECHINS Admin",
+        name: process.env.ADMIN_NAME || "TECHINS Admin",
         email: String(
           process.env.ADMIN_EMAIL || "admin@techins.com"
         )
@@ -53,7 +53,7 @@ function ensureDefaultAccounts() {
       },
 
       {
-        name: "TECHINS Manager",
+        name: process.env.MANAGER_NAME || "TECHINS Manager",
         email: String(
           process.env.MANAGER_EMAIL || "manager@techins.com"
         )
@@ -67,7 +67,7 @@ function ensureDefaultAccounts() {
       },
 
       {
-        name: "TECHINS Student",
+        name: process.env.STUDENT_NAME || "TECHINS Student",
         email: String(
           process.env.STUDENT_EMAIL || "student@techins.com"
         )
@@ -170,13 +170,10 @@ const configuredOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
 
-  // Main Vercel production URL
   "https://technis-work-portal-05.vercel.app",
 
-  // Current Vercel deployment URL
   "https://technis-work-portal-05-ep1h6tgcr.vercel.app",
 
-  // Optional environment URL
   ...(process.env.CLIENT_URL
     ? process.env.CLIENT_URL
         .split(",")
@@ -184,30 +181,23 @@ const configuredOrigins = [
         .filter(Boolean)
     : []),
 
-  // Optional Render/Vercel environment URL
   ...(process.env.VERCEL_URL
     ? [`https://${process.env.VERCEL_URL}`]
     : []),
 ];
 
 const isAllowedOrigin = (origin) => {
-  // Requests without Origin are allowed.
-  // Example: PowerShell / Postman / server-to-server requests.
   if (!origin) {
     return true;
   }
 
-  // Exact allowed URLs
   if (configuredOrigins.includes(origin)) {
     return true;
   }
 
   /*
-    Allow Vercel deployment URLs belonging to this project.
-
-    Examples:
-    https://technis-work-portal-05-xxxxx.vercel.app
-    https://technis-work-portal-05-ep1h6tgcr.vercel.app
+    Allow all Vercel deployment URLs belonging
+    to this TECHINS project.
   */
   if (
     /^https:\/\/technis-work-portal-05-[a-z0-9-]+\.vercel\.app$/i.test(
@@ -309,32 +299,43 @@ app.get(
   "/api/notifications",
   authenticateToken,
   (req, res) => {
-    const rows = db
-      .prepare(
-        `
-        SELECT
-          id,
-          type,
-          title,
-          message,
-          related_task_id,
-          read_at,
-          created_at
-        FROM notifications
-        WHERE user_id = ?
-        ORDER BY id DESC
-        LIMIT 30
-        `
-      )
-      .all(req.user.id);
+    try {
+      const rows = db
+        .prepare(`
+          SELECT
+            id,
+            type,
+            title,
+            message,
+            related_task_id,
+            read_at,
+            created_at
+          FROM notifications
+          WHERE user_id = ?
+          ORDER BY id DESC
+          LIMIT 30
+        `)
+        .all(req.user.id);
 
-    res.json({
-      success: true,
-      notifications: rows,
-      unread: rows.filter(
-        (item) => !item.read_at
-      ).length,
-    });
+      res.json({
+        success: true,
+        notifications: rows,
+        unread: rows.filter(
+          (item) => !item.read_at
+        ).length,
+      });
+    } catch (error) {
+      console.error(
+        "Notifications error:",
+        error
+      );
+
+      res.status(500).json({
+        success: false,
+        message:
+          "Unable to load notifications",
+      });
+    }
   }
 );
 
@@ -342,23 +343,34 @@ app.patch(
   "/api/notifications/:id/read",
   authenticateToken,
   (req, res) => {
-    const result = db
-      .prepare(
-        `
-        UPDATE notifications
-        SET read_at = ?
-        WHERE id = ? AND user_id = ?
-        `
-      )
-      .run(
-        new Date().toISOString(),
-        Number(req.params.id),
-        req.user.id
+    try {
+      const result = db
+        .prepare(`
+          UPDATE notifications
+          SET read_at = ?
+          WHERE id = ? AND user_id = ?
+        `)
+        .run(
+          new Date().toISOString(),
+          Number(req.params.id),
+          req.user.id
+        );
+
+      res.json({
+        success: result.changes > 0,
+      });
+    } catch (error) {
+      console.error(
+        "Notification read error:",
+        error
       );
 
-    res.json({
-      success: result.changes > 0,
-    });
+      res.status(500).json({
+        success: false,
+        message:
+          "Unable to update notification",
+      });
+    }
   }
 );
 
@@ -371,110 +383,119 @@ app.get(
   authenticateToken,
   authorizeRoles("admin"),
   (req, res) => {
-    const period = [
-      "week",
-      "month",
-      "year",
-    ].includes(
-      String(
-        req.query.period || ""
-      ).toLowerCase()
-    )
-      ? String(
-          req.query.period
+    try {
+      const period = [
+        "week",
+        "month",
+        "year",
+      ].includes(
+        String(
+          req.query.period || ""
         ).toLowerCase()
-      : "week";
+      )
+        ? String(
+            req.query.period
+          ).toLowerCase()
+        : "week";
 
-    const database = req.app.locals.db;
+      const database = req.app.locals.db;
 
-    const days =
-      period === "week"
-        ? 7
-        : period === "month"
-        ? 30
-        : 12;
+      const days =
+        period === "week"
+          ? 7
+          : period === "month"
+          ? 30
+          : 12;
 
-    const labels = [];
-    const values = [];
+      const labels = [];
+      const values = [];
 
-    if (period === "year") {
-      for (let i = 11; i >= 0; i--) {
-        const d = new Date();
+      if (period === "year") {
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date();
 
-        d.setMonth(
-          d.getMonth() - i
-        );
+          d.setMonth(
+            d.getMonth() - i
+          );
 
-        const label =
-          d.toISOString().slice(0, 7);
+          const label =
+            d.toISOString().slice(0, 7);
 
-        labels.push(label);
+          labels.push(label);
 
-        values.push(
-          database
-            .prepare(
-              `
-              SELECT COUNT(*) c
-              FROM tasks
-              WHERE LOWER(status) = 'completed'
-              AND substr(
-                COALESCE(
-                  completed_at,
-                  created_at
-                ),
-                1,
-                7
-              ) = ?
-              `
-            )
-            .get(label).c
-        );
+          values.push(
+            database
+              .prepare(`
+                SELECT COUNT(*) c
+                FROM tasks
+                WHERE LOWER(status) = 'completed'
+                AND substr(
+                  COALESCE(
+                    completed_at,
+                    created_at
+                  ),
+                  1,
+                  7
+                ) = ?
+              `)
+              .get(label).c
+          );
+        }
+      } else {
+        for (
+          let i = days - 1;
+          i >= 0;
+          i--
+        ) {
+          const d = new Date();
+
+          d.setDate(
+            d.getDate() - i
+          );
+
+          const label =
+            d.toISOString().slice(0, 10);
+
+          labels.push(label);
+
+          values.push(
+            database
+              .prepare(`
+                SELECT COUNT(*) c
+                FROM tasks
+                WHERE LOWER(status) = 'completed'
+                AND substr(
+                  COALESCE(
+                    completed_at,
+                    created_at
+                  ),
+                  1,
+                  10
+                ) = ?
+              `)
+              .get(label).c
+          );
+        }
       }
-    } else {
-      for (
-        let i = days - 1;
-        i >= 0;
-        i--
-      ) {
-        const d = new Date();
 
-        d.setDate(
-          d.getDate() - i
-        );
+      res.json({
+        success: true,
+        period,
+        labels,
+        values,
+      });
+    } catch (error) {
+      console.error(
+        "Admin progress error:",
+        error
+      );
 
-        const label =
-          d.toISOString().slice(0, 10);
-
-        labels.push(label);
-
-        values.push(
-          database
-            .prepare(
-              `
-              SELECT COUNT(*) c
-              FROM tasks
-              WHERE LOWER(status) = 'completed'
-              AND substr(
-                COALESCE(
-                  completed_at,
-                  created_at
-                ),
-                1,
-                10
-              ) = ?
-              `
-            )
-            .get(label).c
-        );
-      }
+      res.status(500).json({
+        success: false,
+        message:
+          "Unable to load admin progress",
+      });
     }
-
-    res.json({
-      success: true,
-      period,
-      labels,
-      values,
-    });
   }
 );
 
@@ -487,26 +508,37 @@ app.get(
   authenticateToken,
   authorizeRoles("admin"),
   (req, res) => {
-    const rows = db
-      .prepare(
-        `
-        SELECT
-          a.*,
-          u.name AS actor_name,
-          u.email AS actor_email
-        FROM audit_logs a
-        LEFT JOIN users u
-          ON u.id = a.actor_id
-        ORDER BY a.id DESC
-        LIMIT 250
-        `
-      )
-      .all();
+    try {
+      const rows = db
+        .prepare(`
+          SELECT
+            a.*,
+            u.name AS actor_name,
+            u.email AS actor_email
+          FROM audit_logs a
+          LEFT JOIN users u
+            ON u.id = a.actor_id
+          ORDER BY a.id DESC
+          LIMIT 250
+        `)
+        .all();
 
-    res.json({
-      success: true,
-      logs: rows,
-    });
+      res.json({
+        success: true,
+        logs: rows,
+      });
+    } catch (error) {
+      console.error(
+        "Audit logs error:",
+        error
+      );
+
+      res.status(500).json({
+        success: false,
+        message:
+          "Unable to load audit logs",
+      });
+    }
   }
 );
 
@@ -561,32 +593,43 @@ app.get(
     "manager"
   ),
   (req, res) => {
-    const students = db
-      .prepare(
-        `
-        SELECT
-          id,
-          name,
-          email,
-          department,
-          created_at
-        FROM users
-        WHERE LOWER(role) = 'student'
-        AND active = 1
-        ORDER BY name
-        `
-      )
-      .all();
+    try {
+      const students = db
+        .prepare(`
+          SELECT
+            id,
+            name,
+            email,
+            department,
+            created_at
+          FROM users
+          WHERE LOWER(role) = 'student'
+          AND active = 1
+          ORDER BY name
+        `)
+        .all();
 
-    res.json({
-      success: true,
-      students,
-      limit: 25,
-      remaining: Math.max(
-        25 - students.length,
-        0
-      ),
-    });
+      res.json({
+        success: true,
+        students,
+        limit: 25,
+        remaining: Math.max(
+          25 - students.length,
+          0
+        ),
+      });
+    } catch (error) {
+      console.error(
+        "Students error:",
+        error
+      );
+
+      res.status(500).json({
+        success: false,
+        message:
+          "Unable to load students",
+      });
+    }
   }
 );
 
@@ -595,32 +638,43 @@ app.get(
   authenticateToken,
   authorizeRoles("admin"),
   (req, res) => {
-    const students = db
-      .prepare(
-        `
-        SELECT
-          id,
-          name,
-          email,
-          department,
-          created_at
-        FROM users
-        WHERE LOWER(role) = 'student'
-        AND active = 1
-        ORDER BY name
-        `
-      )
-      .all();
+    try {
+      const students = db
+        .prepare(`
+          SELECT
+            id,
+            name,
+            email,
+            department,
+            created_at
+          FROM users
+          WHERE LOWER(role) = 'student'
+          AND active = 1
+          ORDER BY name
+        `)
+        .all();
 
-    res.json({
-      success: true,
-      students,
-      limit: 25,
-      remaining: Math.max(
-        25 - students.length,
-        0
-      ),
-    });
+      res.json({
+        success: true,
+        students,
+        limit: 25,
+        remaining: Math.max(
+          25 - students.length,
+          0
+        ),
+      });
+    } catch (error) {
+      console.error(
+        "Admin students error:",
+        error
+      );
+
+      res.status(500).json({
+        success: false,
+        message:
+          "Unable to load students",
+      });
+    }
   }
 );
 
@@ -650,14 +704,12 @@ app.post(
       }
 
       const count = db
-        .prepare(
-          `
+        .prepare(`
           SELECT COUNT(*) AS count
           FROM users
           WHERE LOWER(role) = 'student'
           AND active = 1
-          `
-        )
+        `)
         .get().count;
 
       if (count >= 25) {
@@ -674,14 +726,12 @@ app.post(
           .toLowerCase();
 
       const existingUser = db
-        .prepare(
-          `
+        .prepare(`
           SELECT id
           FROM users
           WHERE LOWER(email) = ?
           LIMIT 1
-          `
-        )
+        `)
         .get(cleanEmail);
 
       if (existingUser) {
@@ -699,19 +749,18 @@ app.post(
         );
 
       const inserted = db
-        .prepare(
-          `
+        .prepare(`
           INSERT INTO users
           (
             name,
             email,
             password,
             role,
-            department
+            department,
+            active
           )
-          VALUES (?, ?, ?, ?, ?)
-          `
-        )
+          VALUES (?, ?, ?, ?, ?, 1)
+        `)
         .run(
           String(name).trim(),
           cleanEmail,
@@ -753,27 +802,38 @@ app.get(
   authenticateToken,
   authorizeRoles("admin"),
   (req, res) => {
-    const managers = db
-      .prepare(
-        `
-        SELECT
-          id,
-          name,
-          email,
-          department,
-          active,
-          created_at
-        FROM users
-        WHERE LOWER(role) = 'manager'
-        ORDER BY name
-        `
-      )
-      .all();
+    try {
+      const managers = db
+        .prepare(`
+          SELECT
+            id,
+            name,
+            email,
+            department,
+            active,
+            created_at
+          FROM users
+          WHERE LOWER(role) = 'manager'
+          ORDER BY name
+        `)
+        .all();
 
-    res.json({
-      success: true,
-      managers,
-    });
+      res.json({
+        success: true,
+        managers,
+      });
+    } catch (error) {
+      console.error(
+        "Managers error:",
+        error
+      );
+
+      res.status(500).json({
+        success: false,
+        message:
+          "Unable to load managers",
+      });
+    }
   }
 );
 
@@ -808,14 +868,12 @@ app.post(
           .toLowerCase();
 
       const existingUser = db
-        .prepare(
-          `
+        .prepare(`
           SELECT id
           FROM users
           WHERE LOWER(email) = ?
           LIMIT 1
-          `
-        )
+        `)
         .get(cleanEmail);
 
       if (existingUser) {
@@ -833,19 +891,18 @@ app.post(
         );
 
       const result = db
-        .prepare(
-          `
+        .prepare(`
           INSERT INTO users
           (
             name,
             email,
             password,
             role,
-            department
+            department,
+            active
           )
-          VALUES (?, ?, ?, ?, ?)
-          `
-        )
+          VALUES (?, ?, ?, ?, ?, 1)
+        `)
         .run(
           String(name).trim(),
           cleanEmail,
@@ -885,92 +942,99 @@ app.patch(
   authenticateToken,
   authorizeRoles("admin"),
   (req, res) => {
-    const id =
-      Number(req.params.id);
+    try {
+      const id =
+        Number(req.params.id);
 
-    if (!id) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid user id",
-      });
-    }
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid user id",
+        });
+      }
 
-    const target = db
-      .prepare(
-        `
-        SELECT
-          id,
-          name,
-          role,
-          active
-        FROM users
+      const target = db
+        .prepare(`
+          SELECT
+            id,
+            name,
+            role,
+            active
+          FROM users
+          WHERE id = ?
+        `)
+        .get(id);
+
+      if (!target) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      if (
+        target.id === req.user.id
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "You cannot disable your own account",
+        });
+      }
+
+      const active =
+        target.active ? 0 : 1;
+
+      db.prepare(`
+        UPDATE users
+        SET active = ?
         WHERE id = ?
-        `
-      )
-      .get(id);
+      `).run(active, id);
 
-    if (!target) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
+      db.prepare(`
+        INSERT INTO audit_logs
+        (
+          actor_id,
+          action,
+          entity_type,
+          entity_id,
+          previous_value,
+          new_value,
+          created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        req.user.id,
+        active
+          ? "user_enabled"
+          : "user_disabled",
+        "user",
+        id,
+        JSON.stringify({
+          active: target.active,
+        }),
+        JSON.stringify({
+          active,
+        }),
+        new Date().toISOString()
+      );
+
+      res.json({
+        success: true,
+        active,
       });
-    }
+    } catch (error) {
+      console.error(
+        "Disable user error:",
+        error
+      );
 
-    if (
-      target.id === req.user.id
-    ) {
-      return res.status(400).json({
+      res.status(500).json({
         success: false,
         message:
-          "You cannot disable your own account",
+          "Unable to update user",
       });
     }
-
-    const active =
-      target.active ? 0 : 1;
-
-    db.prepare(
-      `
-      UPDATE users
-      SET active = ?
-      WHERE id = ?
-      `
-    ).run(active, id);
-
-    db.prepare(
-      `
-      INSERT INTO audit_logs
-      (
-        actor_id,
-        action,
-        entity_type,
-        entity_id,
-        previous_value,
-        new_value,
-        created_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-      `
-    ).run(
-      req.user.id,
-      active
-        ? "user_enabled"
-        : "user_disabled",
-      "user",
-      id,
-      JSON.stringify({
-        active: target.active,
-      }),
-      JSON.stringify({
-        active,
-      }),
-      new Date().toISOString()
-    );
-
-    res.json({
-      success: true,
-      active,
-    });
   }
 );
 
@@ -986,54 +1050,63 @@ app.get(
     "member"
   ),
   (req, res) => {
-    const rows = db
-      .prepare(
-        `
-        SELECT
-          id,
-          period,
-          score,
-          strengths,
-          improvements,
-          feedback,
-          created_at
-        FROM performance
-        WHERE user_id = ?
-        AND feedback IS NOT NULL
-        AND TRIM(feedback) <> ''
-        ORDER BY id DESC
-        `
-      )
-      .all(req.user.id);
+    try {
+      const rows = db
+        .prepare(`
+          SELECT
+            id,
+            period,
+            score,
+            strengths,
+            improvements,
+            feedback,
+            created_at
+          FROM performance
+          WHERE user_id = ?
+          AND feedback IS NOT NULL
+          AND TRIM(feedback) <> ''
+          ORDER BY id DESC
+        `)
+        .all(req.user.id);
 
-    const taskRows = db
-      .prepare(
-        `
-        SELECT
-          id,
-          'task' AS type,
-          title,
-          feedback,
-          created_at
-        FROM tasks
-        WHERE assigned_to = ?
-        AND feedback IS NOT NULL
-        AND TRIM(feedback) <> ''
-        ORDER BY id DESC
-        `
-      )
-      .all(req.user.id);
+      const taskRows = db
+        .prepare(`
+          SELECT
+            id,
+            'task' AS type,
+            title,
+            feedback,
+            created_at
+          FROM tasks
+          WHERE assigned_to = ?
+          AND feedback IS NOT NULL
+          AND TRIM(feedback) <> ''
+          ORDER BY id DESC
+        `)
+        .all(req.user.id);
 
-    res.json({
-      success: true,
-      feedback: [
-        ...rows.map((row) => ({
-          ...row,
-          type: "performance",
-        })),
-        ...taskRows,
-      ],
-    });
+      res.json({
+        success: true,
+        feedback: [
+          ...rows.map((row) => ({
+            ...row,
+            type: "performance",
+          })),
+          ...taskRows,
+        ],
+      });
+    } catch (error) {
+      console.error(
+        "Feedback error:",
+        error
+      );
+
+      res.status(500).json({
+        success: false,
+        message:
+          "Unable to load feedback",
+      });
+    }
   }
 );
 
@@ -1042,63 +1115,72 @@ app.get(
   authenticateToken,
   authorizeRoles("admin"),
   (req, res) => {
-    const performance = db
-      .prepare(
-        `
-        SELECT
-          p.id,
-          p.feedback,
-          p.score,
-          p.period,
-          p.created_at,
-          u.name AS student_name,
-          u.email AS student_email
-        FROM performance p
-        JOIN users u
-          ON u.id = p.user_id
-        WHERE p.feedback IS NOT NULL
-        AND TRIM(p.feedback) <> ''
-        ORDER BY p.id DESC
-        `
-      )
-      .all();
+    try {
+      const performance = db
+        .prepare(`
+          SELECT
+            p.id,
+            p.feedback,
+            p.score,
+            p.period,
+            p.created_at,
+            u.name AS student_name,
+            u.email AS student_email
+          FROM performance p
+          JOIN users u
+            ON u.id = p.user_id
+          WHERE p.feedback IS NOT NULL
+          AND TRIM(p.feedback) <> ''
+          ORDER BY p.id DESC
+        `)
+        .all();
 
-    const tasks = db
-      .prepare(
-        `
-        SELECT
-          t.id,
-          t.feedback,
-          t.created_at,
-          u.name AS student_name,
-          u.email AS student_email,
-          t.title
-        FROM tasks t
-        JOIN users u
-          ON u.id = t.assigned_to
-        WHERE t.feedback IS NOT NULL
-        AND TRIM(t.feedback) <> ''
-        ORDER BY t.id DESC
-        `
-      )
-      .all();
+      const tasks = db
+        .prepare(`
+          SELECT
+            t.id,
+            t.feedback,
+            t.created_at,
+            u.name AS student_name,
+            u.email AS student_email,
+            t.title
+          FROM tasks t
+          JOIN users u
+            ON u.id = t.assigned_to
+          WHERE t.feedback IS NOT NULL
+          AND TRIM(t.feedback) <> ''
+          ORDER BY t.id DESC
+        `)
+        .all();
 
-    res.json({
-      success: true,
-      feedback: [
-        ...performance.map(
-          (item) => ({
+      res.json({
+        success: true,
+        feedback: [
+          ...performance.map(
+            (item) => ({
+              ...item,
+              type: "performance",
+            })
+          ),
+
+          ...tasks.map((item) => ({
             ...item,
-            type: "performance",
-          })
-        ),
+            type: "task",
+          })),
+        ],
+      });
+    } catch (error) {
+      console.error(
+        "Admin feedback error:",
+        error
+      );
 
-        ...tasks.map((item) => ({
-          ...item,
-          type: "task",
-        })),
-      ],
-    });
+      res.status(500).json({
+        success: false,
+        message:
+          "Unable to load feedback",
+      });
+    }
   }
 );
 
@@ -1107,134 +1189,141 @@ app.post(
   authenticateToken,
   authorizeRoles("admin"),
   (req, res) => {
-    const {
-      user_id,
-      feedback,
-      score,
-      strengths = [],
-      improvements = [],
-      period = "general",
-    } = req.body || {};
+    try {
+      const {
+        user_id,
+        feedback,
+        score,
+        strengths = [],
+        improvements = [],
+        period = "general",
+      } = req.body || {};
 
-    const student = db
-      .prepare(
-        `
-        SELECT id
-        FROM users
-        WHERE id = ?
-        AND LOWER(role) = 'student'
-        AND active = 1
-        `
-      )
-      .get(Number(user_id));
+      const student = db
+        .prepare(`
+          SELECT id
+          FROM users
+          WHERE id = ?
+          AND LOWER(role) = 'student'
+          AND active = 1
+        `)
+        .get(Number(user_id));
 
-    if (!student) {
-      return res.status(404).json({
-        success: false,
-        message: "Student not found",
-      });
-    }
-
-    if (
-      !String(feedback || "").trim()
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Feedback is required",
-      });
-    }
-
-    let normalizedScore = null;
-
-    if (
-      score !== "" &&
-      score != null
-    ) {
-      normalizedScore =
-        Number(score);
+      if (!student) {
+        return res.status(404).json({
+          success: false,
+          message: "Student not found",
+        });
+      }
 
       if (
-        !Number.isInteger(
-          normalizedScore
-        ) ||
-        normalizedScore < 0 ||
-        normalizedScore > 100
+        !String(feedback || "").trim()
       ) {
         return res.status(400).json({
           success: false,
           message:
-            "Score must be between 0 and 100",
+            "Feedback is required",
         });
       }
-    }
 
-    const completedMissions =
-      db
-        .prepare(
-          `
-          SELECT COUNT(*) AS c
-          FROM missions
-          WHERE assigned_to = ?
-          AND (
-            LOWER(status) = 'completed'
-            OR progress >= 100
-          )
-          `
-        )
-        .get(
-          Number(user_id)
-        ).c;
+      let normalizedScore = null;
 
-    const result = db
-      .prepare(
-        `
-        INSERT INTO performance
-        (
-          user_id,
-          period,
-          score,
-          strengths,
-          improvements,
-          completed_missions,
-          feedback,
-          reviewed_by
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `
-      )
-      .run(
-        Number(user_id),
-        String(
-          period || "general"
-        ),
-        normalizedScore,
-        JSON.stringify(
-          Array.isArray(
-            strengths
+      if (
+        score !== "" &&
+        score != null
+      ) {
+        normalizedScore =
+          Number(score);
+
+        if (
+          !Number.isInteger(
+            normalizedScore
+          ) ||
+          normalizedScore < 0 ||
+          normalizedScore > 100
+        ) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "Score must be between 0 and 100",
+          });
+        }
+      }
+
+      const completedMissions =
+        db
+          .prepare(`
+            SELECT COUNT(*) AS c
+            FROM missions
+            WHERE assigned_to = ?
+            AND (
+              LOWER(status) = 'completed'
+              OR progress >= 100
+            )
+          `)
+          .get(
+            Number(user_id)
+          ).c;
+
+      const result = db
+        .prepare(`
+          INSERT INTO performance
+          (
+            user_id,
+            period,
+            score,
+            strengths,
+            improvements,
+            completed_missions,
+            feedback,
+            reviewed_by
           )
-            ? strengths
-            : []
-        ),
-        JSON.stringify(
-          Array.isArray(
-            improvements
-          )
-            ? improvements
-            : []
-        ),
-        completedMissions,
-        String(feedback).trim(),
-        req.user.id
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `)
+        .run(
+          Number(user_id),
+          String(
+            period || "general"
+          ),
+          normalizedScore,
+          JSON.stringify(
+            Array.isArray(
+              strengths
+            )
+              ? strengths
+              : []
+          ),
+          JSON.stringify(
+            Array.isArray(
+              improvements
+            )
+              ? improvements
+              : []
+          ),
+          completedMissions,
+          String(feedback).trim(),
+          req.user.id
+        );
+
+      res.status(201).json({
+        success: true,
+        message:
+          "Feedback saved",
+        id:
+          result.lastInsertRowid,
+      });
+    } catch (error) {
+      console.error(
+        "Save feedback error:",
+        error
       );
 
-    res.status(201).json({
-      success: true,
-      message:
-        "Feedback saved",
-      id:
-        result.lastInsertRowid,
-    });
+      res.status(500).json({
+        success: false,
+        message:
+          "Unable to save feedback",
+      });
+    }
   }
 );
 
@@ -1247,65 +1336,72 @@ app.get(
   authenticateToken,
   authorizeRoles("admin"),
   (req, res) => {
-    const students = db
-      .prepare(
-        `
-        SELECT COUNT(*) c
-        FROM users
-        WHERE LOWER(role) = 'student'
-        AND active = 1
-        `
-      )
-      .get().c;
-
-    const tasks = db
-      .prepare(
-        "SELECT COUNT(*) c FROM tasks"
-      )
-      .get().c;
-
-    const completedTasks =
-      db
-        .prepare(
-          `
+    try {
+      const students = db
+        .prepare(`
           SELECT COUNT(*) c
-          FROM tasks
-          WHERE LOWER(status) = 'completed'
-          `
+          FROM users
+          WHERE LOWER(role) = 'student'
+          AND active = 1
+        `)
+        .get().c;
+
+      const tasks = db
+        .prepare(
+          "SELECT COUNT(*) c FROM tasks"
         )
         .get().c;
 
-    const missions = db
-      .prepare(
-        "SELECT COUNT(*) c FROM missions"
-      )
-      .get().c;
+      const completedTasks =
+        db
+          .prepare(`
+            SELECT COUNT(*) c
+            FROM tasks
+            WHERE LOWER(status) = 'completed'
+          `)
+          .get().c;
 
-    const activitiesToday =
-      db
+      const missions = db
         .prepare(
-          `
-          SELECT COUNT(*) c
-          FROM daily_activities
-          WHERE date = ?
-          `
+          "SELECT COUNT(*) c FROM missions"
         )
-        .get(
-          new Date()
-            .toISOString()
-            .slice(0, 10)
-        ).c;
+        .get().c;
 
-    res.json({
-      success: true,
-      students,
-      tasks,
-      completedTasks,
-      pendingTasks:
-        tasks - completedTasks,
-      missions,
-      activitiesToday,
-    });
+      const activitiesToday =
+        db
+          .prepare(`
+            SELECT COUNT(*) c
+            FROM daily_activities
+            WHERE date = ?
+          `)
+          .get(
+            new Date()
+              .toISOString()
+              .slice(0, 10)
+          ).c;
+
+      res.json({
+        success: true,
+        students,
+        tasks,
+        completedTasks,
+        pendingTasks:
+          tasks - completedTasks,
+        missions,
+        activitiesToday,
+      });
+    } catch (error) {
+      console.error(
+        "Admin stats error:",
+        error
+      );
+
+      res.status(500).json({
+        success: false,
+        message:
+          "Unable to load admin statistics",
+      });
+    }
   }
 );
 
