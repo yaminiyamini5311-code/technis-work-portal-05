@@ -82,7 +82,12 @@ function ensureDefaultAccounts() {
     ];
 
     const findUser = db.prepare(`
-      SELECT id
+      SELECT
+        id,
+        email,
+        password,
+        role,
+        active
       FROM users
       WHERE LOWER(email) = ?
       LIMIT 1
@@ -113,10 +118,26 @@ function ensureDefaultAccounts() {
     `);
 
     for (const account of accounts) {
+      const plainPassword = String(account.password);
+
       const hashedPassword = bcrypt.hashSync(
-        account.password,
+        plainPassword,
         10
       );
+
+      const hashIsValid =
+        typeof hashedPassword === "string" &&
+        hashedPassword.startsWith("$2");
+
+      console.log(
+        `Password hash generated for ${account.email}: ${hashIsValid}`
+      );
+
+      if (!hashIsValid) {
+        throw new Error(
+          `Invalid password hash for ${account.email}`
+        );
+      }
 
       const existingUser = findUser.get(
         account.email
@@ -145,6 +166,29 @@ function ensureDefaultAccounts() {
 
         console.log(
           `${account.role.toUpperCase()} account created: ${account.email}`
+        );
+      }
+
+      const savedUser = findUser.get(
+        account.email
+      );
+
+      const passwordVerified =
+        savedUser &&
+        bcrypt.compareSync(
+          plainPassword,
+          savedUser.password
+        );
+
+      console.log(
+        `Password verification for ${account.email}: ${Boolean(
+          passwordVerified
+        )}`
+      );
+
+      if (!passwordVerified) {
+        throw new Error(
+          `Password verification failed for ${account.email}`
         );
       }
     }
@@ -195,10 +239,6 @@ const isAllowedOrigin = (origin) => {
     return true;
   }
 
-  /*
-    Allow all Vercel deployment URLs belonging
-    to this TECHINS project.
-  */
   if (
     /^https:\/\/technis-work-portal-05-[a-z0-9-]+\.vercel\.app$/i.test(
       origin
@@ -1178,7 +1218,7 @@ app.get(
       res.status(500).json({
         success: false,
         message:
-          "Unable to load feedback",
+          "Unable to load admin feedback",
       });
     }
   }
