@@ -84,19 +84,19 @@ function ensureDefaultAccounts() {
     const findUser = db.prepare(`
       SELECT id
       FROM users
-      WHERE LOWER(email)=?
+      WHERE LOWER(email) = ?
       LIMIT 1
     `);
 
     const updateUser = db.prepare(`
       UPDATE users
       SET
-        name=?,
-        password=?,
-        role=?,
-        department=?,
-        active=1
-      WHERE id=?
+        name = ?,
+        password = ?,
+        role = ?,
+        department = ?,
+        active = 1
+      WHERE id = ?
     `);
 
     const insertUser = db.prepare(`
@@ -170,8 +170,13 @@ const configuredOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
 
+  // Main Vercel production URL
   "https://technis-work-portal-05.vercel.app",
 
+  // Current Vercel deployment URL
+  "https://technis-work-portal-05-ep1h6tgcr.vercel.app",
+
+  // Optional environment URL
   ...(process.env.CLIENT_URL
     ? process.env.CLIENT_URL
         .split(",")
@@ -179,10 +184,41 @@ const configuredOrigins = [
         .filter(Boolean)
     : []),
 
+  // Optional Render/Vercel environment URL
   ...(process.env.VERCEL_URL
     ? [`https://${process.env.VERCEL_URL}`]
     : []),
 ];
+
+const isAllowedOrigin = (origin) => {
+  // Requests without Origin are allowed.
+  // Example: PowerShell / Postman / server-to-server requests.
+  if (!origin) {
+    return true;
+  }
+
+  // Exact allowed URLs
+  if (configuredOrigins.includes(origin)) {
+    return true;
+  }
+
+  /*
+    Allow Vercel deployment URLs belonging to this project.
+
+    Examples:
+    https://technis-work-portal-05-xxxxx.vercel.app
+    https://technis-work-portal-05-ep1h6tgcr.vercel.app
+  */
+  if (
+    /^https:\/\/technis-work-portal-05-[a-z0-9-]+\.vercel\.app$/i.test(
+      origin
+    )
+  ) {
+    return true;
+  }
+
+  return false;
+};
 
 console.log("Allowed CORS origins:");
 console.log(configuredOrigins);
@@ -190,15 +226,14 @@ console.log(configuredOrigins);
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin) {
+      if (isAllowedOrigin(origin)) {
         return callback(null, true);
       }
 
-      if (configuredOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      console.log("Blocked CORS origin:", origin);
+      console.log(
+        "Blocked CORS origin:",
+        origin
+      );
 
       return callback(
         new Error(
@@ -286,7 +321,7 @@ app.get(
           read_at,
           created_at
         FROM notifications
-        WHERE user_id=?
+        WHERE user_id = ?
         ORDER BY id DESC
         LIMIT 30
         `
@@ -311,8 +346,8 @@ app.patch(
       .prepare(
         `
         UPDATE notifications
-        SET read_at=?
-        WHERE id=? AND user_id=?
+        SET read_at = ?
+        WHERE id = ? AND user_id = ?
         `
       )
       .run(
@@ -341,9 +376,13 @@ app.get(
       "month",
       "year",
     ].includes(
-      String(req.query.period).toLowerCase()
+      String(
+        req.query.period || ""
+      ).toLowerCase()
     )
-      ? String(req.query.period).toLowerCase()
+      ? String(
+          req.query.period
+        ).toLowerCase()
       : "week";
 
     const database = req.app.locals.db;
@@ -377,19 +416,26 @@ app.get(
               `
               SELECT COUNT(*) c
               FROM tasks
-              WHERE LOWER(status)='completed'
+              WHERE LOWER(status) = 'completed'
               AND substr(
-                COALESCE(completed_at,created_at),
+                COALESCE(
+                  completed_at,
+                  created_at
+                ),
                 1,
                 7
-              )=?
+              ) = ?
               `
             )
             .get(label).c
         );
       }
     } else {
-      for (let i = days - 1; i >= 0; i--) {
+      for (
+        let i = days - 1;
+        i >= 0;
+        i--
+      ) {
         const d = new Date();
 
         d.setDate(
@@ -407,12 +453,15 @@ app.get(
               `
               SELECT COUNT(*) c
               FROM tasks
-              WHERE LOWER(status)='completed'
+              WHERE LOWER(status) = 'completed'
               AND substr(
-                COALESCE(completed_at,created_at),
+                COALESCE(
+                  completed_at,
+                  created_at
+                ),
                 1,
                 10
-              )=?
+              ) = ?
               `
             )
             .get(label).c
@@ -447,7 +496,7 @@ app.get(
           u.email AS actor_email
         FROM audit_logs a
         LEFT JOIN users u
-          ON u.id=a.actor_id
+          ON u.id = a.actor_id
         ORDER BY a.id DESC
         LIMIT 250
         `
@@ -507,7 +556,10 @@ app.use(
 app.get(
   "/api/students",
   authenticateToken,
-  authorizeRoles("admin", "manager"),
+  authorizeRoles(
+    "admin",
+    "manager"
+  ),
   (req, res) => {
     const students = db
       .prepare(
@@ -519,8 +571,8 @@ app.get(
           department,
           created_at
         FROM users
-        WHERE LOWER(role)='student'
-        AND active=1
+        WHERE LOWER(role) = 'student'
+        AND active = 1
         ORDER BY name
         `
       )
@@ -553,8 +605,8 @@ app.get(
           department,
           created_at
         FROM users
-        WHERE LOWER(role)='student'
-        AND active=1
+        WHERE LOWER(role) = 'student'
+        AND active = 1
         ORDER BY name
         `
       )
@@ -602,8 +654,8 @@ app.post(
           `
           SELECT COUNT(*) AS count
           FROM users
-          WHERE LOWER(role)='student'
-          AND active=1
+          WHERE LOWER(role) = 'student'
+          AND active = 1
           `
         )
         .get().count;
@@ -623,7 +675,12 @@ app.post(
 
       const existingUser = db
         .prepare(
-          "SELECT id FROM users WHERE email=?"
+          `
+          SELECT id
+          FROM users
+          WHERE LOWER(email) = ?
+          LIMIT 1
+          `
         )
         .get(cleanEmail);
 
@@ -652,7 +709,7 @@ app.post(
             role,
             department
           )
-          VALUES (?,?,?,?,?)
+          VALUES (?, ?, ?, ?, ?)
           `
         )
         .run(
@@ -707,7 +764,7 @@ app.get(
           active,
           created_at
         FROM users
-        WHERE LOWER(role)='manager'
+        WHERE LOWER(role) = 'manager'
         ORDER BY name
         `
       )
@@ -752,7 +809,12 @@ app.post(
 
       const existingUser = db
         .prepare(
-          "SELECT id FROM users WHERE email=?"
+          `
+          SELECT id
+          FROM users
+          WHERE LOWER(email) = ?
+          LIMIT 1
+          `
         )
         .get(cleanEmail);
 
@@ -781,7 +843,7 @@ app.post(
             role,
             department
           )
-          VALUES (?,?,?,?,?)
+          VALUES (?, ?, ?, ?, ?)
           `
         )
         .run(
@@ -842,7 +904,7 @@ app.patch(
           role,
           active
         FROM users
-        WHERE id=?
+        WHERE id = ?
         `
       )
       .get(id);
@@ -870,8 +932,8 @@ app.patch(
     db.prepare(
       `
       UPDATE users
-      SET active=?
-      WHERE id=?
+      SET active = ?
+      WHERE id = ?
       `
     ).run(active, id);
 
@@ -887,7 +949,7 @@ app.patch(
         new_value,
         created_at
       )
-      VALUES (?,?,?,?,?,?,?)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
       `
     ).run(
       req.user.id,
@@ -936,9 +998,9 @@ app.get(
           feedback,
           created_at
         FROM performance
-        WHERE user_id=?
+        WHERE user_id = ?
         AND feedback IS NOT NULL
-        AND TRIM(feedback)<>''
+        AND TRIM(feedback) <> ''
         ORDER BY id DESC
         `
       )
@@ -954,9 +1016,9 @@ app.get(
           feedback,
           created_at
         FROM tasks
-        WHERE assigned_to=?
+        WHERE assigned_to = ?
         AND feedback IS NOT NULL
-        AND TRIM(feedback)<>''
+        AND TRIM(feedback) <> ''
         ORDER BY id DESC
         `
       )
@@ -993,9 +1055,9 @@ app.get(
           u.email AS student_email
         FROM performance p
         JOIN users u
-          ON u.id=p.user_id
+          ON u.id = p.user_id
         WHERE p.feedback IS NOT NULL
-        AND TRIM(p.feedback)<>''
+        AND TRIM(p.feedback) <> ''
         ORDER BY p.id DESC
         `
       )
@@ -1013,9 +1075,9 @@ app.get(
           t.title
         FROM tasks t
         JOIN users u
-          ON u.id=t.assigned_to
+          ON u.id = t.assigned_to
         WHERE t.feedback IS NOT NULL
-        AND TRIM(t.feedback)<>''
+        AND TRIM(t.feedback) <> ''
         ORDER BY t.id DESC
         `
       )
@@ -1059,9 +1121,9 @@ app.post(
         `
         SELECT id
         FROM users
-        WHERE id=?
-        AND LOWER(role)='student'
-        AND active=1
+        WHERE id = ?
+        AND LOWER(role) = 'student'
+        AND active = 1
         `
       )
       .get(Number(user_id));
@@ -1113,10 +1175,10 @@ app.post(
           `
           SELECT COUNT(*) AS c
           FROM missions
-          WHERE assigned_to=?
+          WHERE assigned_to = ?
           AND (
-            LOWER(status)='completed'
-            OR progress>=100
+            LOWER(status) = 'completed'
+            OR progress >= 100
           )
           `
         )
@@ -1138,7 +1200,7 @@ app.post(
           feedback,
           reviewed_by
         )
-        VALUES (?,?,?,?,?,?,?,?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `
       )
       .run(
@@ -1190,8 +1252,8 @@ app.get(
         `
         SELECT COUNT(*) c
         FROM users
-        WHERE LOWER(role)='student'
-        AND active=1
+        WHERE LOWER(role) = 'student'
+        AND active = 1
         `
       )
       .get().c;
@@ -1208,7 +1270,7 @@ app.get(
           `
           SELECT COUNT(*) c
           FROM tasks
-          WHERE LOWER(status)='completed'
+          WHERE LOWER(status) = 'completed'
           `
         )
         .get().c;
@@ -1225,7 +1287,7 @@ app.get(
           `
           SELECT COUNT(*) c
           FROM daily_activities
-          WHERE date=?
+          WHERE date = ?
           `
         )
         .get(
