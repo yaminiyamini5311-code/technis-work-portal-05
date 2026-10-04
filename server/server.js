@@ -31,107 +31,136 @@ const app = express();
 const PORT = Number(process.env.PORT) || 5000;
 
 /* =========================================================
-   AUTOMATIC ADMIN SETUP
+   AUTOMATIC DEFAULT ACCOUNTS
+   ADMIN + MANAGER + STUDENT
    ========================================================= */
 
-function ensureAdminAccount() {
+function ensureDefaultAccounts() {
   try {
-    const adminEmail = String(
-      process.env.ADMIN_EMAIL || "admin@techins.com"
-    )
-      .trim()
-      .toLowerCase();
-
-    const adminPassword = String(
-      process.env.ADMIN_PASSWORD || "Admin@123"
-    );
-
-    const adminName = String(
-      process.env.ADMIN_NAME || "TECHINS Admin"
-    ).trim();
-
-    const adminDepartment = String(
-      process.env.ADMIN_DEPARTMENT || "Administration"
-    ).trim();
-
-    if (!adminEmail || !adminPassword) {
-      console.error("Admin email or password is missing.");
-      return;
-    }
-
-    const existingAdmin = db
-      .prepare(
-        `
-        SELECT id
-        FROM users
-        WHERE LOWER(email)=?
-        LIMIT 1
-        `
-      )
-      .get(adminEmail);
-
-    const hashedPassword = bcrypt.hashSync(
-      adminPassword,
-      10
-    );
-
-    if (existingAdmin) {
-      db.prepare(
-        `
-        UPDATE users
-        SET
-          name=?,
-          password=?,
-          role='admin',
-          department=?,
-          active=1
-        WHERE id=?
-        `
-      ).run(
-        adminName,
-        hashedPassword,
-        adminDepartment,
-        existingAdmin.id
-      );
-
-      console.log(
-        `Admin account updated: ${adminEmail}`
-      );
-    } else {
-      db.prepare(
-        `
-        INSERT INTO users
-        (
-          name,
-          email,
-          password,
-          role,
-          department,
-          active
+    const accounts = [
+      {
+        name: "TECHINS Admin",
+        email: String(
+          process.env.ADMIN_EMAIL || "admin@techins.com"
         )
-        VALUES (?,?,?,?,?,1)
-        `
-      ).run(
-        adminName,
-        adminEmail,
-        hashedPassword,
-        "admin",
-        adminDepartment
+          .trim()
+          .toLowerCase(),
+        password: String(
+          process.env.ADMIN_PASSWORD || "Admin@123"
+        ),
+        role: "admin",
+        department: "Administration",
+      },
+
+      {
+        name: "TECHINS Manager",
+        email: String(
+          process.env.MANAGER_EMAIL || "manager@techins.com"
+        )
+          .trim()
+          .toLowerCase(),
+        password: String(
+          process.env.MANAGER_PASSWORD || "Manager@123"
+        ),
+        role: "manager",
+        department: "Techins",
+      },
+
+      {
+        name: "TECHINS Student",
+        email: String(
+          process.env.STUDENT_EMAIL || "student@techins.com"
+        )
+          .trim()
+          .toLowerCase(),
+        password: String(
+          process.env.STUDENT_PASSWORD || "Student@123"
+        ),
+        role: "student",
+        department: "Techins",
+      },
+    ];
+
+    const findUser = db.prepare(`
+      SELECT id
+      FROM users
+      WHERE LOWER(email)=?
+      LIMIT 1
+    `);
+
+    const updateUser = db.prepare(`
+      UPDATE users
+      SET
+        name=?,
+        password=?,
+        role=?,
+        department=?,
+        active=1
+      WHERE id=?
+    `);
+
+    const insertUser = db.prepare(`
+      INSERT INTO users
+      (
+        name,
+        email,
+        password,
+        role,
+        department,
+        active
+      )
+      VALUES (?, ?, ?, ?, ?, 1)
+    `);
+
+    for (const account of accounts) {
+      const hashedPassword = bcrypt.hashSync(
+        account.password,
+        10
       );
 
-      console.log(
-        `Admin account created: ${adminEmail}`
+      const existingUser = findUser.get(
+        account.email
       );
+
+      if (existingUser) {
+        updateUser.run(
+          account.name,
+          hashedPassword,
+          account.role,
+          account.department,
+          existingUser.id
+        );
+
+        console.log(
+          `${account.role.toUpperCase()} account updated: ${account.email}`
+        );
+      } else {
+        insertUser.run(
+          account.name,
+          account.email,
+          hashedPassword,
+          account.role,
+          account.department
+        );
+
+        console.log(
+          `${account.role.toUpperCase()} account created: ${account.email}`
+        );
+      }
     }
+
+    console.log(
+      "Default Admin, Manager and Student accounts are ready."
+    );
   } catch (error) {
     console.error(
-      "Automatic admin setup failed:",
+      "Automatic default account setup failed:",
       error
     );
   }
 }
 
-ensureAdminAccount();
+ensureDefaultAccounts();
 
 /* =========================================================
    CORS CONFIGURATION
