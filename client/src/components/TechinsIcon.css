@@ -1,0 +1,98 @@
+/* =========================================================
+   TECHINS Custom Icon System - Glow Effects
+   ========================================================= */
+
+.techins-icon {
+  flex-shrink: 0;
+  transition: transform 0.25s ease, filter 0.25s ease;
+}
+
+/* Light variant (for light surfaces) */
+.techins-icon--light .icon-stroke {
+  color: #0C120C;
+}
+
+.techins-icon--light .icon-accent,
+.techins-icon--light .icon-accent-stroke {
+  color: #FA9A02;
+}
+
+.techins-icon--light .icon-fill {
+  color: #0C120C;
+}
+
+/* Dark variant (for dark surfaces) */
+.techins-icon--dark .icon-stroke {
+  color: #FFFFFF;
+}
+
+.techins-icon--dark .icon-accent,
+.techins-icon--dark .icon-accent-stroke {
+  color: #FA9A02;
+}
+
+.techins-icon--dark .icon-fill {
+  color: #FFFFFF;
+}
+
+/* Subtle glow effect */
+.techins-icon svg {
+  filter: drop-shadow(0 0 8px rgba(250, 154, 2, 0.15));
+  transition: filter 0.3s ease;
+}
+
+/* Hover/Focus glow enhancement */
+button:hover .techins-icon svg,
+a:hover .techins-icon svg,
+button:focus-visible .techins-icon svg,
+a:focus-visible .techins-icon svg,
+.techins-icon--glow svg {
+  filter: drop-shadow(0 0 10px rgba(250, 154, 2, 0.35)) 
+          drop-shadow(0 0 6px rgba(250, 154, 2, 0.25));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Pulse animation for status indicators */
+  .techins-icon--pulse svg {
+    animation: icon-glow-pulse 3s ease-in-out infinite;
+  }
+
+  @keyframes icon-glow-pulse {
+    0%, 100% {
+      filter: drop-shadow(0 0 8px rgba(250, 154, 2, 0.15));
+    }
+    50% {
+      filter: drop-shadow(0 0 12px rgba(250, 154, 2, 0.4)) 
+              drop-shadow(0 0 8px rgba(250, 154, 2, 0.3));
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .techins-icon,
+  .techins-icon svg {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Icon size variants */
+.techins-icon--sm {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.techins-icon--md {
+  width: 24px !important;
+  height: 24px !important;
+}
+
+.techins-icon--lg {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+.techins-icon--xl {
+  width: 56px !important;
+  height: 56px !important;
+}

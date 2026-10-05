@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import TechinsIcon from "../../components/TechinsIcon";
 import "./DailyActivity.css";
 
 const API_URL =
@@ -379,8 +380,8 @@ function DailyActivity() {
                     ) : activities.length === 0 ? (
 
                         <div className="activity-empty">
-                            <div className="empty-icon">
-                                📝
+                            <div className="empty-icon icon-sway">
+                                <TechinsIcon name="notepad" size={48} variant="light" />
                             </div>
 
                             <h3>No activities yet</h3>
@@ -441,7 +442,7 @@ function DailyActivity() {
                                     <div className="activity-meta">
 
                                         <span>
-                                            ⏱{" "}
+                                            <TechinsIcon name="stopwatch" size={12} variant="light" />{" "}
                                             {activity.hours_worked || 0}
                                             {" "}hours
                                         </span>

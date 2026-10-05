@@ -1,9 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
 
+/* Import TechinsIcon styles */
+@import './components/TechinsIcon.css';
+
 :root{
   font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  color:#0C120C;
-  background:#F3F3F3;
+  color:var(--text-on-light);
+  background:var(--background);
   font-synthesis:none;
   text-rendering:optimizeLegibility;
   --techins-bg:#0C120C;
@@ -26,15 +29,15 @@ html{scroll-behavior:smooth}
 body{
   margin:0;
   min-width:320px;
-  background:#F3F3F3;
-  color:#0C120C;
+  background:var(--background);
+  color:var(--text-on-light);
   overflow-x:hidden;
 }
 button,input,textarea,select{font:inherit}
 button{cursor:pointer}
 a{color:inherit}
 img{max-width:100%}
-::selection{background:#FA9A02;color:#0C120C}
+::selection{background:var(--primary-color);color:var(--surface-dark)}
 
 .portal-loading,.portal-error{
   min-height:55vh;
@@ -44,38 +47,40 @@ img{max-width:100%}
   text-align:center;
   padding:30px;
 }
-.portal-loading p,.portal-error p{color:#5F625F}
+.portal-loading p,.portal-error p{color:var(--text-muted-on-light)}
 .portal-error button{
-  border:1px solid #0C120C;
-  background:#0C120C;
-  color:#FFFFFF;
+  border:1px solid var(--surface-dark);
+  background:var(--surface-dark);
+  color:var(--text-on-dark);
   padding:10px 18px;
   border-radius:8px;
 }
 .loader-dot{
-  width:34px;height:34px;border:3px solid #D9D9D9;
-  border-top-color:#FA9A02;border-radius:50%;
+  width:34px;height:34px;border:3px solid var(--border-color);
+  border-top-color:var(--primary-color);border-radius:50%;
   animation:spin .8s linear infinite;margin:auto;
 }
 
 /* Consistent professional surface language */
 .dash-stat,.dash-card,.admin-stat,.panel,.summary-card,.mission-card,.task-card,
 .activity-admin,.feedback-item,.manager-stats>div,.student-profile-card{
-  animation:card-rise .45s ease both;
-  transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease;
+  animation:card-rise .45s var(--anim-easing-decelerate) both;
+  transition:transform var(--anim-duration-fast) var(--anim-easing-standard),
+             box-shadow var(--anim-duration-fast) var(--anim-easing-standard),
+             border-color var(--anim-duration-fast) var(--anim-easing-standard);
 }
 .dash-stat:hover,.dash-card:hover,.admin-stat:hover,.panel:hover,.summary-card:hover,
 .mission-card:hover,.task-card:hover,.manager-stats>div:hover,.student-profile-card:hover{
   transform:translateY(-2px);
-  box-shadow:0 14px 34px rgba(12,18,12,.08);
-  border-color:rgba(250,154,2,.45);
+  box-shadow:var(--shadow-md);
+  border-color:var(--primary-color);
 }
-.gold-mark{color:#FA9A02}
+.gold-mark{color:var(--primary-color)}
 .empty-state{
   padding:30px;
   text-align:center;
-  color:#777;
-  background:#F7F7F7;
+  color:var(--text-subtle-on-light);
+  background:var(--surface-soft);
   border-radius:10px;
 }
 .pill,.score-chip{
@@ -86,27 +91,29 @@ img{max-width:100%}
   text-transform:capitalize;
   white-space:nowrap;
 }
-.pill.pending{background:#F2F2F2;color:#7A4E00}
-.pill.in_progress{background:#EEEEEE;color:#0C120C}
-.pill.completed{background:#EAEAEA;color:#0C120C}
+.pill.pending{background:#FFF8E1;color:#F57F17}
+.pill.in_progress{background:#E3F2FD;color:#1565C0}
+.pill.completed{background:#E8F5E9;color:#2E7D32}
 .simple-head{margin-bottom:20px}
 .simple-head>span{
-  font-size:10px;letter-spacing:1.8px;color:#9A6500;font-weight:900
+  font-size:10px;letter-spacing:1.8px;color:var(--primary-color);font-weight:900
 }
 .simple-head h2{
-  font-family:Manrope,Inter,sans-serif;font-size:30px;letter-spacing:-.8px;margin:7px 0
+  font-family:Manrope,Inter,sans-serif;font-size:30px;letter-spacing:-.8px;margin:7px 0;
+  color:var(--text-on-light);
 }
-.simple-head p{color:#5F625F;margin:0;line-height:1.6}
+.simple-head p{color:var(--text-muted-on-light);margin:0;line-height:1.6}
 .metric{margin:18px 0}
-.metric>span{font-size:12px;color:#5F625F}
-.metric>b{float:right;font-size:12px}
-.metric>div{height:7px;background:#D9D9D9;border-radius:20px;overflow:hidden;margin-top:10px;clear:both}
-.metric i{display:block;height:100%;background:linear-gradient(90deg,#0C120C,#FA9A02);border-radius:20px}
-.feedback-text{margin:0;line-height:1.7;color:#454945;background:#F7F7F7;padding:16px;border-radius:10px}
+.metric>span{font-size:12px;color:var(--text-muted-on-light)}
+.metric>b{float:right;font-size:12px;color:var(--text-on-light)}
+.metric>div{height:7px;background:var(--border-color);border-radius:20px;overflow:hidden;margin-top:10px;clear:both}
+.metric i{display:block;height:100%;background:linear-gradient(90deg,var(--surface-dark),var(--primary-color));border-radius:20px}
+.feedback-text{margin:0;line-height:1.7;color:var(--text-muted-on-light);background:var(--surface-soft);padding:16px;border-radius:10px}
 
 @keyframes card-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes hero-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
+
 @media(prefers-reduced-motion:reduce){
   *,*:before,*:after{
     animation-duration:.01ms!important;
@@ -116,7 +123,14 @@ img{max-width:100%}
   }
 }
 
-
 /* Global professional interaction polish */
-button,a,input,textarea,select{transition:transform .18s cubic-bezier(.22,1,.36,1),box-shadow .24s ease,border-color .24s ease,background-color .24s ease}
-button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid rgba(250,154,2,.25);outline-offset:2px}
+button,a,input,textarea,select{
+  transition:transform var(--anim-duration-fast) var(--anim-easing-standard),
+             box-shadow var(--anim-duration-normal) var(--anim-easing-standard),
+             border-color var(--anim-duration-normal) var(--anim-easing-standard),
+             background-color var(--anim-duration-normal) var(--anim-easing-standard);
+}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{
+  outline:3px solid rgba(250,154,2,.4);
+  outline-offset:2px;
+}

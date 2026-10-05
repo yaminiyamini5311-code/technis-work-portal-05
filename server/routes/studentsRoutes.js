@@ -20,6 +20,7 @@ router.get("/", authenticateToken, (req, res) => {
         name,
         email,
         department,
+        program,
         created_at
       FROM users
       WHERE LOWER(role) = 'student' AND active = 1

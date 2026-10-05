@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import Navbar from "./Navbar";
 import NotificationBell from "./NotificationBell";
+import TechinsIcon from "./TechinsIcon";
 import "./StudentLayout.css";
 
 export default function StudentLayout(){
@@ -8,11 +9,9 @@ export default function StudentLayout(){
   try{user=JSON.parse(localStorage.getItem("user")||"{}")}catch{}
   
   return <div className="student-layout">
-    {/* Floating logo background */}
-    <div className="floating-logo-bg" aria-hidden="true">
-      <img src="/techins-logo.jpg" alt="" className="float-logo float-logo-1" />
-      <img src="/techins-logo.jpg" alt="" className="float-logo float-logo-2" />
-      <img src="/techins-logo.jpg" alt="" className="float-logo float-logo-3" />
+    {/* Single fixed background logo */}
+    <div className="background-logo-fixed" aria-hidden="true">
+      <img src="/techins-logo.jpg" alt="" />
     </div>
     
     <Navbar role="student" />
@@ -21,7 +20,13 @@ export default function StudentLayout(){
         <div><span>TECHINS WORK PORTAL</span><h1>Student Workspace</h1></div>
         <div className="student-header-actions">
           <NotificationBell/>
-          <div className="student-header-user"><strong>{user.name||"Student"}</strong><small>{user.email||""}</small></div>
+          <div className="student-header-user">
+            <TechinsIcon name="user" size={20} variant="light" />
+            <div>
+              <strong>{user.name||"Student"}</strong>
+              <small>{user.email||""}</small>
+            </div>
+          </div>
         </div>
       </header>
       <section className="student-content"><Outlet/></section>

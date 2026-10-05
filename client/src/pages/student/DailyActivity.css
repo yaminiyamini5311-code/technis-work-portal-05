@@ -1,8 +1,8 @@
 .daily-activity-page {
     min-height: 100vh;
     padding: 32px;
-    background: #F3F3F3;
-    color: #182018;
+    background: var(--background);
+    color: var(--text-on-light);
 }
 
 .daily-activity-header {
@@ -18,18 +18,19 @@
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 1.4px;
-    color: #0C120C;
+    color: var(--text-accent-on-light);
 }
 
 .daily-activity-header h1 {
     margin: 0;
     font-size: 32px;
     font-weight: 800;
+    color: var(--text-on-light);
 }
 
 .page-description {
     margin: 8px 0 0;
-    color: #5F625F;
+    color: var(--text-muted-on-light);
     font-size: 15px;
 }
 
@@ -38,10 +39,10 @@
     align-items: center;
     gap: 12px;
     padding: 12px 16px;
-    background: white;
-    border: 1px solid #D9D9D9;
+    background: var(--surface);
+    border: 1px solid var(--border-color);
     border-radius: 14px;
-    box-shadow: 0 4px 15px rgba(20, 30, 60, 0.05);
+    box-shadow: var(--shadow-sm);
 }
 
 .student-avatar {
@@ -51,21 +52,22 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #0C120C;
-    color: white;
+    background: var(--surface-dark);
+    color: var(--text-on-dark);
     font-weight: 800;
 }
 
 .student-badge strong {
     display: block;
     font-size: 14px;
+    color: var(--text-on-light);
 }
 
 .student-badge span {
     display: block;
     margin-top: 3px;
     font-size: 12px;
-    color: #5F625F;
+    color: var(--text-muted-on-light);
 }
 
 .daily-activity-grid {
@@ -77,11 +79,11 @@
 
 .activity-form-card,
 .activity-history-card {
-    background: white;
-    border: 1px solid #D9D9D9;
+    background: var(--surface);
+    border: 1px solid var(--border-color);
     border-radius: 18px;
     padding: 24px;
-    box-shadow: 0 6px 24px rgba(20, 30, 60, 0.06);
+    box-shadow: var(--shadow-sm);
 }
 
 .card-header {
@@ -95,11 +97,12 @@
 .card-header h2 {
     margin: 0;
     font-size: 20px;
+    color: var(--text-on-light);
 }
 
 .card-header p {
     margin: 6px 0 0;
-    color: #5F625F;
+    color: var(--text-muted-on-light);
     font-size: 13px;
 }
 
@@ -108,8 +111,8 @@
     flex-shrink: 0;
     padding: 8px 12px;
     border-radius: 10px;
-    background: #EEEEEE;
-    color: #0C120C;
+    background: var(--surface-soft);
+    color: var(--text-on-light);
     font-size: 12px;
     font-weight: 700;
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import TechinsIcon from "../../components/TechinsIcon";
 import "./Performance.css";
 
 const API_URL =
@@ -160,7 +161,7 @@ function Performance() {
 
             <div className="card-top">
               <span className="card-icon">
-                📈
+                <TechinsIcon name="chart" size={28} variant="light" />
               </span>
 
               <span className="card-label">
@@ -192,7 +193,7 @@ function Performance() {
 
             <div className="card-top">
               <span className="card-icon">
-                🏆
+                <TechinsIcon name="trophy" size={28} variant="light" />
               </span>
 
               <span className="card-label">
@@ -224,7 +225,7 @@ function Performance() {
 
             <div className="card-top">
               <span className="card-icon">
-                ✅
+                <TechinsIcon name="check" size={28} variant="light" />
               </span>
 
               <span className="card-label">
@@ -263,7 +264,7 @@ function Performance() {
           <div className="detail-card">
 
             <div className="detail-heading">
-              <span>💪</span>
+              <span><TechinsIcon name="strength" size={24} variant="light" /></span>
               <h3>Strengths</h3>
             </div>
 
@@ -291,7 +292,7 @@ function Performance() {
           <div className="detail-card">
 
             <div className="detail-heading">
-              <span>🎯</span>
+              <span><TechinsIcon name="improve" size={24} variant="light" /></span>
               <h3>Areas to Improve</h3>
             </div>
 
@@ -319,7 +320,7 @@ function Performance() {
           <div className="detail-card feedback-card">
 
             <div className="detail-heading">
-              <span>💬</span>
+              <span><TechinsIcon name="comment" size={24} variant="light" /></span>
               <h3>Feedback</h3>
             </div>
 
@@ -336,7 +337,7 @@ function Performance() {
         {/* PRIVACY MESSAGE */}
 
         <div className="privacy-message">
-          🔒 This performance information is private
+          <TechinsIcon name="lock" size={16} variant="light" /> This performance information is private
           and belongs only to your student account.
         </div>
 

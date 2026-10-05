@@ -1,259 +1,303 @@
 /* =========================================================
-   TECHINS WORK PORTAL — Button Text Visibility Fix
-   Ensures all buttons have clearly visible text in all states
+   TECHINS WORK PORTAL — Unified Button System
+   Primary/Secondary variants with accessible contrast
    ========================================================= */
 
-/* Primary/Action Buttons */
+/* Primary Buttons (dark background, light text) */
 button,
-.button,
+.button-primary,
 .gold-btn,
 .action-complete,
 .submit-activity-btn,
 .update-btn,
 .login-submit {
-  font-weight: 700 !important;
-  color: #FFFFFF !important;
-  text-shadow: none !important;
-}
-
-/* Ensure minimum contrast for dark backgrounds */
-button:where([class*="gold"], [class*="submit"], [class*="complete"], [class*="update"]),
-.gold-btn,
-.action-complete,
-.submit-activity-btn,
-.update-btn,
-.login-submit {
-  background: #0C120C !important;
-  color: #FFFFFF !important;
+  background: var(--surface-dark) !important;
+  color: var(--text-on-dark) !important;
+  border: 1px solid var(--surface-dark) !important;
   font-weight: 700 !important;
   min-height: 42px;
   padding: 11px 16px;
   font-size: 13px;
   letter-spacing: 0.3px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
-.gold-btn:hover,
-.action-complete:hover,
+button:hover:not(:disabled),
+.button-primary:hover:not(:disabled),
+.gold-btn:hover:not(:disabled),
 .submit-activity-btn:hover:not(:disabled),
 .update-btn:hover:not(:disabled) {
-  background: #182018 !important;
-  color: #FFFFFF !important;
+  background: var(--surface-dark-secondary) !important;
+  color: var(--text-on-dark) !important;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
 
+button:disabled,
+.button-primary:disabled,
 .gold-btn:disabled,
-.action-complete:disabled,
-.submit-activity-btn:disabled,
-.update-btn:disabled {
-  background: #5F625F !important;
-  color: #D9D9D9 !important;
+.submit-activity-btn:disabled {
+  background: var(--text-muted-on-light) !important;
+  color: #E6E6E6 !important;
+  border-color: var(--text-muted-on-light) !important;
   opacity: 1 !important;
   cursor: not-allowed;
+  transform: none !important;
 }
 
-/* Secondary/Progress Buttons */
+/* Secondary Buttons (light background, dark text) */
+.button-secondary,
 .action-progress,
 .refresh-button,
-.refresh-btn {
-  background: #F7F7F7 !important;
-  color: #0C120C !important;
-  border: 1px solid #D0D0D0 !important;
+.refresh-btn,
+.back-button {
+  background: var(--surface) !important;
+  color: var(--text-on-light) !important;
+  border: 1px solid var(--border-color) !important;
   font-weight: 700 !important;
   min-height: 42px;
   padding: 11px 16px;
   font-size: 13px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
+.button-secondary:hover:not(:disabled),
 .action-progress:hover:not(:disabled),
 .refresh-button:hover:not(:disabled),
-.refresh-btn:hover:not(:disabled) {
-  background: #FFFFFF !important;
-  color: #0C120C !important;
-  border-color: #FA9A02 !important;
+.refresh-btn:hover:not(:disabled),
+.back-button:hover:not(:disabled) {
+  background: var(--surface-soft) !important;
+  color: var(--text-on-light) !important;
+  border-color: var(--primary-color) !important;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
+.button-secondary:disabled,
 .action-progress:disabled {
-  background: #F0F0F0 !important;
-  color: #999999 !important;
-  border-color: #E0E0E0 !important;
+  background: var(--surface-soft) !important;
+  color: var(--text-subtle-on-light) !important;
+  border-color: var(--border-light) !important;
   opacity: 1 !important;
   cursor: not-allowed;
+  transform: none !important;
 }
 
-/* Orange/Warning Buttons */
-button:where([style*="background: #FA9A02"], [class*="orange"]),
-.refresh-btn {
-  background: #FA9A02 !important;
-  color: #0C120C !important;
+/* Accent Buttons (orange) */
+.button-accent {
+  background: var(--primary-color) !important;
+  color: var(--surface-dark) !important;
+  border: 1px solid var(--primary-color) !important;
   font-weight: 800 !important;
-  text-shadow: none !important;
+  min-height: 42px;
+  padding: 11px 16px;
+  font-size: 13px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
-.refresh-btn:hover:not(:disabled) {
-  background: #0C120C !important;
-  color: #FFFFFF !important;
+.button-accent:hover:not(:disabled) {
+  background: var(--surface-dark) !important;
+  color: var(--text-on-dark) !important;
+  border-color: var(--surface-dark) !important;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
 
 /* Upload/File Buttons */
 .upload-button {
-  background: #FFFFFF !important;
-  color: #0C120C !important;
-  border: 1px solid #D0D0D0 !important;
+  background: var(--surface) !important;
+  color: var(--text-on-light) !important;
+  border: 1px solid var(--border-color) !important;
   font-weight: 700 !important;
   padding: 10px 14px;
   font-size: 12px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
 .upload-button:hover {
-  background: #F7F7F7 !important;
-  color: #0C120C !important;
-  border-color: #FA9A02 !important;
+  background: var(--surface-soft) !important;
+  color: var(--text-on-light) !important;
+  border-color: var(--primary-color) !important;
+}
+
+.upload-button input {
+  display: none;
 }
 
 /* Chart Tab Buttons */
 .chart-tabs button {
-  color: #5F625F !important;
+  color: var(--text-muted-on-light) !important;
   font-weight: 800 !important;
   padding: 9px 12px;
   font-size: 12px;
   background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
 .chart-tabs button.active {
-  background: #0C120C !important;
-  color: #FFFFFF !important;
+  background: var(--surface-dark) !important;
+  color: var(--text-on-dark) !important;
   font-weight: 800 !important;
 }
 
 .chart-tabs button:hover:not(.active) {
   background: rgba(250, 154, 2, 0.1) !important;
-  color: #0C120C !important;
+  color: var(--text-on-light) !important;
 }
 
 /* Quick Action Links/Buttons */
 .quick-actions a,
 .quick-actions button {
-  background: #0C120C !important;
-  color: #FFFFFF !important;
+  background: var(--surface-dark) !important;
+  color: var(--text-on-dark) !important;
   font-weight: 700 !important;
   padding: 11px 14px;
   font-size: 12px;
   text-decoration: none;
+  border-radius: 9px;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
 .quick-actions a:hover,
 .quick-actions button:hover {
-  background: #182018 !important;
-  color: #FFFFFF !important;
+  background: var(--surface-dark-secondary) !important;
+  color: var(--text-on-dark) !important;
+  transform: translateY(-1px);
 }
 
 /* Panel/Form Buttons */
 .panel-head button {
-  background: #FFFFFF !important;
-  color: #0C120C !important;
-  border: 1px solid #D0D0D0 !important;
+  background: var(--surface) !important;
+  color: var(--text-on-light) !important;
+  border: 1px solid var(--border-color) !important;
   font-weight: 700 !important;
   padding: 9px 13px;
   font-size: 12px;
+  border-radius: 8px;
 }
 
 .panel-head button:hover {
-  background: #F7F7F7 !important;
-  color: #0C120C !important;
-  border-color: #FA9A02 !important;
+  background: var(--surface-soft) !important;
+  color: var(--text-on-light) !important;
+  border-color: var(--primary-color) !important;
 }
 
 /* Notification Button */
 .notification-button {
-  background: #FFFFFF !important;
-  color: #0C120C !important;
-  border: 1px solid #D9D9D9 !important;
+  background: var(--surface) !important;
+  color: var(--text-on-light) !important;
+  border: 1px solid var(--border-color) !important;
   font-size: 18px !important;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
 .notification-button:hover {
-  background: #F7F7F7 !important;
-  color: #FA9A02 !important;
-  border-color: #FA9A02 !important;
+  background: var(--surface-soft) !important;
+  color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
 }
 
 /* Password Show/Hide Button */
 .password-field button {
-  background: #F1F3F5 !important;
-  color: #0C120C !important;
+  background: var(--surface-soft) !important;
+  color: var(--text-on-light) !important;
   font-weight: 800 !important;
   font-size: 11px;
   padding: 0 11px;
+  border: 1px solid var(--border-light) !important;
+  border-radius: 6px;
 }
 
 .password-field button:hover {
-  background: #E4E7EA !important;
-  color: #0C120C !important;
+  background: var(--surface-hover) !important;
+  color: var(--text-on-light) !important;
+  border-color: var(--border-color) !important;
 }
 
 /* Submission Actions */
 .submission-actions button {
-  background: #FFFFFF !important;
-  color: #0C120C !important;
-  border: 1px solid #D0D0D0 !important;
+  background: var(--surface) !important;
+  color: var(--text-on-light) !important;
+  border: 1px solid var(--border-color) !important;
   font-weight: 700 !important;
   font-size: 11px;
   padding: 8px 11px;
+  border-radius: 8px;
 }
 
 .submission-actions button:hover {
-  background: #F7F7F7 !important;
-  color: #0C120C !important;
-  border-color: #FA9A02 !important;
+  background: var(--surface-soft) !important;
+  color: var(--text-on-light) !important;
+  border-color: var(--primary-color) !important;
 }
 
-/* Logout Buttons */
+/* Logout Buttons (on dark surfaces) */
 .student-logout,
 .role-logout,
 .navbar-logout {
   background: rgba(255, 255, 255, 0.05) !important;
-  color: #FFFFFF !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: var(--text-on-dark) !important;
+  border: 1px solid var(--border-on-dark) !important;
   font-weight: 700 !important;
+  border-radius: 11px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
 .student-logout:hover,
 .role-logout:hover,
 .navbar-logout:hover {
   background: rgba(255, 255, 255, 0.1) !important;
-  color: #FA9A02 !important;
-  border-color: #FA9A02 !important;
+  color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  transform: translateY(-1px);
 }
 
 /* Close/Cancel Buttons */
 .mobile-close-button,
 .navbar-close {
   background: transparent !important;
-  color: #FFFFFF !important;
-  border: 1px solid rgba(183, 183, 183, 0.45) !important;
+  color: var(--text-on-dark) !important;
+  border: 1px solid var(--border-on-dark) !important;
   font-size: 24px !important;
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
 .mobile-close-button:hover,
 .navbar-close:hover {
   background: rgba(255, 255, 255, 0.1) !important;
-  color: #FA9A02 !important;
-  border-color: #FA9A02 !important;
-}
-
-/* Loading State */
-button:where([disabled]) {
-  cursor: not-allowed !important;
-}
-
-.button-loader {
-  color: #FFFFFF !important;
-  border-color: rgba(255, 255, 255, 0.35) !important;
-  border-top-color: #FA9A02 !important;
+  color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  transform: rotate(90deg);
 }
 
 /* Focus State for Accessibility */
 button:focus-visible,
-.button:focus-visible {
+.button:focus-visible,
+a[role="button"]:focus-visible {
   outline: 3px solid rgba(250, 154, 2, 0.4) !important;
   outline-offset: 2px !important;
 }
@@ -292,3 +336,4 @@ a[role="button"] {
     font-size: 14px;
   }
 }
+

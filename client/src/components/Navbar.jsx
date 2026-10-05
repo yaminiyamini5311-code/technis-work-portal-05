@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+import TechinsIcon from "./TechinsIcon";
 import "./Navbar.css";
 
 export default function Navbar({ role }) {
@@ -21,30 +22,30 @@ export default function Navbar({ role }) {
     switch (role) {
       case "admin":
         return [
-          { path: "/admin", icon: "⌂", label: "Dashboard", end: true },
-          { path: "/admin/students", icon: "◉", label: "Students" },
-          { path: "/admin/tasks", icon: "✓", label: "Tasks" },
-          { path: "/admin/missions", icon: "◆", label: "Missions" },
-          { path: "/admin/daily-activities", icon: "▤", label: "Daily Activity" },
-          { path: "/admin/performance", icon: "◒", label: "Performance" },
-          { path: "/admin/feedback", icon: "◌", label: "Feedback" },
-          { path: "/admin/audit", icon: "▥", label: "Audit Log" }
+          { path: "/admin", icon: "home", label: "Dashboard", end: true },
+          { path: "/admin/students", icon: "user", label: "Students" },
+          { path: "/admin/tasks", icon: "clipboard", label: "Tasks" },
+          { path: "/admin/missions", icon: "target", label: "Missions" },
+          { path: "/admin/daily-activities", icon: "notepad", label: "Daily Activity" },
+          { path: "/admin/performance", icon: "gauge", label: "Performance" },
+          { path: "/admin/feedback", icon: "comment", label: "Feedback" },
+          { path: "/admin/audit", icon: "history", label: "Audit Log" }
         ];
       case "manager":
         return [
-          { path: "/manager", icon: "◉", label: "Team Activity", end: true },
-          { path: "/manager/tasks", icon: "✓", label: "Tasks" }
+          { path: "/manager", icon: "grid", label: "Team Activity", end: true },
+          { path: "/manager/tasks", icon: "clipboard", label: "Tasks" }
         ];
       case "student":
       case "member":
         return [
-          { path: "/student", icon: "⌂", label: "Dashboard", end: true },
-          { path: "/student/tasks", icon: "✓", label: "My Tasks" },
-          { path: "/student/missions", icon: "◆", label: "Missions" },
-          { path: "/student/daily-activity", icon: "▤", label: "Daily Activity" },
-          { path: "/student/work-history", icon: "◫", label: "Work History" },
-          { path: "/student/performance", icon: "◒", label: "Performance" },
-          { path: "/student/feedback", icon: "◌", label: "Feedback" }
+          { path: "/student", icon: "home", label: "Dashboard", end: true },
+          { path: "/student/tasks", icon: "clipboard", label: "My Tasks" },
+          { path: "/student/missions", icon: "target", label: "Missions" },
+          { path: "/student/daily-activity", icon: "notepad", label: "Daily Activity" },
+          { path: "/student/work-history", icon: "history", label: "Work History" },
+          { path: "/student/performance", icon: "gauge", label: "Performance" },
+          { path: "/student/feedback", icon: "comment", label: "Feedback" }
         ];
       default:
         return [];
@@ -116,7 +117,7 @@ export default function Navbar({ role }) {
               end={item.end}
               onClick={() => setMenuOpen(false)}
             >
-              <span>{item.icon}</span>
+              <span><TechinsIcon name={item.icon} size={16} variant="dark" /></span>
               {item.label}
             </NavLink>
           ))}

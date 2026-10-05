@@ -8,6 +8,8 @@ const {
   getSecret,
 } = require("../middleware/authMiddleware");
 
+const { MAX_STUDENT_ACCOUNTS, ALLOWED_DEPARTMENTS, ALLOWED_PROGRAMS } = require("../config");
+
 const router = express.Router();
 
 /* =========================================================
@@ -177,14 +179,31 @@ router.post(
         .toLowerCase();
       const password = String(req.body?.password || "");
       const department = String(
-        req.body?.department || "Techins"
-      ).trim();
+        req.body?.department || ""
+      ).trim().toLowerCase();
+      const program = req.body?.program ? String(req.body.program).trim().toLowerCase() : null;
 
       if (!name || !email || !password) {
         return res.status(400).json({
           success: false,
           message:
             "Name, email and password are required",
+        });
+      }
+
+      if (!department || !ALLOWED_DEPARTMENTS.includes(department)) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Valid department is required. Choose from: " + ALLOWED_DEPARTMENTS.join(", "),
+        });
+      }
+
+      if (program && !ALLOWED_PROGRAMS.includes(program)) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid program. Choose from: " + ALLOWED_PROGRAMS.join(", "),
         });
       }
 
@@ -221,11 +240,11 @@ router.post(
         `)
         .get();
 
-      if (Number(studentCount?.count || 0) >= 25) {
+      if (Number(studentCount?.count || 0) >= MAX_STUDENT_ACCOUNTS) {
         return res.status(409).json({
           success: false,
           message:
-            "Maximum of 25 students has been reached",
+            `Maximum of ${MAX_STUDENT_ACCOUNTS} students has been reached`,
         });
       }
 
@@ -260,21 +279,23 @@ router.post(
             password,
             role,
             department,
+            program,
             active
           )
-          VALUES (?, ?, ?, 'student', ?, 1)
+          VALUES (?, ?, ?, 'student', ?, ?, 1)
         `)
         .run(
           name,
           email,
           passwordHash,
-          department || "Techins"
+          department,
+          program
         );
 
       return res.status(201).json({
         success: true,
         message:
-          "Student created successfully",
+          "ID created successfully",
         userId: Number(
           result.lastInsertRowid
         ),
@@ -288,7 +309,7 @@ router.post(
       return res.status(500).json({
         success: false,
         message:
-          "Unable to create student",
+          "Unable to create ID",
       });
     }
   }

@@ -1,104 +1,247 @@
 /* =========================================================
-   TECHINS WORK PORTAL — Enhanced Logo Glow Effect
-   Professional, prominent glow animation for logos
+   TECHINS WORK PORTAL — Enhanced Theme System
+   Semantic text tokens, animations, and logo glow
    ========================================================= */
 
 :root {
-  /* Light Theme Colors */
+  /* Brand Colors */
   --primary-color: #FA9A02;
   --secondary-color: #0C120C;
   --accent-color: #B7B7B7;
   
+  /* Surface Colors */
   --background: #F3F3F3;
   --surface: #FFFFFF;
   --surface-soft: #F7F7F7;
   --surface-hover: #FAFAFA;
+  --surface-dark: #0C120C;
+  --surface-dark-secondary: #182018;
   
+  /* Semantic Text Tokens - Light Surfaces */
+  --text-on-light: #0C120C;
+  --text-on-light-secondary: #303430;
+  --text-muted-on-light: #5F625F;
+  --text-subtle-on-light: #777777;
+  --text-accent-on-light: #FA9A02;
+  --text-link-on-light: #0C120C;
+  
+  /* Semantic Text Tokens - Dark Surfaces */
+  --text-on-dark: #FFFFFF;
+  --text-on-dark-secondary: #F0F0F0;
+  --text-muted-on-dark: #D1D1D1;
+  --text-subtle-on-dark: #B7B7B7;
+  --text-accent-on-dark: #FA9A02;
+  --text-link-on-dark: #FFFFFF;
+  
+  /* Legacy (backwards compatibility) */
   --text-primary: #0C120C;
   --text-secondary: #5F625F;
   --text-muted: #777777;
   
+  /* Borders */
   --border-color: #D9D9D9;
   --border-light: #E6E6E6;
+  --border-strong: #B7B7B7;
+  --border-on-dark: rgba(255, 255, 255, 0.25);
   
+  /* Shadows */
   --shadow-sm: 0 4px 15px rgba(16, 24, 40, 0.04);
   --shadow-md: 0 8px 25px rgba(16, 24, 40, 0.08);
   --shadow-lg: 0 20px 60px rgba(12, 18, 12, 0.12);
+  
+  /* Animation Tokens */
+  --anim-duration-fast: 200ms;
+  --anim-duration-normal: 300ms;
+  --anim-duration-slow: 500ms;
+  --anim-duration-ambient: 12s;
+  --anim-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --anim-easing-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --anim-easing-accelerate: cubic-bezier(0.4, 0, 1, 1);
 }
 
-/* Enhanced Logo Glow Effect - More Prominent and Professional */
-.loading-logo-container,
+/* =========================================================
+   ANIMATIONS - Caustic Light, Bubbles, Sway, Glow
+   ========================================================= */
+
+/* Caustic Light Shimmer (for dark hero banners) */
+@media (prefers-reduced-motion: no-preference) {
+  .caustic-light {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    border-radius: inherit;
+    opacity: 0.15;
+    z-index: 0;
+  }
+  
+  .caustic-light::before,
+  .caustic-light::after {
+    content: '';
+    position: absolute;
+    inset: -50%;
+    background: radial-gradient(circle at 30% 50%, rgba(250, 154, 2, 0.4), transparent 50%);
+    animation: caustic-drift 14s ease-in-out infinite;
+  }
+  
+  .caustic-light::after {
+    background: radial-gradient(circle at 70% 60%, rgba(250, 154, 2, 0.3), transparent 40%);
+    animation: caustic-drift 18s ease-in-out infinite reverse;
+    animation-delay: -3s;
+  }
+  
+  @keyframes caustic-drift {
+    0%, 100% {
+      transform: translate(0, 0) scale(1);
+    }
+    33% {
+      transform: translate(8%, -12%) scale(1.1);
+    }
+    66% {
+      transform: translate(-10%, 8%) scale(0.95);
+    }
+  }
+}
+
+/* Gentle Sway (for empty-state icons) */
+@media (prefers-reduced-motion: no-preference) {
+  .icon-sway {
+    animation: gentle-sway 6s ease-in-out infinite;
+  }
+  
+  @keyframes gentle-sway {
+    0%, 100% {
+      transform: translateY(0) translateX(0);
+    }
+    25% {
+      transform: translateY(-3px) translateX(1px);
+    }
+    50% {
+      transform: translateY(-1px) translateX(-2px);
+    }
+    75% {
+      transform: translateY(-4px) translateX(1px);
+    }
+  }
+}
+
+/* Rising Bubbles (for loading/progress states) */
+@media (prefers-reduced-motion: no-preference) {
+  .bubbles-container {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 1;
+  }
+  
+  .bubble {
+    position: absolute;
+    bottom: -20px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(250, 154, 2, 0.3);
+    animation: rise-bubble 4s ease-in infinite;
+  }
+  
+  .bubble:nth-child(1) { left: 15%; animation-delay: 0s; animation-duration: 3.5s; }
+  .bubble:nth-child(2) { left: 35%; animation-delay: 0.8s; animation-duration: 4.2s; }
+  .bubble:nth-child(3) { left: 55%; animation-delay: 1.6s; animation-duration: 3.8s; }
+  .bubble:nth-child(4) { left: 75%; animation-delay: 2.3s; animation-duration: 4.5s; }
+  .bubble:nth-child(5) { left: 25%; animation-delay: 1.2s; animation-duration: 3.9s; }
+  .bubble:nth-child(6) { left: 65%; animation-delay: 2.8s; animation-duration: 4.1s; }
+  
+  @keyframes rise-bubble {
+    0% {
+      transform: translateY(0) scale(0);
+      opacity: 0;
+    }
+    10% {
+      opacity: 0.5;
+      transform: translateY(-10px) scale(1);
+    }
+    90% {
+      opacity: 0.3;
+    }
+    100% {
+      transform: translateY(calc(-100vh - 20px)) scale(0.5);
+      opacity: 0;
+    }
+  }
+}
+
+/* Glow Pulse (for status indicators) */
+@media (prefers-reduced-motion: no-preference) {
+  .glow-pulse {
+    animation: glow-pulse 3s ease-in-out infinite;
+  }
+  
+  @keyframes glow-pulse {
+    0%, 100% {
+      box-shadow: 0 0 8px rgba(250, 154, 2, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 16px rgba(250, 154, 2, 0.7), 
+                  0 0 24px rgba(250, 154, 2, 0.4);
+    }
+  }
+}
+
+/* Enhanced Logo Glow Effect */
 .loading-logo-container img,
-.navbar-brand img,
-.student-brand img,
-.role-brand img,
-.hero-brand img,
-.login-brand img {
+.navbar-brand img {
   box-shadow: 0 0 40px rgba(250, 154, 2, 0.6),
               0 0 80px rgba(250, 154, 2, 0.4),
-              0 0 120px rgba(250, 154, 2, 0.3),
-              0 0 160px rgba(250, 154, 2, 0.15);
-  animation: enhanced-logo-glow 3s ease-in-out infinite;
+              0 0 120px rgba(250, 154, 2, 0.3);
 }
 
-@keyframes enhanced-logo-glow {
-  0%, 100% {
-    box-shadow: 0 0 40px rgba(250, 154, 2, 0.6),
-                0 0 80px rgba(250, 154, 2, 0.4),
-                0 0 120px rgba(250, 154, 2, 0.3),
-                0 0 160px rgba(250, 154, 2, 0.15);
-    filter: brightness(1);
+@media (prefers-reduced-motion: no-preference) {
+  .loading-logo-container img,
+  .navbar-brand img {
+    animation: enhanced-logo-glow 3s ease-in-out infinite;
   }
-  50% {
-    box-shadow: 0 0 60px rgba(250, 154, 2, 0.8),
-                0 0 100px rgba(250, 154, 2, 0.6),
-                0 0 140px rgba(250, 154, 2, 0.4),
-                0 0 200px rgba(250, 154, 2, 0.2);
-    filter: brightness(1.1);
+  
+  @keyframes enhanced-logo-glow {
+    0%, 100% {
+      box-shadow: 0 0 40px rgba(250, 154, 2, 0.6),
+                  0 0 80px rgba(250, 154, 2, 0.4),
+                  0 0 120px rgba(250, 154, 2, 0.3);
+      filter: brightness(1);
+    }
+    50% {
+      box-shadow: 0 0 60px rgba(250, 154, 2, 0.8),
+                  0 0 100px rgba(250, 154, 2, 0.6),
+                  0 0 140px rgba(250, 154, 2, 0.4);
+      filter: brightness(1.1);
+    }
   }
 }
 
-/* Additional glow for loading page container */
 .loading-logo-container {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.05));
   backdrop-filter: blur(15px);
   border: 2px solid rgba(250, 154, 2, 0.5);
 }
 
-.loading-logo-container::before {
-  content: '';
-  position: absolute;
-  inset: -20px;
-  background: radial-gradient(circle, rgba(250, 154, 2, 0.15), transparent 70%);
-  border-radius: 50%;
-  animation: pulse-ring 3s ease-in-out infinite;
-  z-index: -1;
-}
-
-@keyframes pulse-ring {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 0.6;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 1;
-  }
-}
-
-/* Hover enhancement - extra glow on hover */
-.navbar-brand img:hover,
-.student-brand img:hover,
-.role-brand img:hover,
-.hero-brand img:hover,
-.login-brand img:hover {
+.navbar-brand img:hover {
   box-shadow: 0 0 50px rgba(250, 154, 2, 0.9),
               0 0 100px rgba(250, 154, 2, 0.7),
-              0 0 150px rgba(250, 154, 2, 0.5),
-              0 0 200px rgba(250, 154, 2, 0.3);
+              0 0 150px rgba(250, 154, 2, 0.5);
   filter: brightness(1.15);
   transform: scale(1.02);
   transition: all 0.4s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caustic-light,
+  .icon-sway,
+  .bubble,
+  .glow-pulse,
+  .loading-logo-container img,
+  .navbar-brand img {
+    animation: none !important;
+  }
 }
 
 /* Surface Elements */
@@ -117,7 +260,7 @@
 .upload-box {
   background: var(--surface) !important;
   border-color: var(--border-color) !important;
-  color: var(--text-primary);
+  color: var(--text-on-light);
   box-shadow: var(--shadow-md);
 }
 
@@ -133,29 +276,29 @@ input,
 textarea,
 select {
   background: var(--surface) !important;
-  color: var(--text-primary) !important;
+  color: var(--text-on-light) !important;
   border-color: var(--border-color) !important;
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: var(--text-muted) !important;
+  color: var(--text-muted-on-light) !important;
 }
 
 /* Text Colors */
 h1, h2, h3, h4, h5, h6 {
-  color: var(--text-primary);
+  color: var(--text-on-light);
 }
 
 p, span, small {
-  color: var(--text-secondary);
+  color: var(--text-muted-on-light);
 }
 
 .text-muted,
 .page-description,
 .task-card-top p,
 .feedback-box p {
-  color: var(--text-muted) !important;
+  color: var(--text-muted-on-light) !important;
 }
 
 /* Notification Popup */
@@ -177,7 +320,7 @@ p, span, small {
 .empty-state,
 .workspace-empty {
   background: var(--surface-soft) !important;
-  color: var(--text-muted) !important;
+  color: var(--text-subtle-on-light) !important;
 }
 
 /* Progress Bars */
@@ -192,30 +335,23 @@ p, span, small {
 .status,
 .workspace-status-badge {
   background: var(--surface-soft) !important;
-  color: var(--text-primary) !important;
+  color: var(--text-on-light) !important;
 }
 
 /* Reduced Motion Support */
 @media (prefers-reduced-motion: reduce) {
-  .loading-logo-container,
-  .loading-logo-container img,
-  .navbar-brand img,
-  .student-brand img,
-  .role-brand img,
-  .hero-brand img,
-  .login-brand img {
-    animation: none !important;
-  }
-  
-  .loading-logo-container::before {
-    animation: none !important;
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
 /* Smooth transitions */
 * {
-  transition: background-color 0.3s ease, 
-              color 0.3s ease, 
-              border-color 0.3s ease,
-              box-shadow 0.3s ease;
+  transition: background-color var(--anim-duration-normal) var(--anim-easing-standard), 
+              color var(--anim-duration-normal) var(--anim-easing-standard), 
+              border-color var(--anim-duration-normal) var(--anim-easing-standard),
+              box-shadow var(--anim-duration-normal) var(--anim-easing-standard);
 }
+

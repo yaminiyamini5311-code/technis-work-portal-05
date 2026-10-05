@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import TechinsIcon from "../../components/TechinsIcon";
 
 const API_URL =
     import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -178,8 +179,8 @@ function Missions() {
 
             {!error && missions.length === 0 && (
                 <div className="empty-missions">
-                    <div className="empty-icon">
-                        🎯
+                    <div className="empty-icon icon-sway">
+                        <TechinsIcon name="target" size={48} variant="light" />
                     </div>
 
                     <h2>No Missions Assigned</h2>
@@ -294,7 +295,7 @@ function Missions() {
 
                                     {completed ? (
                                         <div className="completed-message">
-                                            ✓ Mission Completed
+                                            <TechinsIcon name="check" size={18} variant="light" /> Mission Completed
                                         </div>
                                     ) : (
                                         <button

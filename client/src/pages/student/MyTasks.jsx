@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
+import TechinsIcon from "../../components/TechinsIcon";
 import "./MyTasks.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -93,8 +94,17 @@ export default function MyTasks() {
         {message && <div className="info-msg">{message}</div>}
 
         <div className="task-summary">
-          {[["Total Tasks", tasks.length, "⌁"], ["Pending", pending, "◷"], ["In Progress", inProgress, "◒"], ["Under Review", review, "◌"], ["Approved", completed, "✓"]].map(([label, value, icon]) => (
-            <div className="summary-card" key={label}><div className="summary-icon">{icon}</div><div><span>{label}</span><strong>{value}</strong></div></div>
+          {[
+            ["Total Tasks", tasks.length, "clipboard"],
+            ["Pending", pending, "clock"],
+            ["In Progress", inProgress, "progress"],
+            ["Under Review", review, "search"],
+            ["Approved", completed, "check"]
+          ].map(([label, value, iconName]) => (
+            <div className="summary-card" key={label}>
+              <div className="summary-icon"><TechinsIcon name={iconName} size={20} variant="light" /></div>
+              <div><span>{label}</span><strong>{value}</strong></div>
+            </div>
           ))}
         </div>
 
@@ -111,7 +121,7 @@ export default function MyTasks() {
                 <div className="task-actions">
                   {(workflow === "Assigned" || task.status === "pending") && <button className="action-progress" disabled={busy === task.id} onClick={() => startTask(task.id)}>{busy === task.id ? "Updating…" : "Start Task"}</button>}
                   {workflow === "Under Review" || workflow === "Submitted" || workflow === "Resubmitted" ? <div className="completed-label">Submission received · awaiting review</div> : null}
-                  {workflow === "Approved" && <div className="completed-label">✓ Task approved and recorded</div>}
+                  {workflow === "Approved" && <div className="completed-label"><TechinsIcon name="check" size={16} variant="light" /> Task approved and recorded</div>}
                 </div>
                 {task.workflow_status === "Revision Required" && <div className="feedback-box"><strong>Revision requested</strong><p>{task.feedback || "Review the manager feedback and submit a new version."}</p></div>}
                 {canSubmit && <div className="upload-box">

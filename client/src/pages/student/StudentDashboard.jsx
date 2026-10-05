@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import TechinsIcon from "../../components/TechinsIcon";
 import "./StudentDashboard.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -48,30 +49,38 @@ export default function StudentDashboard(){
 
   return <div className="student-dashboard-page page-enter">
     <section className="workspace-hero">
+      <div className="caustic-light"></div>
       <div className="workspace-hero-copy">
         <span className="section-kicker">PRIVATE WORKSPACE</span>
         <h2>Welcome back, {user.name}</h2>
         <p>Everything assigned to you, your daily work, missions and measurable progress in one place.</p>
         <div className={`workspace-status ${unread?"has-updates":""}`}>
-          <span className="status-dot"/>
+          <span className={`status-dot ${unread?"glow-pulse":""}`}/>
           {unread?`${unread} new update${unread>1?"s":""} waiting for you`:"Workspace is up to date"}
         </div>
       </div>
       <div className="overall-progress">
-        <div className="progress-ring"><strong>{data.progress}%</strong></div>
+        <div className="progress-ring">
+          <div className="bubbles-container">
+            <span className="bubble"></span>
+            <span className="bubble"></span>
+            <span className="bubble"></span>
+          </div>
+          <strong>{data.progress}%</strong>
+        </div>
         <div><span>Overall progress</span><small>Based on your current records</small></div>
       </div>
     </section>
 
     <section className="workspace-stats" aria-label="Workspace overview">
       {[
-        ["Total tasks",data.tasks.total,"Assigned work","⌁"],
-        ["Pending",pending,"Needs your attention","◷"],
-        ["Completed",completed,"Approved work","✓"],
-        ["Missions",data.missions.total,"Assigned missions","✦"]
-      ].map(([label,value,note,icon])=>
+        ["Total tasks",data.tasks.total,"Assigned work","clipboard"],
+        ["Pending",pending,"Needs your attention","clock"],
+        ["Completed",completed,"Approved work","check"],
+        ["Missions",data.missions.total,"Assigned missions","target"]
+      ].map(([label,value,note,iconName])=>
         <article className="workspace-stat" key={label}>
-          <div className="stat-icon">{icon}</div>
+          <div className="stat-icon-tile"><TechinsIcon name={iconName} size={20} variant="light" /></div>
           <div><span>{label}</span><strong>{value}</strong><small>{note}</small></div>
         </article>
       )}
@@ -86,11 +95,11 @@ export default function StudentDashboard(){
         <div className="task-list">
           {data.tasks.recent.length?data.tasks.recent.map(t=>
             <div className="professional-task-row" key={t.id}>
-              <div className="task-index">T</div>
+              <div className="task-index"><TechinsIcon name="clipboard" size={16} variant="light" /></div>
               <div className="task-row-content"><strong>{t.title}</strong><small>{t.due_date?`Due ${t.due_date}`:"No due date"}</small></div>
               <span className={`workspace-status-badge ${t.status}`}>{String(t.status).replace("_"," ")}</span>
             </div>
-          ):<div className="workspace-empty"><strong>No tasks assigned yet</strong><span>New assignments will appear here.</span></div>}
+          ):<div className="workspace-empty"><TechinsIcon name="folder" size={40} variant="light" className="icon-sway" /><strong>No tasks assigned yet</strong><span>New assignments will appear here.</span></div>}
         </div>
       </section>
 
@@ -122,26 +131,38 @@ export default function StudentDashboard(){
         </div>
         {data.missions.recent.length?data.missions.recent.map(m=>
           <div className="mission-row" key={m.id}>
-            <div className="mission-mark">◆</div>
+            <div className="mission-mark"><TechinsIcon name="target" size={16} variant="light" /></div>
             <div><strong>{m.title}</strong><small>{m.due_date||"No deadline"}</small></div>
             <b>{Math.min(100,Number(m.progress||0))}%</b>
           </div>
-        ):<div className="workspace-empty"><strong>No missions assigned yet</strong><span>Assigned missions will appear here.</span></div>}
+        ):<div className="workspace-empty"><TechinsIcon name="target" size={40} variant="light" className="icon-sway" /><strong>No missions assigned yet</strong><span>Assigned missions will appear here.</span></div>}
       </section>
 
       <section className="workspace-card feedback-card">
         <div className="card-heading">
           <div><span className="section-kicker">PRIVATE FEEDBACK</span><h3>Latest feedback</h3><p>Feedback connected to your work.</p></div>
-          <span className="feedback-mark">◈</span>
+          <TechinsIcon name="comment" size={20} variant="light" className="feedback-mark" />
         </div>
         <p className="feedback-text">{data.feedback||"No feedback has been recorded yet."}</p>
       </section>
     </div>
 
     <section className="workspace-quick-links">
-      <a href="/student/daily-activity"><span>▤</span><div><strong>Daily activity</strong><small>Record today's completed work, blockers and next steps.</small></div><b>→</b></a>
-      <a href="/student/work-history"><span>◫</span><div><strong>Work history</strong><small>Review your stored work and submission history.</small></div><b>→</b></a>
-      <a href="/student/performance"><span>◒</span><div><strong>Performance</strong><small>Review measurable progress and evaluated results.</small></div><b>→</b></a>
+      <a href="/student/daily-activity">
+        <span><TechinsIcon name="notepad" size={20} variant="light" /></span>
+        <div><strong>Daily activity</strong><small>Record today's completed work, blockers and next steps.</small></div>
+        <b><TechinsIcon name="chevron" size={18} variant="light" /></b>
+      </a>
+      <a href="/student/work-history">
+        <span><TechinsIcon name="history" size={20} variant="light" /></span>
+        <div><strong>Work history</strong><small>Review your stored work and submission history.</small></div>
+        <b><TechinsIcon name="chevron" size={18} variant="light" /></b>
+      </a>
+      <a href="/student/performance">
+        <span><TechinsIcon name="gauge" size={20} variant="light" /></span>
+        <div><strong>Performance</strong><small>Review measurable progress and evaluated results.</small></div>
+        <b><TechinsIcon name="chevron" size={18} variant="light" /></b>
+      </a>
     </section>
   </div>
 }

@@ -81,7 +81,8 @@ export default function AdminDashboard() {
   };
   
   useEffect(()=>{load();const id=setInterval(load,20000);return()=>clearInterval(id)},[period]);
-  const capacity=useMemo(()=>Math.min(((data?.students||0)/25)*100,100),[data]);
+  const maxStudents = data?.maxStudents || 100;
+  const capacity=useMemo(()=>Math.min(((data?.students||0)/maxStudents)*100,100),[data, maxStudents]);
   
   if(loading&&!data)return <div className="portal-loading"><div className="loader-dot"/><h2>Loading admin workspace</h2><p>Syncing the latest team data.</p></div>;
   
@@ -97,8 +98,8 @@ export default function AdminDashboard() {
       {chart?.values?.length ? <MiniLineChart labels={chart.labels} values={chart.values}/> : <div className="empty-state">No completion activity has been recorded yet.</div>}
     </section>
     <div className="admin-quick">
-      <div className="panel capacity-panel"><div className="section-icon">◈</div><div><h3>Student capacity</h3><p>{data?.students||0} of 25 student accounts are currently registered.</p></div><div className="capacity"><i style={{width:`${capacity}%`}}/></div><div className="capacity-meta"><span>Available slots</span><strong>{Math.max(25-(data?.students||0),0)}</strong></div></div>
-      <div className="panel"><div className="section-icon">✦</div><div><h3>Quick actions</h3><p>Move directly into the areas you manage most.</p></div><div className="quick-actions"><a href="/admin/students">Create student</a><a href="/admin/tasks">Assign task</a><a href="/admin/missions">Create mission</a><a href="/admin/feedback">Give feedback</a></div></div>
+      <div className="panel capacity-panel"><div className="section-icon">◈</div><div><h3>Student capacity</h3><p>{data?.students||0} of {maxStudents} student accounts are currently registered.</p></div><div className="capacity"><i style={{width:`${capacity}%`}}/></div><div className="capacity-meta"><span>Available slots</span><strong>{Math.max(maxStudents-(data?.students||0),0)}</strong></div></div>
+      <div className="panel"><div className="section-icon">✦</div><div><h3>Quick actions</h3><p>Move directly into the areas you manage most.</p></div><div className="quick-actions"><a href="/admin/students">Create ID</a><a href="/admin/tasks">Assign task</a><a href="/admin/missions">Create mission</a><a href="/admin/feedback">Give feedback</a></div></div>
     </div>
     <section className="panel"><div className="panel-head"><div><span className="section-kicker">SUBMITTED WORK</span><h3>Latest task outcomes & files</h3></div><a className="panel-link" href="/admin/tasks">Open task control →</a></div>{submissions?.length?<div className="submission-list">{submissions.slice(0,6).map(item=><div className="submission-row" key={item.id}><div className="submission-avatar">{(item.student_name||'S').charAt(0).toUpperCase()}</div><div><strong>{item.title}</strong><small>{item.student_name} · {item.outcome_submitted_at ? new Date(item.outcome_submitted_at).toLocaleString() : 'Files uploaded'}</small></div><span>{item.file_count||0} file{item.file_count===1?'':'s'}</span></div>)}</div>:<div className="empty-state">No student reports or task files submitted yet.</div>}</section>
   </div>;

@@ -5,6 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const { sendTaskAssignmentEmail } = require("../utils/email");
 const { writeAudit } = require("../utils/audit");
+const { ALLOWED_PROGRAMS } = require("../config");
 
 const router = express.Router();
 const upload = multer({
@@ -75,13 +76,22 @@ router.post("/", authenticateToken, authorizeRoles("admin","manager"), async (re
   try {
     const b=req.body||{}; const title=String(b.title||"").trim(); const assignedTo=Number(b.assigned_to);
     if(!title || !assignedTo) return res.status(400).json({success:false,message:"Task title and student are required"});
+    
+    const program = b.program ? String(b.program).trim().toLowerCase() : null;
+    if (program && !ALLOWED_PROGRAMS.includes(program)) {
+      return res.status(400).json({success:false,message:"Invalid program. Choose from: " + ALLOWED_PROGRAMS.join(", ")});
+    }
+    
     const db=req.app.locals.db; const student=db.prepare("SELECT id,name,email FROM users WHERE id=? AND LOWER(role)='student' AND active=1").get(assignedTo);
     if(!student) return res.status(404).json({success:false,message:"Student not found"});
     const priority=String(b.priority||"medium").toLowerCase(); if(!priorityValues.has(priority)) return res.status(400).json({success:false,message:"Invalid priority"});
     const taskCode=nextTaskCode(db); const workflow=String(b.workflow_status||"Assigned");
     if(!STATUS.includes(workflow)) return res.status(400).json({success:false,message:"Invalid task workflow status"});
-    const result=db.prepare(`INSERT INTO tasks (task_code,title,category,program,team,task_type,description,what,why,how,expected_output,submission_requirements,resources,notes,assigned_to,assigned_by,status,workflow_status,priority,start_date,due_date,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
-      taskCode,title,String(b.category||"General"),String(b.program||"TECHINS"),String(b.team||"General"),String(b.task_type||"General"),String(b.description||"").trim(),String(b.what||"").trim(),String(b.why||"").trim(),String(b.how||"").trim(),String(b.expected_output||"").trim(),String(b.submission_requirements||"").trim(),String(b.resources||"").trim(),String(b.notes||"").trim(),assignedTo,req.user.id,legacyStatus(workflow),workflow,priority,b.start_date||null,b.due_date||null,new Date().toISOString(),new Date().toISOString()
+    
+    const how_to_do = b.how_to_do ? String(b.how_to_do).trim().substring(0, 5000) : null;
+    
+    const result=db.prepare(`INSERT INTO tasks (task_code,title,category,program,team,task_type,description,what,why,how,how_to_do,expected_output,submission_requirements,resources,notes,assigned_to,assigned_by,status,workflow_status,priority,start_date,due_date,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      taskCode,title,String(b.category||"").trim()||null,program,String(b.team||"").trim()||null,String(b.task_type||"General"),String(b.description||"").trim(),String(b.what||"").trim(),String(b.why||"").trim(),String(b.how||"").trim(),how_to_do,String(b.expected_output||"").trim(),String(b.submission_requirements||"").trim(),String(b.resources||"").trim(),String(b.notes||"").trim(),assignedTo,req.user.id,legacyStatus(workflow),workflow,priority,b.start_date||null,b.due_date||null,new Date().toISOString(),new Date().toISOString()
     );
     const id=Number(result.lastInsertRowid); notify(db,assignedTo,"task_assigned","New task assigned",`${title} (${taskCode}) has been assigned to you.`,id);
     writeAudit(db,{actorId:req.user.id,action:"task_created",entityType:"task",entityId:id,newValue:{task_code:taskCode,title,assigned_to:assignedTo,workflow_status:workflow}});

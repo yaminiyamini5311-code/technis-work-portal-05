@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const db = require("./database");
+const { MAX_STUDENT_ACCOUNTS } = require("./config");
 
 async function main() {
   const [name, emailArg, passwordArg, roleArg = "student"] = process.argv.slice(2);
@@ -11,7 +12,7 @@ async function main() {
   if (!["student", "manager", "admin"].includes(role)) throw new Error("Role must be student, manager or admin");
   const email = String(emailArg).trim().toLowerCase();
   if (db.prepare("SELECT id FROM users WHERE email=?").get(email)) throw new Error("A user with this email already exists");
-  if (role === "student" && Number(db.prepare("SELECT COUNT(*) c FROM users WHERE LOWER(role)='student' AND active=1").get().c) >= 25) throw new Error("Maximum of 25 active students has been reached");
+  if (role === "student" && Number(db.prepare("SELECT COUNT(*) c FROM users WHERE LOWER(role)='student' AND active=1").get().c) >= MAX_STUDENT_ACCOUNTS) throw new Error(`Maximum of ${MAX_STUDENT_ACCOUNTS} active students has been reached`);
   const hash = await bcrypt.hash(String(passwordArg), 12);
   const result = db.prepare("INSERT INTO users (name,email,password,role,department,active) VALUES (?,?,?,?,?,1)").run(String(name).trim(),email,hash,role,"Techins");
   console.log(`Created ${role} account: ${email} (id ${Number(result.lastInsertRowid)})`);

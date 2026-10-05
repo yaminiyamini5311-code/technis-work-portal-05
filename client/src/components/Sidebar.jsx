@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import TechinsIcon from "./TechinsIcon";
 
 function Sidebar() {
   const user = JSON.parse(localStorage.getItem("user"));
@@ -10,31 +11,31 @@ function Sidebar() {
       </div>
 
       <NavLink to="/dashboard">
-        🏠 Dashboard
+        <TechinsIcon name="home" size={18} variant="light" /> Dashboard
       </NavLink>
 
       <NavLink to="/tasks">
-        📋 My Tasks
+        <TechinsIcon name="clipboard" size={18} variant="light" /> My Tasks
       </NavLink>
 
       <NavLink to="/mission">
-        🎯 Missions
+        <TechinsIcon name="target" size={18} variant="light" /> Missions
       </NavLink>
 
       <NavLink to="/daily-activity">
-        📝 Daily Activity
+        <TechinsIcon name="notepad" size={18} variant="light" /> Daily Activity
       </NavLink>
 
       <NavLink to="/work-history">
-        📚 Work History
+        <TechinsIcon name="history" size={18} variant="light" /> Work History
       </NavLink>
 
       <NavLink to="/performance">
-        📊 Performance
+        <TechinsIcon name="gauge" size={18} variant="light" /> Performance
       </NavLink>
 
       <NavLink to="/activity-monitor">
-        👁 Activity Monitor
+        <TechinsIcon name="search" size={18} variant="light" /> Activity Monitor
       </NavLink>
 
       {user?.role === "admin" && (
@@ -44,7 +45,7 @@ function Sidebar() {
           </div>
 
           <NavLink to="/admin">
-            ⚙ Admin Dashboard
+            <TechinsIcon name="grid" size={18} variant="light" /> Admin Dashboard
           </NavLink>
         </>
       )}

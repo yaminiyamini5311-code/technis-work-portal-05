@@ -1,5 +1,6 @@
 const express = require("express");
 const { authenticateToken, authorizeRoles } = require("../middleware/authMiddleware");
+const { MAX_STUDENT_ACCOUNTS } = require("../config");
 
 const router = express.Router();
 
@@ -15,6 +16,7 @@ router.get("/stats", authenticateToken, authorizeRoles("admin", "manager"), (req
     
     const stats = {
       students: db.prepare("SELECT COUNT(*) AS count FROM users WHERE LOWER(role) = 'student' AND active = 1").get().count || 0,
+      maxStudents: MAX_STUDENT_ACCOUNTS,
       tasks: db.prepare("SELECT COUNT(*) AS count FROM tasks").get().count || 0,
       missions: db.prepare("SELECT COUNT(*) AS count FROM missions").get().count || 0,
       activities: db.prepare("SELECT COUNT(*) AS count FROM daily_activities").get().count || 0,

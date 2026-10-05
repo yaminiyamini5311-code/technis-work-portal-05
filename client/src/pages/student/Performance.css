@@ -1,7 +1,7 @@
 .performance-page {
   min-height: 100vh;
-  background: #f4f7fb;
-  color: #182018;
+  background: var(--background);
+  color: var(--text-on-light);
   font-family: Arial, sans-serif;
 }
 
@@ -9,22 +9,28 @@
 /* HEADER */
 
 .performance-header {
-  background: #0C120C;
-  color: white;
+  background: var(--surface-dark);
+  color: var(--text-on-dark);
   padding: 25px 40px;
   display: flex;
   align-items: center;
   gap: 25px;
+  position: relative;
+  overflow: hidden;
 }
 
 .performance-header h1 {
   margin: 0;
   font-size: 26px;
+  position: relative;
+  z-index: 2;
 }
 
 .performance-header p {
   margin: 5px 0 0;
-  color: #B7B7B7;
+  color: var(--text-muted-on-dark);
+  position: relative;
+  z-index: 2;
 }
 
 
@@ -32,8 +38,8 @@
 
 .back-button {
   border: none;
-  background: white;
-  color: #0C120C;
+  background: var(--surface);
+  color: var(--text-on-light);
   padding: 10px 18px;
   border-radius: 8px;
   cursor: pointer;
@@ -41,7 +47,7 @@
 }
 
 .back-button:hover {
-  background: #D9D9D9;
+  background: var(--surface-soft);
 }
 
 
@@ -57,22 +63,22 @@
 /* STUDENT PROFILE */
 
 .student-profile {
-  background: white;
+  background: var(--surface);
   padding: 25px;
   border-radius: 14px;
   display: flex;
   align-items: center;
   gap: 18px;
   margin-bottom: 25px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-sm);
 }
 
 .student-avatar {
   width: 65px;
   height: 65px;
   border-radius: 50%;
-  background: #FA9A02;
-  color: white;
+  background: var(--primary-color);
+  color: var(--surface-dark);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -82,16 +88,17 @@
 
 .student-profile h2 {
   margin: 0 0 5px;
+  color: var(--text-on-light);
 }
 
 .student-profile p {
   margin: 0 0 5px;
-  color: #5F625F;
+  color: var(--text-muted-on-light);
 }
 
 .student-profile span {
   font-size: 14px;
-  color: #FA9A02;
+  color: var(--text-accent-on-light);
   font-weight: 600;
 }
 
@@ -106,10 +113,10 @@
 }
 
 .performance-card {
-  background: white;
+  background: var(--surface);
   padding: 25px;
   border-radius: 14px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-sm);
 }
 
 .card-top {
@@ -125,16 +132,17 @@
 .card-label {
   font-size: 13px;
   font-weight: bold;
-  color: #5F625F;
+  color: var(--text-muted-on-light);
 }
 
 .performance-card h2 {
   font-size: 35px;
   margin: 20px 0 12px;
+  color: var(--text-on-light);
 }
 
 .performance-card p {
-  color: #5F625F;
+  color: var(--text-muted-on-light);
   line-height: 1.5;
 }
 
@@ -144,14 +152,14 @@
 .progress-track {
   width: 100%;
   height: 9px;
-  background: #D9D9D9;
+  background: var(--surface-soft);
   border-radius: 20px;
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
-  background: #FA9A02;
+  background: var(--primary-color);
   border-radius: 20px;
 }
 
@@ -165,18 +173,18 @@
 }
 
 .detail-card {
-  background: white;
+  background: var(--surface);
   padding: 25px;
   border-radius: 14px;
   min-height: 180px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-sm);
 }
 
 .detail-heading {
   display: flex;
   align-items: center;
   gap: 10px;
-  border-bottom: 1px solid #D9D9D9;
+  border-bottom: 1px solid var(--border-color);
   padding-bottom: 12px;
   margin-bottom: 15px;
 }
@@ -187,6 +195,7 @@
 
 .detail-heading h3 {
   margin: 0;
+  color: var(--text-on-light);
 }
 
 .detail-card ul {
@@ -195,15 +204,16 @@
 
 .detail-card li {
   margin: 10px 0;
+  color: var(--text-on-light);
 }
 
 .feedback-card p {
-  color: #475569;
+  color: var(--text-muted-on-light);
   line-height: 1.7;
 }
 
 .empty-text {
-  color: #777777;
+  color: var(--text-muted-on-light);
 }
 
 
@@ -211,12 +221,12 @@
 
 .privacy-message {
   margin-top: 25px;
-  background: #EEEEEE;
-  border: 1px solid #bfdbfe;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-color);
   padding: 15px;
   border-radius: 10px;
   text-align: center;
-  color: #0C120C;
+  color: var(--text-on-light);
 }
 
 
@@ -227,18 +237,18 @@
   width: 90%;
   max-width: 500px;
   margin: 120px auto;
-  background: white;
+  background: var(--surface);
   padding: 40px;
   border-radius: 15px;
   text-align: center;
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-md);
 }
 
 .loader {
   width: 40px;
   height: 40px;
-  border: 4px solid #D9D9D9;
-  border-top: 4px solid #FA9A02;
+  border: 4px solid var(--surface-soft);
+  border-top: 4px solid var(--primary-color);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 20px;
@@ -251,7 +261,7 @@
 }
 
 .error-box p {
-  color: #0C120C;
+  color: var(--text-on-light);
 }
 
 

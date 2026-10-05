@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import TechinsIcon from "../../components/TechinsIcon";
 
 const API_URL =
     import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -298,20 +299,16 @@ function WorkHistory() {
     };
 
     const getTypeIcon = (type) => {
-
         if (type === "activity") {
-            return "📝";
+            return <TechinsIcon name="notepad" size={18} variant="light" />;
         }
-
         if (type === "task") {
-            return "✓";
+            return <TechinsIcon name="clipboard" size={18} variant="light" />;
         }
-
         if (type === "mission") {
-            return "🎯";
+            return <TechinsIcon name="target" size={18} variant="light" />;
         }
-
-        return "📌";
+        return <TechinsIcon name="folder" size={18} variant="light" />;
     };
 
     if (loading) {
@@ -402,10 +399,10 @@ function WorkHistory() {
                     <div
                         style={{
                             ...styles.summaryIcon,
-                            background: "#eef2ff"
+                            background: "rgba(250,154,2,0.12)"
                         }}
                     >
-                        📝
+                        <TechinsIcon name="notepad" size={21} variant="light" />
                     </div>
 
                     <div>
@@ -426,10 +423,10 @@ function WorkHistory() {
                     <div
                         style={{
                             ...styles.summaryIcon,
-                            background: "#ecfdf5"
+                            background: "rgba(250,154,2,0.12)"
                         }}
                     >
-                        ✓
+                        <TechinsIcon name="check" size={21} variant="light" />
                     </div>
 
                     <div>
@@ -450,10 +447,10 @@ function WorkHistory() {
                     <div
                         style={{
                             ...styles.summaryIcon,
-                            background: "#fff7ed"
+                            background: "rgba(250,154,2,0.12)"
                         }}
                     >
-                        🎯
+                        <TechinsIcon name="target" size={21} variant="light" />
                     </div>
 
                     <div>
@@ -474,10 +471,10 @@ function WorkHistory() {
                     <div
                         style={{
                             ...styles.summaryIcon,
-                            background: "#f0fdf4"
+                            background: "rgba(250,154,2,0.12)"
                         }}
                     >
-                        ⏱
+                        <TechinsIcon name="stopwatch" size={21} variant="light" />
                     </div>
 
                     <div>
@@ -594,7 +591,7 @@ function WorkHistory() {
                     <div style={styles.empty}>
 
                         <div style={styles.emptyIcon}>
-                            📂
+                            <TechinsIcon name="folder" size={40} variant="light" />
                         </div>
 
                         <h3>
@@ -711,7 +708,7 @@ function WorkHistory() {
                                         >
 
                                             <span>
-                                                📅{" "}
+                                                <TechinsIcon name="clock" size={12} variant="light" />{" "}
                                                 {formatDate(
                                                     item.date
                                                 )}
@@ -720,7 +717,7 @@ function WorkHistory() {
                                             {item.hours !==
                                                 null && (
                                                 <span>
-                                                    ⏱{" "}
+                                                    <TechinsIcon name="stopwatch" size={12} variant="light" />{" "}
                                                     {
                                                         item.hours
                                                     }{" "}
@@ -731,7 +728,7 @@ function WorkHistory() {
                                             {item.progress !==
                                                 undefined && (
                                                 <span>
-                                                    📊{" "}
+                                                    <TechinsIcon name="progress" size={12} variant="light" />{" "}
                                                     {
                                                         item.progress
                                                     }%
@@ -831,7 +828,7 @@ const styles = {
     },
 
     eyebrow: {
-        color: "#4f46e5",
+        color: "var(--text-accent-on-light)",
         fontSize: "12px",
         fontWeight: "800",
         letterSpacing: "1.5px",
@@ -841,13 +838,14 @@ const styles = {
     title: {
         margin: 0,
         fontSize: "34px",
-        fontWeight: "800"
+        fontWeight: "800",
+        color: "var(--text-on-light)"
     },
 
     subtitle: {
         margin:
             "8px 0 0",
-        color: "#6b7280",
+        color: "var(--text-muted-on-light)",
         fontSize: "15px"
     },
 
@@ -915,14 +913,15 @@ const styles = {
 
     summaryLabel: {
         margin: 0,
-        color: "#718096",
+        color: "var(--text-muted-on-light)",
         fontSize: "13px"
     },
 
     summaryValue: {
         margin:
             "5px 0 0",
-        fontSize: "25px"
+        fontSize: "25px",
+        color: "var(--text-on-light)"
     },
 
     mainCard: {
@@ -943,13 +942,14 @@ const styles = {
 
     sectionTitle: {
         margin: 0,
-        fontSize: "21px"
+        fontSize: "21px",
+        color: "var(--text-on-light)"
     },
 
     sectionSubtitle: {
         margin:
             "5px 0 0",
-        color: "#7b8494",
+        color: "var(--text-muted-on-light)",
         fontSize: "14px"
     },
 
@@ -974,8 +974,8 @@ const styles = {
 
     tab: {
         border: "none",
-        background: "#f8fafc",
-        color: "#64748b",
+        background: "var(--surface-soft)",
+        color: "var(--text-on-light)",
         padding: "9px 16px",
         borderRadius: "9px",
         cursor: "pointer",
@@ -983,8 +983,8 @@ const styles = {
     },
 
     activeTab: {
-        background: "#172554",
-        color: "#fff"
+        background: "var(--primary-color)",
+        color: "var(--text-on-dark)"
     },
 
     timeline: {
