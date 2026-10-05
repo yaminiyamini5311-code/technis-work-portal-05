@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
+import { useScrollReveal } from "../../components/useScrollReveal";
 import "./MyTasks.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -15,6 +16,9 @@ export default function MyTasks() {
   const [selectedFiles, setSelectedFiles] = useState({});
   const [comments, setComments] = useState({});
   const previousApproved = useRef(null);
+
+  // Scroll reveal effect for space theme
+  useScrollReveal('.reveal-card', { stagger: 80 });
 
   const load = async () => {
     try {
@@ -114,10 +118,27 @@ export default function MyTasks() {
           {tasks.length ? tasks.map((task) => {
             const workflow = task.workflow_status || (task.status === "completed" ? "Approved" : task.status === "in_progress" ? "In Progress" : "Assigned");
             const canSubmit = ["In Progress", "Revision Required", "Acknowledged", "Assigned"].includes(workflow);
+            
+            // Check if task is overdue
+            const isOverdue = task.due_date && new Date(task.due_date) < new Date() && workflow !== "Approved";
+            
+            // Format dates for display
+            const formatDate = (dateStr) => {
+              if (!dateStr) return null;
+              const d = new Date(dateStr + 'T00:00:00'); // Avoid timezone shifts
+              return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+            };
+            
             return (
-              <article className={`task-card ${task.status}`} key={task.id}>
-                <div className="task-card-top"><div><span className="task-label">{task.task_code || "TASK"}</span><h2>{task.title}</h2><p>{task.description || "No description provided."}</p></div><span className={`status ${task.status}`}>{workflow}</span></div>
-                <div className="task-meta-grid"><div><span>Priority</span><strong className={`priority ${task.priority}`}>{task.priority || "medium"}</strong></div><div><span>Due date</span><strong>{task.due_date || "No deadline"}</strong></div><div><span>Assigned by</span><strong>{task.assigned_by_name || "Management"}</strong></div><div><span>Versions</span><strong>{task.latest_version || 0}</strong></div></div>
+              <article className={`task-card reveal-card ${task.status} ${isOverdue ? 'overdue' : ''}`} key={task.id}>
+                <div className="task-card-top"><div><span className="task-label">{task.task_code || "TASK"}</span><h2>{task.title}</h2><p>{task.description || "No description provided."}</p></div><span className={`status ${task.status} ${isOverdue ? 'overdue-badge' : ''}`}>{isOverdue ? '⚠ Overdue' : workflow}</span></div>
+                <div className="task-meta-grid">
+                  <div><span>Priority</span><strong className={`priority ${task.priority}`}>{task.priority || "medium"}</strong></div>
+                  {task.start_date && <div><span>Start</span><strong>{formatDate(task.start_date)}</strong></div>}
+                  <div><span>End</span><strong>{task.due_date ? formatDate(task.due_date) : "No deadline"}</strong></div>
+                  <div><span>Assigned by</span><strong>{task.assigned_by_name || "Management"}</strong></div>
+                  <div><span>Versions</span><strong>{task.latest_version || 0}</strong></div>
+                </div>
                 <div className="task-actions">
                   {(workflow === "Assigned" || task.status === "pending") && <button className="action-progress" disabled={busy === task.id} onClick={() => startTask(task.id)}>{busy === task.id ? "Updating…" : "Start Task"}</button>}
                   {workflow === "Under Review" || workflow === "Submitted" || workflow === "Resubmitted" ? <div className="completed-label">Submission received · awaiting review</div> : null}

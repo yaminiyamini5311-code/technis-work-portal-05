@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
+import { useScrollReveal } from "../../components/useScrollReveal";
 
 const API_URL =
     import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -15,6 +16,9 @@ function WorkHistory() {
 
     const [activeTab, setActiveTab] = useState("all");
     const [search, setSearch] = useState("");
+
+    // Scroll reveal effect
+    useScrollReveal('.reveal-card', { stagger: 50 });
 
     const token = localStorage.getItem("token");
 

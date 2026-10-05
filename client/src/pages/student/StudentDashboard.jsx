@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import TechinsIcon from "../../components/TechinsIcon";
+import { useScrollReveal } from "../../components/useScrollReveal";
 import "./StudentDashboard.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -9,6 +10,16 @@ export default function StudentDashboard(){
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
   const [unread,setUnread]=useState(0);
+
+  // Scroll reveal effect for space theme
+  useScrollReveal('.reveal-card', { stagger: 60 });
+
+  // Format dates without timezone shift
+  const formatDate = (dateStr) => {
+    if (!dateStr) return null;
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
 
   const load=async()=>{
     try{
@@ -87,7 +98,7 @@ export default function StudentDashboard(){
     </section>
 
     <div className="workspace-main-grid">
-      <section className="workspace-card tasks-card">
+      <section className="workspace-card reveal-card tasks-card">
         <div className="card-heading">
           <div><span className="section-kicker">ASSIGNED WORK</span><h3>Recent tasks</h3><p>Latest work assigned to you.</p></div>
           <a href="/student/tasks">View all</a>
@@ -96,14 +107,14 @@ export default function StudentDashboard(){
           {data.tasks.recent.length?data.tasks.recent.map(t=>
             <div className="professional-task-row" key={t.id}>
               <div className="task-index"><TechinsIcon name="clipboard" size={16} variant="light" /></div>
-              <div className="task-row-content"><strong>{t.title}</strong><small>{t.due_date?`Due ${t.due_date}`:"No due date"}</small></div>
+              <div className="task-row-content"><strong>{t.title}</strong><small>{t.start_date ? `${formatDate(t.start_date)} - ` : ''}{t.due_date ? formatDate(t.due_date) : "No deadline"}</small></div>
               <span className={`workspace-status-badge ${t.status}`}>{String(t.status).replace("_"," ")}</span>
             </div>
           ):<div className="workspace-empty"><TechinsIcon name="folder" size={40} variant="light" className="icon-sway" /><strong>No tasks assigned yet</strong><span>New assignments will appear here.</span></div>}
         </div>
       </section>
 
-      <section className="workspace-card progress-card-large">
+      <section className="workspace-card reveal-card progress-card-large">
         <div className="card-heading">
           <div><span className="section-kicker">MEASURABLE PROGRESS</span><h3>Work summary</h3><p>Live from your task and mission records.</p></div>
         </div>
@@ -124,7 +135,7 @@ export default function StudentDashboard(){
     </div>
 
     <div className="workspace-main-grid lower-grid">
-      <section className="workspace-card">
+      <section className="workspace-card reveal-card">
         <div className="card-heading">
           <div><span className="section-kicker">MISSIONS</span><h3>Mission focus</h3><p>Your current mission progress.</p></div>
           <a href="/student/missions">Open missions</a>
@@ -138,7 +149,7 @@ export default function StudentDashboard(){
         ):<div className="workspace-empty"><TechinsIcon name="target" size={40} variant="light" className="icon-sway" /><strong>No missions assigned yet</strong><span>Assigned missions will appear here.</span></div>}
       </section>
 
-      <section className="workspace-card feedback-card">
+      <section className="workspace-card reveal-card feedback-card">
         <div className="card-heading">
           <div><span className="section-kicker">PRIVATE FEEDBACK</span><h3>Latest feedback</h3><p>Feedback connected to your work.</p></div>
           <TechinsIcon name="comment" size={20} variant="light" className="feedback-mark" />

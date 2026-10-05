@@ -21,6 +21,7 @@ export default function Tasks() {
     description: "", 
     assigned_to: "", 
     priority: "medium", 
+    start_date: "",
     due_date: "", 
     program: "", 
     how_to_do: "",
@@ -57,6 +58,11 @@ export default function Tasks() {
     setMessage(""); 
     setError("");
     
+    // Validate start/end dates
+    if (form.start_date && form.due_date && form.start_date > form.due_date) {
+      return setError("Starting Date cannot be after Ending Date");
+    }
+    
     const res = await fetch(`${API_URL}/api/tasks`, { 
       method: "POST", 
       headers: { ...auth(), "Content-Type": "application/json" }, 
@@ -72,6 +78,7 @@ export default function Tasks() {
       description: "", 
       assigned_to: "", 
       priority: "medium", 
+      start_date: "",
       due_date: "", 
       program: "", 
       how_to_do: "",
@@ -158,14 +165,29 @@ export default function Tasks() {
           <option>critical</option>
         </select>
         
-        <input 
-          id="task-due-date"
-          name="task-due-date"
-          type="date" 
-          value={form.due_date} 
-          onChange={e => setForm({ ...form, due_date: e.target.value })} 
-          autoComplete="off"
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <label htmlFor="task-start-date" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Starting Date</label>
+          <input 
+            id="task-start-date"
+            name="task-start-date"
+            type="date" 
+            value={form.start_date} 
+            onChange={e => setForm({ ...form, start_date: e.target.value })} 
+            autoComplete="off"
+          />
+        </div>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <label htmlFor="task-due-date" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Ending Date</label>
+          <input 
+            id="task-due-date"
+            name="task-due-date"
+            type="date" 
+            value={form.due_date} 
+            onChange={e => setForm({ ...form, due_date: e.target.value })} 
+            autoComplete="off"
+          />
+        </div>
         
         <select 
           id="task-program"
@@ -237,7 +259,8 @@ export default function Tasks() {
               <th>Program</th>
               <th>Workflow</th>
               <th>Priority</th>
-              <th>Due</th>
+              <th>Start</th>
+              <th>End</th>
               <th>Submissions</th>
               <th>Action</th>
             </tr>
@@ -257,6 +280,7 @@ export default function Tasks() {
                   </span>
                 </td>
                 <td>{t.priority}</td>
+                <td>{t.start_date || "—"}</td>
                 <td>{t.due_date || "—"}</td>
                 <td>{t.submission_count || 0}</td>
                 <td>

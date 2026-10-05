@@ -88,6 +88,11 @@ router.post("/", authenticateToken, authorizeRoles("admin","manager"), async (re
     const taskCode=nextTaskCode(db); const workflow=String(b.workflow_status||"Assigned");
     if(!STATUS.includes(workflow)) return res.status(400).json({success:false,message:"Invalid task workflow status"});
     
+    // Validate start/end dates
+    if (b.start_date && b.due_date && b.start_date > b.due_date) {
+      return res.status(400).json({success:false,message:"Starting Date cannot be after Ending Date"});
+    }
+    
     const how_to_do = b.how_to_do ? String(b.how_to_do).trim().substring(0, 5000) : null;
     
     const result=db.prepare(`INSERT INTO tasks (task_code,title,category,program,team,task_type,description,what,why,how,how_to_do,expected_output,submission_requirements,resources,notes,assigned_to,assigned_by,status,workflow_status,priority,start_date,due_date,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(

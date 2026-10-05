@@ -50,7 +50,12 @@ export default function App() {
 
     <Route element={<Protected role="manager"><RoleLayout role="manager" /></Protected>}>
       <Route path="/manager" element={<ActivityMonitor />} />
+      <Route path="/manager/students" element={<Students />} />
       <Route path="/manager/tasks" element={<AdminTasks />} />
+      <Route path="/manager/missions" element={<AdminMissions />} />
+      <Route path="/manager/daily-activities" element={<DailyActivities />} />
+      <Route path="/manager/performance" element={<AdminPerformance />} />
+      <Route path="/manager/feedback" element={<Feedback />} />
     </Route>
 
     <Route element={<Protected role="admin"><RoleLayout role="admin" /></Protected>}>

@@ -14,7 +14,7 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  border: 1px solid #D9D9D9;
+  border: 1px solid rgba(250, 154, 2, 0.3);
   border-radius: 11px;
   background: #FFFFFF;
   box-shadow: 0 8px 24px rgba(12, 18, 12, 0.12);
@@ -35,7 +35,7 @@
 
 .navbar-hamburger:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(12, 18, 12, 0.18);
+  box-shadow: 0 12px 28px rgba(250, 154, 2, 0.3);
   border-color: #FA9A02;
   background: #FEFEFE;
 }
@@ -43,6 +43,11 @@
 .navbar-hamburger:hover span {
   background: #FA9A02;
   width: 24px;
+}
+
+.navbar-hamburger:focus-visible {
+  outline: 2px solid #FA9A02;
+  outline-offset: 2px;
 }
 
 .navbar-hamburger:active {

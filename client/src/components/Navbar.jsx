@@ -34,7 +34,12 @@ export default function Navbar({ role }) {
       case "manager":
         return [
           { path: "/manager", icon: "grid", label: "Team Activity", end: true },
-          { path: "/manager/tasks", icon: "clipboard", label: "Tasks" }
+          { path: "/manager/students", icon: "user", label: "Students" },
+          { path: "/manager/tasks", icon: "clipboard", label: "Tasks" },
+          { path: "/manager/missions", icon: "target", label: "Missions" },
+          { path: "/manager/daily-activities", icon: "notepad", label: "Daily Activity" },
+          { path: "/manager/performance", icon: "gauge", label: "Performance" },
+          { path: "/manager/feedback", icon: "comment", label: "Feedback" }
         ];
       case "student":
       case "member":

@@ -347,6 +347,19 @@ p, span, small {
   }
 }
 
+/* Scroll Reveal Animation for Space Theme */
+.reveal-card.revealed {
+  opacity: 1 !important;
+  transform: scale(1) translateY(0) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-card {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
 /* Smooth transitions */
 * {
   transition: background-color var(--anim-duration-normal) var(--anim-easing-standard), 

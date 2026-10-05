@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import Navbar from "./Navbar";
 import NotificationBell from "./NotificationBell";
 import TechinsIcon from "./TechinsIcon";
+import SpaceBackground from "./SpaceBackground";
 import "./StudentLayout.css";
 
 export default function StudentLayout(){
@@ -9,6 +10,9 @@ export default function StudentLayout(){
   try{user=JSON.parse(localStorage.getItem("user")||"{}")}catch{}
   
   return <div className="student-layout">
+    {/* Cosmic space backdrop with parallax starfield */}
+    <SpaceBackground />
+    
     {/* Single fixed background logo */}
     <div className="background-logo-fixed" aria-hidden="true">
       <img src="/techins-logo.jpg" alt="" />
