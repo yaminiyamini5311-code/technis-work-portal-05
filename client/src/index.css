@@ -26,6 +26,15 @@
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
+
+/* Dark cosmic background for Student Portal (when data-space attribute is present) */
+html[data-space] {
+  background: #060908;
+}
+html[data-space] body {
+  background: transparent;
+}
+
 body{
   margin:0;
   min-width:320px;

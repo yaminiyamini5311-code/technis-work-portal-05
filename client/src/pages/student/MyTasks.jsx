@@ -105,7 +105,7 @@ export default function MyTasks() {
             ["Under Review", review, "search"],
             ["Approved", completed, "check"]
           ].map(([label, value, iconName]) => (
-            <div className="summary-card" key={label}>
+            <div className="summary-card" key={label} data-space-depth>
               <div className="summary-icon"><TechinsIcon name={iconName} size={20} variant="light" /></div>
               <div><span>{label}</span><strong>{value}</strong></div>
             </div>

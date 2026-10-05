@@ -90,7 +90,7 @@ export default function StudentDashboard(){
         ["Completed",completed,"Approved work","check"],
         ["Missions",data.missions.total,"Assigned missions","target"]
       ].map(([label,value,note,iconName])=>
-        <article className="workspace-stat" key={label}>
+        <article className="workspace-stat" key={label} data-space-depth>
           <div className="stat-icon-tile"><TechinsIcon name={iconName} size={20} variant="light" /></div>
           <div><span>{label}</span><strong>{value}</strong><small>{note}</small></div>
         </article>
@@ -98,7 +98,7 @@ export default function StudentDashboard(){
     </section>
 
     <div className="workspace-main-grid">
-      <section className="workspace-card reveal-card tasks-card">
+      <section className="workspace-card reveal-card tasks-card" data-space-depth>
         <div className="card-heading">
           <div><span className="section-kicker">ASSIGNED WORK</span><h3>Recent tasks</h3><p>Latest work assigned to you.</p></div>
           <a href="/student/tasks">View all</a>
@@ -114,7 +114,7 @@ export default function StudentDashboard(){
         </div>
       </section>
 
-      <section className="workspace-card reveal-card progress-card-large">
+      <section className="workspace-card reveal-card progress-card-large" data-space-depth>
         <div className="card-heading">
           <div><span className="section-kicker">MEASURABLE PROGRESS</span><h3>Work summary</h3><p>Live from your task and mission records.</p></div>
         </div>
@@ -135,7 +135,7 @@ export default function StudentDashboard(){
     </div>
 
     <div className="workspace-main-grid lower-grid">
-      <section className="workspace-card reveal-card">
+      <section className="workspace-card reveal-card" data-space-depth>
         <div className="card-heading">
           <div><span className="section-kicker">MISSIONS</span><h3>Mission focus</h3><p>Your current mission progress.</p></div>
           <a href="/student/missions">Open missions</a>
@@ -149,7 +149,7 @@ export default function StudentDashboard(){
         ):<div className="workspace-empty"><TechinsIcon name="target" size={40} variant="light" className="icon-sway" /><strong>No missions assigned yet</strong><span>Assigned missions will appear here.</span></div>}
       </section>
 
-      <section className="workspace-card reveal-card feedback-card">
+      <section className="workspace-card reveal-card feedback-card" data-space-depth>
         <div className="card-heading">
           <div><span className="section-kicker">PRIVATE FEEDBACK</span><h3>Latest feedback</h3><p>Feedback connected to your work.</p></div>
           <TechinsIcon name="comment" size={20} variant="light" className="feedback-mark" />

@@ -1,4 +1,4 @@
-.student-layout{min-height:100vh;background:#0A0F0A;color:var(--text-on-dark);display:flex;position:relative;overflow-x:hidden}
+.student-layout{min-height:100vh;background:transparent;color:var(--text-on-dark);display:flex;position:relative;overflow-x:hidden;z-index:1}
 .student-main{margin-left:0;width:100%;min-width:0;padding-top:78px;position:relative;z-index:1}
 .student-header{height:78px;background:rgba(12,18,12,0.85);backdrop-filter:blur(12px);border-bottom:1px solid rgba(250,154,2,0.15);padding:0 30px 0 70px;display:flex;align-items:center;justify-content:space-between;position:fixed;top:0;left:0;right:0;z-index:60;box-shadow:0 4px 24px rgba(0,0,0,0.4)}
 .student-header>div:first-child span{font-size:10px;letter-spacing:1.6px;color:var(--text-accent-on-dark);font-weight:900}
