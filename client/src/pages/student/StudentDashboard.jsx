@@ -11,8 +11,14 @@ export default function StudentDashboard(){
   const [error,setError]=useState("");
   const [unread,setUnread]=useState(0);
 
-  // Scroll reveal effect for space theme
-  useScrollReveal('.reveal-card', { stagger: 60 });
+  // Scroll reveal effect for space theme - sophisticated animation
+  useScrollReveal('.reveal-card', { 
+    stagger: 110,
+    initialScale: 0.85,
+    initialOpacity: 0.1,
+    initialTranslateY: 50,
+    initialBlur: 5
+  });
 
   // Format dates without timezone shift
   const formatDate = (dateStr) => {
@@ -84,14 +90,14 @@ export default function StudentDashboard(){
     </section>
 
     <section className="workspace-stats" aria-label="Workspace overview">
-      {[
+      {[/* eslint-disable indent */
         ["Total tasks",data.tasks.total,"Assigned work","clipboard"],
         ["Pending",pending,"Needs your attention","clock"],
         ["Completed",completed,"Approved work","check"],
         ["Missions",data.missions.total,"Assigned missions","target"]
       ].map(([label,value,note,iconName])=>
-        <article className="workspace-stat" key={label} data-space-depth>
-          <div className="stat-icon-tile"><TechinsIcon name={iconName} size={20} variant="light" /></div>
+        <article className="workspace-stat reveal-card" key={label} data-space-depth>
+          <div className="stat-icon-tile"><TechinsIcon name={iconName} size={22} variant="dark" className="portal-icon" /></div>
           <div><span>{label}</span><strong>{value}</strong><small>{note}</small></div>
         </article>
       )}
@@ -106,11 +112,11 @@ export default function StudentDashboard(){
         <div className="task-list">
           {data.tasks.recent.length?data.tasks.recent.map(t=>
             <div className="professional-task-row" key={t.id}>
-              <div className="task-index"><TechinsIcon name="clipboard" size={16} variant="light" /></div>
+              <div className="task-index"><TechinsIcon name="clipboard" size={18} variant="light" className="portal-icon" /></div>
               <div className="task-row-content"><strong>{t.title}</strong><small>{t.start_date ? `${formatDate(t.start_date)} - ` : ''}{t.due_date ? formatDate(t.due_date) : "No deadline"}</small></div>
               <span className={`workspace-status-badge ${t.status}`}>{String(t.status).replace("_"," ")}</span>
             </div>
-          ):<div className="workspace-empty"><TechinsIcon name="folder" size={40} variant="light" className="icon-sway" /><strong>No tasks assigned yet</strong><span>New assignments will appear here.</span></div>}
+          ):<div className="workspace-empty"><TechinsIcon name="folder" size={40} variant="light" className="icon-sway portal-icon" /><strong>No tasks assigned yet</strong><span>New assignments will appear here.</span></div>}
         </div>
       </section>
 
@@ -142,37 +148,37 @@ export default function StudentDashboard(){
         </div>
         {data.missions.recent.length?data.missions.recent.map(m=>
           <div className="mission-row" key={m.id}>
-            <div className="mission-mark"><TechinsIcon name="target" size={16} variant="light" /></div>
+            <div className="mission-mark"><TechinsIcon name="target" size={18} variant="light" className="portal-icon" /></div>
             <div><strong>{m.title}</strong><small>{m.due_date||"No deadline"}</small></div>
             <b>{Math.min(100,Number(m.progress||0))}%</b>
           </div>
-        ):<div className="workspace-empty"><TechinsIcon name="target" size={40} variant="light" className="icon-sway" /><strong>No missions assigned yet</strong><span>Assigned missions will appear here.</span></div>}
+        ):<div className="workspace-empty"><TechinsIcon name="target" size={40} variant="light" className="icon-sway portal-icon" /><strong>No missions assigned yet</strong><span>Assigned missions will appear here.</span></div>}
       </section>
 
       <section className="workspace-card reveal-card feedback-card" data-space-depth>
         <div className="card-heading">
           <div><span className="section-kicker">PRIVATE FEEDBACK</span><h3>Latest feedback</h3><p>Feedback connected to your work.</p></div>
-          <TechinsIcon name="comment" size={20} variant="light" className="feedback-mark" />
+          <TechinsIcon name="comment" size={20} variant="light" className="feedback-mark portal-icon" />
         </div>
         <p className="feedback-text">{data.feedback||"No feedback has been recorded yet."}</p>
       </section>
     </div>
 
     <section className="workspace-quick-links">
-      <a href="/student/daily-activity">
-        <span><TechinsIcon name="notepad" size={20} variant="light" /></span>
+      <a href="/student/daily-activity" className="reveal-card">
+        <span><TechinsIcon name="notepad" size={20} variant="light" className="portal-icon" /></span>
         <div><strong>Daily activity</strong><small>Record today's completed work, blockers and next steps.</small></div>
-        <b><TechinsIcon name="chevron" size={18} variant="light" /></b>
+        <b><TechinsIcon name="chevron" size={18} variant="light" className="portal-icon" /></b>
       </a>
-      <a href="/student/work-history">
-        <span><TechinsIcon name="history" size={20} variant="light" /></span>
+      <a href="/student/work-history" className="reveal-card">
+        <span><TechinsIcon name="history" size={20} variant="light" className="portal-icon" /></span>
         <div><strong>Work history</strong><small>Review your stored work and submission history.</small></div>
-        <b><TechinsIcon name="chevron" size={18} variant="light" /></b>
+        <b><TechinsIcon name="chevron" size={18} variant="light" className="portal-icon" /></b>
       </a>
-      <a href="/student/performance">
-        <span><TechinsIcon name="gauge" size={20} variant="light" /></span>
+      <a href="/student/performance" className="reveal-card">
+        <span><TechinsIcon name="gauge" size={20} variant="light" className="portal-icon" /></span>
         <div><strong>Performance</strong><small>Review measurable progress and evaluated results.</small></div>
-        <b><TechinsIcon name="chevron" size={18} variant="light" /></b>
+        <b><TechinsIcon name="chevron" size={18} variant="light" className="portal-icon" /></b>
       </a>
     </section>
   </div>

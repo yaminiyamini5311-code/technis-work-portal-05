@@ -1,0 +1,19 @@
+/* =========================================================
+   TECHINS WORK PORTAL — Work History Page
+   Dark glass theme for Student Portal
+   ========================================================= */
+
+.work-history-search::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.work-history-search::-webkit-input-placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.work-history-search::-moz-placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}

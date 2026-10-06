@@ -9,26 +9,31 @@
   left: 14px;
   width: 46px;
   height: 46px;
+  min-width: 44px;
+  min-height: 44px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  border: 1px solid rgba(250, 154, 2, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 11px;
-  background: #FFFFFF;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
   box-shadow: 0 8px 24px rgba(12, 18, 12, 0.12);
   z-index: 70;
   cursor: pointer;
   padding: 0;
   transition: all 0.25s ease;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .navbar-hamburger span {
   display: block;
   width: 22px;
   height: 2.5px;
-  background: #0C120C;
+  background: #F5F8FF;
   border-radius: 3px;
   transition: all 0.3s ease;
 }
@@ -36,8 +41,8 @@
 .navbar-hamburger:hover {
   transform: translateY(-2px);
   box-shadow: 0 12px 28px rgba(250, 154, 2, 0.3);
-  border-color: #FA9A02;
-  background: #FEFEFE;
+  border-color: rgba(250, 154, 2, 0.6);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .navbar-hamburger:hover span {

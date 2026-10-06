@@ -13,3 +13,13 @@ server/*.db-shm
 .DS_Store
 .vscode/
 coverage/
+
+# Test files and temporary artifacts
+test-*.mjs
+test-*.js
+diagnose-*.mjs
+proof/
+*.png
+*.html
+NUL
+**/NUL

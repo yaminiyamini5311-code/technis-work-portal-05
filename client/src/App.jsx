@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import LoadingPage from "./components/LoadingPage";
+import TechinsLoader from "./components/TechinsLoader";
 import Login from "./pages/Login";
 import StudentLayout from "./components/StudentLayout";
 import RoleLayout from "./components/RoleLayout";
@@ -33,9 +34,12 @@ function Protected({ role, children }) {
 }
 
 export default function App() {
+  const [booting, setBooting] = useState(true);
   return (
-    <BrowserRouter><Routes>
-      <Route path="/" element={<LoadingPage redirectTo="/login" duration={5000} />} />
+    <>
+      {booting && <TechinsLoader duration={3000} onDone={() => setBooting(false)} />}
+      <BrowserRouter><Routes>
+      <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
 
     <Route element={<Protected role="student"><StudentLayout /></Protected>}>
@@ -71,5 +75,6 @@ export default function App() {
 
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes></BrowserRouter>
+    </>
   );
 }

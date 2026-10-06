@@ -1,17 +1,17 @@
-.student-layout{min-height:100vh;background:transparent;color:var(--text-on-dark);display:flex;position:relative;overflow-x:hidden;z-index:1}
+.student-layout{min-height:100vh;background:transparent;color:var(--text-primary);display:flex;position:relative;overflow-x:hidden;z-index:1}
 .student-main{margin-left:0;width:100%;min-width:0;padding-top:78px;position:relative;z-index:1}
-.student-header{height:78px;background:rgba(12,18,12,0.85);backdrop-filter:blur(12px);border-bottom:1px solid rgba(250,154,2,0.15);padding:0 30px 0 70px;display:flex;align-items:center;justify-content:space-between;position:fixed;top:0;left:0;right:0;z-index:60;box-shadow:0 4px 24px rgba(0,0,0,0.4)}
+.student-header{height:78px;background:rgba(8,14,30,0.55);backdrop-filter:blur(16px);border-bottom:1px solid rgba(250,154,2,0.25);padding:0 30px 0 70px;display:flex;align-items:center;justify-content:space-between;position:fixed;top:0;left:0;right:0;z-index:60;box-shadow:0 4px 24px rgba(0,0,0,0.3)}
 .student-header>div:first-child span{font-size:10px;letter-spacing:1.6px;color:var(--text-accent-on-dark);font-weight:900}
 .student-header h1{font-size:20px;margin:3px 0 0;color:var(--text-on-dark)}
 .student-header-actions{display:flex;align-items:center;gap:14px}
-.student-header-user{display:flex;align-items:center;gap:10px;font-size:13px;padding:8px 12px;border-radius:10px;background:rgba(250,154,2,0.08);border:1px solid rgba(250,154,2,0.2)}
+.student-header-user{display:flex;align-items:center;gap:10px;font-size:13px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.08);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.28)}
 .student-header-user>div{display:flex;flex-direction:column;text-align:left}
-.student-header-user strong{color:var(--text-on-dark);font-weight:700;font-size:13px}
-.student-header-user small{color:var(--text-muted-on-dark);margin-top:2px;font-weight:500;font-size:11px}
+.student-header-user strong{color:#F5F8FF;font-weight:700;font-size:13px;text-shadow:0 1px 3px rgba(0,0,0,0.5)}
+.student-header-user small{color:#C7D2E8;margin-top:2px;font-weight:500;font-size:11px;text-shadow:0 1px 2px rgba(0,0,0,0.4)}
 .student-content{padding:28px;max-width:1500px;margin:0 auto}
 .student-content>*{max-width:100%}
 
-/* Single Fixed Background Logo */
+/* Single Fixed Background Logo - Circular Container with Glow */
 .background-logo-fixed{
   position:fixed;
   inset:0;
@@ -25,12 +25,58 @@
   width:clamp(260px,62vmin,760px);
   height:auto;
   object-fit:contain;
-  opacity:0.05;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,0.92) 0%,rgba(220,230,255,0.88) 100%);
+  padding:clamp(20px,4vmin,60px);
+  opacity:0.4;
+  filter:drop-shadow(0 0 40px rgba(250,154,2,0.35)) drop-shadow(0 0 120px rgba(59,130,246,0.30));
+  transition:opacity 0.5s ease, filter 0.5s ease, transform 0.5s ease;
+  animation:logo-pulse 5s ease-in-out infinite;
+  box-shadow:
+    0 0 0 1px rgba(250,154,2,0.3),
+    0 0 0 3px rgba(250,154,2,0.15),
+    0 0 40px rgba(250,154,2,0.35),
+    0 0 120px rgba(59,130,246,0.30),
+    inset 0 0 30px rgba(250,154,2,0.1);
+}
+.background-logo-fixed img:hover{
+  opacity:0.18;
+  filter:drop-shadow(0 0 100px rgba(250,154,2,0.6)) drop-shadow(0 0 60px rgba(59,130,246,0.3));
+  transform:scale(1.03);
+  box-shadow:
+    0 0 0 1px rgba(250,154,2,0.3),
+    0 0 0 3px rgba(250,154,2,0.15),
+    0 0 80px rgba(250,154,2,0.4),
+    0 0 150px rgba(59,130,246,0.2),
+    inset 0 0 40px rgba(250,154,2,0.15);
+}
+
+@keyframes logo-pulse{
+  0%,100%{
+    filter:drop-shadow(0 0 40px rgba(250,154,2,0.35)) drop-shadow(0 0 120px rgba(59,130,246,0.30));
+    box-shadow:
+      0 0 0 1px rgba(250,154,2,0.3),
+      0 0 0 3px rgba(250,154,2,0.15),
+      0 0 40px rgba(250,154,2,0.35),
+      0 0 120px rgba(59,130,246,0.30),
+      inset 0 0 30px rgba(250,154,2,0.1);
+  }
+  50%{
+    filter:drop-shadow(0 0 60px rgba(250,154,2,0.45)) drop-shadow(0 0 140px rgba(59,130,246,0.35));
+    box-shadow:
+      0 0 0 1px rgba(250,154,2,0.4),
+      0 0 0 3px rgba(250,154,2,0.2),
+      0 0 60px rgba(250,154,2,0.45),
+      0 0 140px rgba(59,130,246,0.35),
+      inset 0 0 40px rgba(250,154,2,0.15);
+  }
 }
 
 .notification-wrap{position:relative}
-.notification-button{width:38px;height:38px;border:1px solid rgba(250,154,2,0.3);background:rgba(250,154,2,0.08);border-radius:11px;color:var(--text-on-dark);font-size:18px;position:relative}
-.notification-button b{position:absolute;right:-4px;top:-5px;min-width:16px;height:16px;border-radius:20px;background:#FA9A02;color:#0C120C;font-size:8px;display:grid;place-items:center}
+.notification-button{width:38px;height:38px;min-width:38px;min-height:38px;border:1px solid rgba(255,255,255,0.28);background:rgba(255,255,255,0.08);backdrop-filter:blur(8px);border-radius:11px;color:#F5F8FF;font-size:18px;position:relative;cursor:pointer;opacity:1 !important;visibility:visible !important}
+.notification-button:hover{background:rgba(255,255,255,0.12);border-color:rgba(250,154,2,0.6);transform:translateY(-1px)}
+.notification-button:focus-visible{outline:2px solid #FA9A02;outline-offset:2px}
+.notification-button b{position:absolute;right:-4px;top:-5px;min-width:16px;height:16px;border-radius:20px;background:#FA9A02;color:#0B1220;font-size:8px;display:grid;place-items:center}
 .notification-pop{position:absolute;right:0;top:47px;width:310px;background:rgba(20,28,20,0.98);backdrop-filter:blur(16px);border:1px solid rgba(250,154,2,0.25);border-radius:15px;box-shadow:0 22px 50px rgba(0,0,0,0.7);z-index:80;overflow:hidden}
 .notification-pop>div{padding:14px 15px;border-bottom:1px solid rgba(250,154,2,0.15);display:flex;justify-content:space-between;color:var(--text-on-dark)}
 .notification-pop>div small{color:var(--text-muted-on-dark);font-size:9px}
@@ -58,3 +104,43 @@
   .student-header>div:first-child span{font-size:9px}
   .notification-pop{position:fixed;right:10px;top:70px;width:min(310px,calc(100vw - 20px))}
 }
+
+/* =========================================================
+   ICON GLOW FIX - Applied at end to override all other rules
+   ========================================================= */
+
+.student-layout svg{
+  color:#FFC24D;
+  stroke-width:2.25;
+  opacity:1;
+  filter:drop-shadow(0 0 3px rgba(255,194,77,.9)) drop-shadow(0 0 9px rgba(255,160,30,.5));
+}
+.student-layout header svg{
+  color:#F5F8FF;
+  filter:drop-shadow(0 0 3px rgba(255,255,255,.8)) drop-shadow(0 0 8px rgba(120,160,255,.45));
+}
+.student-layout .stat-icon-tile,
+.student-layout .task-index,
+.student-layout .mission-mark,
+.student-layout .detail-heading span,
+.student-layout .feedback-mark,
+.student-layout .summary-icon,
+.student-layout .workspace-quick-links a > span,
+.student-layout .notification-item > span,
+.student-layout .timelineIcon,
+.student-layout .emptyIcon{
+  overflow:visible;
+  background:rgba(255,176,32,.14);
+  border:1px solid rgba(255,194,77,.45);
+  box-shadow:0 0 16px rgba(255,176,32,.35), inset 0 0 8px rgba(255,194,77,.15);
+}
+.student-layout .stat-icon-tile:hover,
+.student-layout .task-index:hover,
+.student-layout .mission-mark:hover,
+.student-layout .detail-heading span:hover,
+.student-layout .feedback-mark:hover,
+.student-layout .summary-icon:hover,
+.student-layout .workspace-quick-links a > span:hover,
+.student-layout .notification-item > span:hover,
+.student-layout .timelineIcon:hover,
+.student-layout .emptyIcon:hover{box-shadow:0 0 24px rgba(255,176,32,.6)}

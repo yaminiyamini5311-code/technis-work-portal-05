@@ -351,7 +351,7 @@ export function mountSpace({ force = false } = {}) {
     });
     nebula.remove();
     canvas.remove();
-    badge && badge.remove();
+    if (badge) badge.remove();
     root.removeAttribute('data-space');
   };
 }

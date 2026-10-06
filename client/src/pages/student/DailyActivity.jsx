@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
+import { useScrollReveal } from "../../components/useScrollReveal";
 import "./DailyActivity.css";
 
 const API_URL =
@@ -12,6 +13,15 @@ function DailyActivity() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+
+    // Scroll reveal effect for space theme - sophisticated animation
+    useScrollReveal('.reveal-card', { 
+        stagger: 110,
+        initialScale: 0.85,
+        initialOpacity: 0.1,
+        initialTranslateY: 50,
+        initialBlur: 5
+    });
 
     const [form, setForm] = useState({
         work_title: "",
@@ -204,7 +214,7 @@ function DailyActivity() {
 
             <div className="daily-activity-grid">
 
-                <section className="activity-form-card">
+                <section className="activity-form-card reveal-card">
 
                     <div className="card-header">
                         <div>
@@ -381,7 +391,7 @@ function DailyActivity() {
 
                         <div className="activity-empty">
                             <div className="empty-icon icon-sway">
-                                <TechinsIcon name="notepad" size={48} variant="light" />
+                                <TechinsIcon name="notepad" size={48} variant="light" className="portal-icon" />
                             </div>
 
                             <h3>No activities yet</h3>
@@ -399,7 +409,7 @@ function DailyActivity() {
                             {activities.map((activity) => (
 
                                 <article
-                                    className="activity-item"
+                                    className="activity-item reveal-card"
                                     key={activity.id}
                                 >
 

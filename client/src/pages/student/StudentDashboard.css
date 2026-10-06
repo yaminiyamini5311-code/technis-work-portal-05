@@ -6,7 +6,7 @@
   width:100%;
   max-width:1500px;
   margin:0 auto;
-  color:var(--text-on-light);
+  color:var(--text-primary);
 }
 
 .workspace-hero{
@@ -99,28 +99,28 @@
   gap:13px;
   min-width:0;
   padding:18px;
-  background:rgba(255,255,255,0.92);
+  background:rgba(10,18,40,0.72);
   backdrop-filter:blur(8px);
-  border:1px solid var(--border-color);
+  border:1px solid rgba(250,154,2,0.25);
   border-radius:12px;
-  box-shadow:var(--shadow-sm);
+  box-shadow:0 8px 32px rgba(0,0,0,0.3);
 }
 .stat-icon-tile{
   width:44px;height:44px;
   flex:none;
   display:grid;place-items:center;
   border-radius:10px;
-  background:rgba(250,154,2,0.12);
-  color:var(--primary-color);
+  background:rgba(250,154,2,0.2);
+  color:#FA9A02;
 }
-.workspace-stat span{display:block;color:var(--text-muted-on-light);font-size:11px;font-weight:700}
+.workspace-stat span{display:block;color:#C0C0C0;font-size:11px;font-weight:700}
 .workspace-stat strong{
   display:block;
   margin:3px 0;
   font:800 25px/1 Manrope,Inter,sans-serif;
-  color:var(--text-on-light);
+  color:#FFFFFF;
 }
-.workspace-stat small{display:block;font-size:9px;color:var(--text-subtle-on-light)}
+.workspace-stat small{display:block;font-size:9px;color:#A0A0A0}
 
 .workspace-main-grid{
   display:grid;
@@ -130,12 +130,12 @@
 }
 .workspace-card{
   min-width:0;
-  background:rgba(255,255,255,0.92);
+  background:rgba(10,18,40,0.72);
   backdrop-filter:blur(8px);
-  border:1px solid var(--border-color);
+  border:1px solid rgba(250,154,2,0.25);
   border-radius:13px;
   padding:23px;
-  box-shadow:var(--shadow-sm);
+  box-shadow:0 8px 32px rgba(0,0,0,0.3);
 }
 .card-heading{
   display:flex;
@@ -148,24 +148,24 @@
   margin:5px 0 3px;
   font:700 18px/1.25 Manrope,Inter,sans-serif;
   letter-spacing:-.3px;
-  color:var(--text-on-light);
+  color:#FFFFFF;
 }
 .card-heading p{
   margin:0;
-  color:var(--text-muted-on-light);
+  color:#C0C0C0;
   font-size:11px;
   line-height:1.5;
 }
 .card-heading a{
   flex:none;
-  color:var(--text-link-on-light);
+  color:#FFFFFF;
   text-decoration:none;
   font-size:11px;
   font-weight:800;
-  border-bottom:1px solid var(--primary-color);
+  border-bottom:1px solid #FA9A02;
   padding-bottom:2px;
 }
-.card-heading a:hover{color:var(--primary-color)}
+.card-heading a:hover{color:#FA9A02}
 
 .task-list{display:flex;flex-direction:column;gap:9px}
 .professional-task-row{
@@ -173,11 +173,11 @@
   align-items:center;
   gap:11px;
   padding:12px;
-  border:1px solid var(--border-light);
+  border:1px solid rgba(255,255,255,0.1);
   border-radius:9px;
-  background:var(--surface);
+  background:rgba(255,255,255,0.05);
 }
-.professional-task-row:hover{background:var(--surface-soft);border-color:var(--border-strong)}
+.professional-task-row:hover{background:rgba(250,154,2,0.1);border-color:rgba(250,154,2,0.3)}
 .task-index,.mission-mark{
   width:35px;height:35px;flex:none;
   display:grid;place-items:center;
@@ -189,7 +189,7 @@
 .task-row-content strong,.mission-row strong{
   display:block;
   font-size:12px;
-  color:var(--text-on-light);
+  color:#FFFFFF;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
@@ -197,18 +197,19 @@
 .task-row-content small,.mission-row small{
   display:block;
   margin-top:4px;
-  color:var(--text-muted-on-light);
+  color:#C0C0C0;
   font-size:10px;
 }
 .workspace-status-badge{
   padding:5px 9px;
   border-radius:20px;
-  background:var(--surface-soft);
-  color:var(--text-on-light);
+  background:rgba(255,255,255,0.1);
+  color:#FFFFFF;
   font-size:9px;
   font-weight:800;
   text-transform:capitalize;
   white-space:nowrap;
+  border:1px solid rgba(255,255,255,0.15);
 }
 .workspace-status-badge.completed{background:#E8F5E9;color:#2E7D32}
 .workspace-status-badge.pending{background:#FFF8E1;color:#F57F17}
@@ -219,8 +220,8 @@
   display:flex;justify-content:space-between;align-items:center;
   margin-bottom:8px;
 }
-.progress-metric span{font-size:11px;color:var(--text-muted-on-light)}
-.progress-metric strong{font-size:12px;color:var(--text-on-light)}
+.progress-metric span{font-size:11px;color:#C0C0C0}
+.progress-metric strong{font-size:12px;color:#FFFFFF}
 .professional-progress{
   height:7px;
   background:var(--surface-soft);
@@ -244,8 +245,8 @@
   padding-top:17px;
   border-top:1px solid var(--border-light);
 }
-.evaluation-row span{color:var(--text-muted-on-light);font-size:11px}
-.evaluation-row strong{font-size:12px;color:var(--text-on-light)}
+.evaluation-row span{color:#C0C0C0;font-size:11px}
+.evaluation-row strong{font-size:12px;color:#FFFFFF}
 
 .lower-grid{grid-template-columns:1fr 1fr}
 .mission-row{
@@ -259,17 +260,17 @@
 .mission-row>b{
   flex:none;
   font-size:12px;
-  color:var(--text-on-light);
+  color:#FFFFFF;
 }
 .feedback-mark{color:var(--primary-color)}
 .feedback-text{
   margin:0;
   padding:15px;
   min-height:105px;
-  background:var(--surface-soft);
-  border-left:3px solid var(--primary-color);
+  background:rgba(255,255,255,0.05);
+  border-left:3px solid #FA9A02;
   border-radius:8px;
-  color:var(--text-muted-on-light);
+  color:#C0C0C0;
   font-size:12px;
   line-height:1.75;
 }
@@ -285,8 +286,8 @@
   border-radius:9px;
   padding:20px;
 }
-.workspace-empty strong{font-size:12px;color:var(--text-on-light)}
-.workspace-empty span{margin-top:4px;color:var(--text-muted-on-light);font-size:10px}
+.workspace-empty strong{font-size:12px;color:#FFFFFF}
+.workspace-empty span{margin-top:4px;color:#C0C0C0;font-size:10px}
 
 .workspace-quick-links{
   display:grid;
@@ -300,16 +301,16 @@
   gap:11px;
   min-width:0;
   padding:14px;
-  background:var(--surface);
-  border:1px solid var(--border-color);
+  background:rgba(10,18,40,0.72);
+  border:1px solid rgba(250,154,2,0.25);
   border-radius:11px;
   text-decoration:none;
   transition:var(--anim-duration-fast) var(--anim-easing-standard);
 }
 .workspace-quick-links a:hover{
-  border-color:var(--primary-color);
+  border-color:rgba(250,154,2,0.5);
   transform:translateY(-1px);
-  box-shadow:var(--shadow-md);
+  box-shadow:0 8px 32px rgba(250,154,2,0.2);
 }
 .workspace-quick-links>a>span{
   width:34px;height:34px;flex:none;
@@ -320,10 +321,10 @@
 }
 .workspace-quick-links div{min-width:0;flex:1}
 .workspace-quick-links strong,.workspace-quick-links small{display:block}
-.workspace-quick-links strong{font-size:11px;color:var(--text-on-light)}
+.workspace-quick-links strong{font-size:11px;color:#FFFFFF}
 .workspace-quick-links small{
   margin-top:4px;
-  color:var(--text-muted-on-light);
+  color:#C0C0C0;
   font-size:9px;
   line-height:1.4;
 }

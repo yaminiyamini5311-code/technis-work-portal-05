@@ -17,8 +17,14 @@ export default function MyTasks() {
   const [comments, setComments] = useState({});
   const previousApproved = useRef(null);
 
-  // Scroll reveal effect for space theme
-  useScrollReveal('.reveal-card', { stagger: 80 });
+  // Scroll reveal effect for space theme - sophisticated animation
+  useScrollReveal('.reveal-card', { 
+    stagger: 110,
+    initialScale: 0.85,
+    initialOpacity: 0.1,
+    initialTranslateY: 50,
+    initialBlur: 5
+  });
 
   const load = async () => {
     try {
@@ -105,8 +111,8 @@ export default function MyTasks() {
             ["Under Review", review, "search"],
             ["Approved", completed, "check"]
           ].map(([label, value, iconName]) => (
-            <div className="summary-card" key={label} data-space-depth>
-              <div className="summary-icon"><TechinsIcon name={iconName} size={20} variant="light" /></div>
+            <div className="summary-card reveal-card" key={label} data-space-depth>
+              <div className="summary-icon"><TechinsIcon name={iconName} size={22} variant="light" className="portal-icon" /></div>
               <div><span>{label}</span><strong>{value}</strong></div>
             </div>
           ))}

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
+import { useScrollReveal } from "../../components/useScrollReveal";
 import "./Performance.css";
 
 const API_URL =
@@ -19,6 +20,14 @@ function Performance() {
   const user = JSON.parse(
     localStorage.getItem("user") || "{}"
   );
+
+  useScrollReveal('.reveal-card', { 
+    stagger: 110,
+    initialScale: 0.85,
+    initialOpacity: 0.1,
+    initialTranslateY: 50,
+    initialBlur: 5
+  });
 
   useEffect(() => {
     const loadPerformance = async () => {
@@ -157,11 +166,11 @@ function Performance() {
 
           {/* PROGRESS */}
 
-          <div className="performance-card">
+          <div className="performance-card reveal-card">
 
             <div className="card-top">
               <span className="card-icon">
-                <TechinsIcon name="chart" size={28} variant="light" />
+                <TechinsIcon name="chart" size={28} variant="light" className="portal-icon" />
               </span>
 
               <span className="card-label">
@@ -189,11 +198,11 @@ function Performance() {
 
           {/* SCORE */}
 
-          <div className="performance-card">
+          <div className="performance-card reveal-card">
 
             <div className="card-top">
               <span className="card-icon">
-                <TechinsIcon name="trophy" size={28} variant="light" />
+                <TechinsIcon name="trophy" size={28} variant="light" className="portal-icon" />
               </span>
 
               <span className="card-label">
@@ -221,11 +230,11 @@ function Performance() {
 
           {/* COMPLETED MISSIONS */}
 
-          <div className="performance-card">
+          <div className="performance-card reveal-card">
 
             <div className="card-top">
               <span className="card-icon">
-                <TechinsIcon name="check" size={28} variant="light" />
+                <TechinsIcon name="check" size={28} variant="light" className="portal-icon" />
               </span>
 
               <span className="card-label">
@@ -261,10 +270,10 @@ function Performance() {
 
           {/* STRENGTHS */}
 
-          <div className="detail-card">
+          <div className="detail-card reveal-card">
 
             <div className="detail-heading">
-              <span><TechinsIcon name="strength" size={24} variant="light" /></span>
+              <span><TechinsIcon name="strength" size={24} variant="light" className="portal-icon" /></span>
               <h3>Strengths</h3>
             </div>
 
@@ -289,10 +298,10 @@ function Performance() {
 
           {/* IMPROVEMENT */}
 
-          <div className="detail-card">
+          <div className="detail-card reveal-card">
 
             <div className="detail-heading">
-              <span><TechinsIcon name="improve" size={24} variant="light" /></span>
+              <span><TechinsIcon name="improve" size={24} variant="light" className="portal-icon" /></span>
               <h3>Areas to Improve</h3>
             </div>
 
@@ -317,17 +326,16 @@ function Performance() {
 
           {/* FEEDBACK */}
 
-          <div className="detail-card feedback-card">
+          <div className="detail-card reveal-card">
 
             <div className="detail-heading">
-              <span><TechinsIcon name="comment" size={24} variant="light" /></span>
+              <span><TechinsIcon name="comment" size={24} variant="light" className="portal-icon" /></span>
               <h3>Feedback</h3>
             </div>
 
-            <p>
-              {performance?.feedback ||
-                "No feedback available yet."}
-            </p>
+            <div className="feedback-card">
+              <p>{performance?.feedback || "No feedback recorded yet."}</p>
+            </div>
 
           </div>
 

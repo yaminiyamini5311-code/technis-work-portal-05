@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
 import { useScrollReveal } from "../../components/useScrollReveal";
+import "./WorkHistory.css";
 
 const API_URL =
     import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -398,7 +399,7 @@ function WorkHistory() {
 
             <div style={styles.summaryGrid}>
 
-                <div style={styles.summaryCard}>
+                <div style={styles.summaryCard} className="reveal-card" data-space-depth>
 
                     <div
                         style={{
@@ -422,7 +423,7 @@ function WorkHistory() {
                 </div>
 
 
-                <div style={styles.summaryCard}>
+                <div style={styles.summaryCard} className="reveal-card" data-space-depth>
 
                     <div
                         style={{
@@ -446,7 +447,7 @@ function WorkHistory() {
                 </div>
 
 
-                <div style={styles.summaryCard}>
+                <div style={styles.summaryCard} className="reveal-card" data-space-depth>
 
                     <div
                         style={{
@@ -470,7 +471,7 @@ function WorkHistory() {
                 </div>
 
 
-                <div style={styles.summaryCard}>
+                <div style={styles.summaryCard} className="reveal-card" data-space-depth>
 
                     <div
                         style={{
@@ -498,7 +499,7 @@ function WorkHistory() {
 
             {/* MAIN CARD */}
 
-            <div style={styles.mainCard}>
+            <div style={styles.mainCard} className="reveal-card" data-space-depth>
 
                 <div style={styles.toolbar}>
 
@@ -520,6 +521,7 @@ function WorkHistory() {
                             setSearch(e.target.value)
                         }
                         style={styles.search}
+                        className="work-history-search"
                     />
 
                 </div>
@@ -816,11 +818,11 @@ const styles = {
 
     page: {
         minHeight: "100vh",
-        background: "#f5f7fb",
+        background: "transparent",
         padding: "32px",
         fontFamily:
             "Inter, Arial, sans-serif",
-        color: "#172033"
+        color: "var(--text-primary-dark)"
     },
 
     header: {
@@ -832,7 +834,7 @@ const styles = {
     },
 
     eyebrow: {
-        color: "var(--text-accent-on-light)",
+        color: "var(--text-accent-on-dark)",
         fontSize: "12px",
         fontWeight: "800",
         letterSpacing: "1.5px",
@@ -843,31 +845,31 @@ const styles = {
         margin: 0,
         fontSize: "34px",
         fontWeight: "800",
-        color: "var(--text-on-light)"
+        color: "var(--text-primary-dark)"
     },
 
     subtitle: {
         margin:
             "8px 0 0",
-        color: "var(--text-muted-on-light)",
+        color: "var(--text-muted-dark)",
         fontSize: "15px"
     },
 
     refreshButton: {
-        border: "none",
-        background: "#172554",
-        color: "#fff",
+        background: "rgba(250, 154, 2, 0.2)",
+        color: "#FA9A02",
         padding: "11px 18px",
         borderRadius: "10px",
         cursor: "pointer",
-        fontWeight: "700"
+        fontWeight: "700",
+        border: "1px solid rgba(250, 154, 2, 0.4)"
     },
 
     errorCard: {
-        background: "#fff1f2",
+        background: "rgba(239, 68, 68, 0.15)",
         border:
-            "1px solid #fecdd3",
-        color: "#991b1b",
+            "1px solid rgba(239, 68, 68, 0.4)",
+        color: "#FCA5A5",
         borderRadius: "14px",
         padding: "16px 20px",
         marginBottom: "22px",
@@ -879,7 +881,7 @@ const styles = {
 
     retryButton: {
         border: "none",
-        background: "#991b1b",
+        background: "#EF4444",
         color: "#fff",
         padding: "9px 15px",
         borderRadius: "8px",
@@ -895,14 +897,15 @@ const styles = {
     },
 
     summaryCard: {
-        background: "#fff",
+        background: "rgba(10, 18, 40, 0.72)",
+        backdropFilter: "blur(8px)",
         borderRadius: "16px",
         padding: "20px",
         display: "flex",
         alignItems: "center",
         gap: "15px",
-        boxShadow:
-            "0 5px 20px rgba(15,23,42,0.06)"
+        border: "1px solid rgba(250, 154, 2, 0.25)",
+        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)"
     },
 
     summaryIcon: {
@@ -917,7 +920,7 @@ const styles = {
 
     summaryLabel: {
         margin: 0,
-        color: "var(--text-muted-on-light)",
+        color: "var(--text-muted-dark)",
         fontSize: "13px"
     },
 
@@ -925,15 +928,16 @@ const styles = {
         margin:
             "5px 0 0",
         fontSize: "25px",
-        color: "var(--text-on-light)"
+        color: "var(--text-primary-dark)"
     },
 
     mainCard: {
-        background: "#fff",
+        background: "rgba(10, 18, 40, 0.72)",
+        backdropFilter: "blur(8px)",
         borderRadius: "18px",
         padding: "26px",
-        boxShadow:
-            "0 5px 20px rgba(15,23,42,0.06)"
+        border: "1px solid rgba(250, 154, 2, 0.25)",
+        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)"
     },
 
     toolbar: {
@@ -947,13 +951,13 @@ const styles = {
     sectionTitle: {
         margin: 0,
         fontSize: "21px",
-        color: "var(--text-on-light)"
+        color: "var(--text-primary-dark)"
     },
 
     sectionSubtitle: {
         margin:
             "5px 0 0",
-        color: "var(--text-muted-on-light)",
+        color: "var(--text-muted-dark)",
         fontSize: "14px"
     },
 
@@ -961,10 +965,15 @@ const styles = {
         width: "260px",
         padding: "11px 14px",
         border:
-            "1px solid #dce1ea",
+            "1px solid rgba(255, 255, 255, 0.2)",
         borderRadius: "10px",
         outline: "none",
-        fontSize: "14px"
+        fontSize: "14px",
+        background: "rgba(10, 18, 40, 0.6)",
+        color: "var(--text-primary-dark)",
+        "::placeholder": {
+            color: "var(--text-muted-dark)"
+        }
     },
 
     tabs: {
@@ -972,23 +981,24 @@ const styles = {
         gap: "8px",
         marginBottom: "25px",
         borderBottom:
-            "1px solid #edf0f4",
+            "1px solid rgba(255, 255, 255, 0.1)",
         paddingBottom: "14px"
     },
 
     tab: {
-        border: "none",
-        background: "var(--surface-soft)",
-        color: "var(--text-on-light)",
+        background: "rgba(255, 255, 255, 0.05)",
+        color: "var(--text-primary-dark)",
         padding: "9px 16px",
         borderRadius: "9px",
         cursor: "pointer",
-        fontWeight: "600"
+        fontWeight: "600",
+        border: "1px solid rgba(255, 255, 255, 0.1)"
     },
 
     activeTab: {
         background: "var(--primary-color)",
-        color: "var(--text-on-dark)"
+        color: "#FFFFFF",
+        borderColor: "var(--primary-color)"
     },
 
     timeline: {
@@ -1008,26 +1018,27 @@ const styles = {
         width: "44px",
         height: "44px",
         borderRadius: "50%",
-        background: "#eef2ff",
+        background: "rgba(250, 154, 2, 0.15)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         fontSize: "18px",
-        zIndex: 2
+        zIndex: 2,
+        border: "1px solid rgba(250, 154, 2, 0.3)"
     },
 
     timelineLine: {
         width: "1px",
-        background: "#e2e8f0",
+        background: "rgba(255, 255, 255, 0.1)",
         minHeight: "100%"
     },
 
     historyCard: {
         border:
-            "1px solid #e7ebf1",
+            "1px solid rgba(255, 255, 255, 0.1)",
         borderRadius: "14px",
         padding: "19px",
-        background: "#fff"
+        background: "rgba(255, 255, 255, 0.03)"
     },
 
     historyTop: {
@@ -1039,7 +1050,7 @@ const styles = {
 
     typeLabel: {
         fontSize: "10px",
-        color: "#6366f1",
+        color: "#FA9A02",
         fontWeight: "800",
         letterSpacing: "1px",
         marginBottom: "5px"
@@ -1047,11 +1058,12 @@ const styles = {
 
     historyTitle: {
         margin: 0,
-        fontSize: "17px"
+        fontSize: "17px",
+        color: "var(--text-primary-dark)"
     },
 
     description: {
-        color: "#64748b",
+        color: "var(--text-muted-dark)",
         fontSize: "14px",
         lineHeight: "1.6",
         margin:
@@ -1068,30 +1080,34 @@ const styles = {
     },
 
     completed: {
-        background: "#dcfce7",
-        color: "#166534"
+        background: "rgba(16, 185, 129, 0.2)",
+        color: "#34D399",
+        border: "1px solid rgba(16, 185, 129, 0.3)"
     },
 
     progress: {
-        background: "#dbeafe",
-        color: "#1d4ed8"
+        background: "rgba(59, 130, 246, 0.2)",
+        color: "#60A5FA",
+        border: "1px solid rgba(59, 130, 246, 0.3)"
     },
 
     pending: {
-        background: "#fef3c7",
-        color: "#92400e"
+        background: "rgba(245, 158, 11, 0.2)",
+        color: "#FBBF24",
+        border: "1px solid rgba(245, 158, 11, 0.3)"
     },
 
     assigned: {
-        background: "#f1f5f9",
-        color: "#475569"
+        background: "rgba(255, 255, 255, 0.05)",
+        color: "var(--text-muted-dark)",
+        border: "1px solid rgba(255, 255, 255, 0.1)"
     },
 
     meta: {
         display: "flex",
         flexWrap: "wrap",
         gap: "18px",
-        color: "#64748b",
+        color: "var(--text-muted-dark)",
         fontSize: "12px"
     },
 
@@ -1104,26 +1120,29 @@ const styles = {
         justifyContent: "space-between",
         marginBottom: "7px",
         fontSize: "12px",
-        color: "#64748b"
+        color: "var(--text-muted-dark)"
     },
 
     progressTrack: {
         height: "7px",
-        background: "#e5e7eb",
+        background: "rgba(255, 255, 255, 0.1)",
         borderRadius: "10px",
         overflow: "hidden"
     },
 
     progressFill: {
         height: "100%",
-        background: "#4f46e5",
+        background: "linear-gradient(90deg, var(--primary-color), #FBBF24)",
         borderRadius: "10px"
     },
 
     empty: {
         padding: "65px 20px",
         textAlign: "center",
-        color: "#64748b"
+        color: "var(--text-muted-dark)",
+        background: "rgba(10, 18, 40, 0.5)",
+        borderRadius: "14px",
+        border: "1px dashed rgba(255, 255, 255, 0.1)"
     },
 
     emptyIcon: {
@@ -1135,17 +1154,19 @@ const styles = {
         maxWidth: "600px",
         margin:
             "120px auto",
-        background: "#fff",
+        background: "rgba(10, 18, 40, 0.72)",
+        backdropFilter: "blur(8px)",
         borderRadius: "18px",
         padding: "50px",
         textAlign: "center",
-        boxShadow:
-            "0 10px 40px rgba(15,23,42,0.08)"
+        border: "1px solid rgba(250, 154, 2, 0.25)",
+        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)"
     },
 
     loadingIcon: {
         fontSize: "35px",
-        marginBottom: "10px"
+        marginBottom: "10px",
+        color: "var(--text-primary-dark)"
     }
 };
 

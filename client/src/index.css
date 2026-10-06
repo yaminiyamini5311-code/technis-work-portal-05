@@ -27,18 +27,40 @@
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 
-/* Dark cosmic background for Student Portal (when data-space attribute is present) */
-html[data-space] {
-  background: #060908;
+/* Dark cosmic background for Student Portal */
+body.student-portal {
+  background: transparent;
+  color: var(--text-primary);
+  min-height: 100vh;
 }
 html[data-space] body {
   background: transparent;
 }
 
+/* Space environment nebula effects */
+.student-layout::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 20% 30%, var(--space-nebula-blue) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, var(--space-nebula-violet) 0%, transparent 35%),
+    radial-gradient(circle at 50% 50%, var(--space-nebula-orange) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.6;
+  animation: nebula-drift 20s ease-in-out infinite alternate;
+}
+
+@keyframes nebula-drift {
+  0% { transform: translateX(-2%) translateY(-1%); }
+  100% { transform: translateX(2%) translateY(1%); }
+}
+
 body{
   margin:0;
   min-width:320px;
-  background:var(--background);
+  background:linear-gradient(135deg,var(--space-bg-deep) 0%,var(--space-bg-navy) 50%,var(--space-bg-deep) 100%);
   color:var(--text-on-light);
   overflow-x:hidden;
 }

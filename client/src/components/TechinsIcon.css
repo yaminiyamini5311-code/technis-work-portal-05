@@ -47,7 +47,7 @@ a:hover .techins-icon svg,
 button:focus-visible .techins-icon svg,
 a:focus-visible .techins-icon svg,
 .techins-icon--glow svg {
-  filter: drop-shadow(0 0 10px rgba(250, 154, 2, 0.35)) 
+  filter: drop-shadow(0 0 10px rgba(250, 154, 2, 0.35))
           drop-shadow(0 0 6px rgba(250, 154, 2, 0.25));
 }
 
@@ -62,7 +62,7 @@ a:focus-visible .techins-icon svg,
       filter: drop-shadow(0 0 8px rgba(250, 154, 2, 0.15));
     }
     50% {
-      filter: drop-shadow(0 0 12px rgba(250, 154, 2, 0.4)) 
+      filter: drop-shadow(0 0 12px rgba(250, 154, 2, 0.4))
               drop-shadow(0 0 8px rgba(250, 154, 2, 0.3));
     }
   }
@@ -95,4 +95,99 @@ a:focus-visible .techins-icon svg,
 .techins-icon--xl {
   width: 56px !important;
   height: 56px !important;
+}
+
+/* =========================================================
+   Student Portal Icon Enhancements
+   Scoped to Student Portal only
+   ========================================================= */
+
+/* Header icons - white color with glow */
+.student-layout .notification-button svg,
+.student-layout .student-header-user svg {
+  filter: drop-shadow(0 0 4px rgba(255, 176, 32, 0.55))
+          drop-shadow(0 0 10px rgba(255, 176, 32, 0.25));
+}
+
+.student-layout .notification-button .icon-stroke,
+.student-layout .student-header-user .icon-stroke {
+  color: #F5F8FF;
+  stroke-width: 2.25;
+}
+
+.student-layout .notification-button .icon-accent,
+.student-layout .notification-button .icon-accent-stroke,
+.student-layout .student-header-user .icon-accent,
+.student-layout .student-header-user .icon-accent-stroke {
+  color: #FFB020;
+}
+
+/* Portal icon class for stat cards and other accent icons */
+.student-layout .portal-icon svg {
+  filter: drop-shadow(0 0 4px rgba(255, 176, 32, 0.55))
+          drop-shadow(0 0 10px rgba(255, 176, 32, 0.25));
+}
+
+.student-layout .portal-icon .icon-stroke {
+  stroke-width: 2.25;
+}
+
+.student-layout .portal-icon.techins-icon--dark .icon-stroke {
+  color: #F5F8FF;
+}
+
+.student-layout .portal-icon.techins-icon--dark .icon-accent,
+.student-layout .portal-icon.techins-icon--dark .icon-accent-stroke {
+  color: #FFB020;
+}
+
+.student-layout .portal-icon.techins-icon--light .icon-stroke {
+  color: #FFB020;
+}
+
+.student-layout .portal-icon.techins-icon--light .icon-accent,
+.student-layout .portal-icon.techins-icon--light .icon-accent-stroke {
+  color: #FFC24D;
+}
+
+/* Small icon containers (glass tiles) in Student Portal */
+.student-layout .stat-icon-tile,
+.student-layout .task-index,
+.student-layout .mission-mark,
+.student-layout .detail-heading span,
+.student-layout .feedback-mark,
+.student-layout .summary-icon,
+.student-layout .workspace-quick-links a > span,
+.student-layout .notification-item > span {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 176, 32, 0.35);
+  box-shadow: 0 0 14px rgba(255, 176, 32, 0.18);
+  transition: all 0.25s ease;
+}
+
+.student-layout .stat-icon-tile:hover,
+.student-layout .task-index:hover,
+.student-layout .mission-mark:hover,
+.student-layout .detail-heading span:hover,
+.student-layout .feedback-mark:hover,
+.student-layout .summary-icon:hover,
+.student-layout .workspace-quick-links a > span:hover,
+.student-layout .notification-item > span:hover {
+  box-shadow: 0 0 20px rgba(255, 176, 32, 0.35);
+  border-color: rgba(255, 176, 32, 0.6);
+}
+
+/* Empty state icons - larger with glow */
+.student-layout .workspace-empty svg,
+.student-layout .empty-state svg,
+.student-layout .activity-empty svg {
+  filter: drop-shadow(0 0 6px rgba(255, 176, 32, 0.5))
+          drop-shadow(0 0 12px rgba(255, 176, 32, 0.3));
+}
+
+.student-layout .workspace-empty .icon-stroke,
+.student-layout .empty-state .icon-stroke,
+.student-layout .activity-empty .icon-stroke {
+  color: #FFB020;
+  stroke-width: 2;
 }

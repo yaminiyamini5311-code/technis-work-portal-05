@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
+import { useScrollReveal } from "../../components/useScrollReveal";
+import "./Missions.css";
 
 const API_URL =
     import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -10,6 +12,15 @@ function Missions() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [updatingId, setUpdatingId] = useState(null);
+
+    // Scroll reveal effect for space theme - sophisticated animation
+    useScrollReveal('.reveal-card', { 
+        stagger: 110,
+        initialScale: 0.85,
+        initialOpacity: 0.1,
+        initialTranslateY: 50,
+        initialBlur: 5
+    });
 
     const getToken = () => {
         return localStorage.getItem("token");
@@ -211,7 +222,7 @@ function Missions() {
 
                         return (
                             <div
-                                className="mission-card"
+                                className="mission-card reveal-card"
                                 key={mission.id}
                             >
 

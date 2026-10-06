@@ -192,11 +192,8 @@ button:disabled,
   border-color: var(--primary-color) !important;
 }
 
-/* Notification Button */
+/* Notification Button - styled per layout in StudentLayout.css and RoleLayout.css */
 .notification-button {
-  background: var(--surface) !important;
-  color: var(--text-on-light) !important;
-  border: 1px solid var(--border-color) !important;
   font-size: 18px !important;
   width: 38px;
   height: 38px;
@@ -205,12 +202,12 @@ button:disabled,
   display: grid;
   place-items: center;
   transition: var(--anim-duration-fast) var(--anim-easing-standard);
+  cursor: pointer;
 }
 
-.notification-button:hover {
-  background: var(--surface-soft) !important;
-  color: var(--primary-color) !important;
-  border-color: var(--primary-color) !important;
+.notification-button:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
 }
 
 /* Password Show/Hide Button */

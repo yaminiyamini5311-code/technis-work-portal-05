@@ -25,7 +25,7 @@ export default function StudentLayout(){
         <div className="student-header-actions">
           <NotificationBell/>
           <div className="student-header-user">
-            <TechinsIcon name="user" size={20} variant="light" />
+            <TechinsIcon name="user" size={20} variant="dark" />
             <div>
               <strong>{user.name||"Student"}</strong>
               <small>{user.email||""}</small>

@@ -1,6 +1,7 @@
 /* =========================================================
    TECHINS WORK PORTAL — Professional Login
    Brand: #B7B7B7 / #0C120C / #FA9A02
+   Scoped to .login-page to prevent global CSS interference
 ========================================================= */
 
 .login-page{
@@ -197,13 +198,13 @@
   border:1px solid #CDD3DB;
   border-radius:11px;
   padding:13px 15px;
-  background:#fff;
-  color:#0C120C;
+  background:#fff !important;
+  color:#0C120C !important;
   outline:none;
   font-size:14px;
   transition:border-color .2s,box-shadow .2s;
 }
-.login-card input::placeholder{color:#8B929B}
+.login-card input::placeholder{color:#5b6475 !important}
 .login-card input:focus{
   border-color:#FA9A02;
   box-shadow:0 0 0 4px rgba(250,154,2,.12);
@@ -215,15 +216,19 @@
   right:7px;
   top:8px;
   height:38px;
-  border:0;
-  background:#F1F3F5;
-  color:#27303A;
+  border:1px solid #CDD3DB;
+  background:#fff !important;
+  color:#5b6475 !important;
   border-radius:8px;
   padding:0 11px;
   font-size:11px;
   font-weight:800;
 }
-.password-field button:hover{background:#E4E7EA}
+.password-field button:hover{background:#F1F3F5 !important;color:#0C120C !important}
+.password-field button:focus-visible{
+  outline:2px solid #FA9A02;
+  outline-offset:2px;
+}
 .login-submit{
   width:100%;
   min-height:54px;
