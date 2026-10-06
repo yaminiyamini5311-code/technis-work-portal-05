@@ -28,17 +28,25 @@
 }
 
 .refresh-btn {
-    border: none;
-    background: #FA9A02;
-    color: white;
+    border: 1px solid rgba(255,194,77,0.40);
+    background: rgba(255,255,255,0.08);
+    color: #F5F8FF;
     padding: 11px 18px;
     border-radius: 9px;
     font-size: 14px;
+    font-weight: 600;
     cursor: pointer;
 }
 
 .refresh-btn:hover {
-    background: #0C120C;
+    background: rgba(255,255,255,0.14);
+    border-color: rgba(255,194,77,0.60);
+    color: #FFFFFF;
+}
+
+.refresh-btn:focus-visible {
+    outline: 2px solid #FFC24D;
+    outline-offset: 2px;
 }
 
 .missions-grid {

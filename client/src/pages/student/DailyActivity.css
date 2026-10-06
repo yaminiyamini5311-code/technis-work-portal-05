@@ -185,8 +185,8 @@
     border: 0;
     border-radius: 11px;
     padding: 13px 18px;
-    background: #FA9A02;
-    color: #0C120C;
+    background: #FFB020;
+    color: #0B1430;
     font-size: 14px;
     font-weight: 800;
     cursor: pointer;
@@ -194,12 +194,17 @@
 }
 
 .submit-activity-btn:hover {
-    background: #FFB833;
+    background: #FFC24D;
 }
 
 .submit-activity-btn:disabled {
-    opacity: 0.65;
+    opacity: 0.6;
     cursor: not-allowed;
+}
+
+.submit-activity-btn:focus-visible {
+    outline: 2px solid #FFC24D;
+    outline-offset: 2px;
 }
 
 .activity-message {

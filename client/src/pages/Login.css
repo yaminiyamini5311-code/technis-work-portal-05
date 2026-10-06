@@ -218,11 +218,11 @@
   height:38px;
   border:1px solid #CDD3DB;
   background:#fff !important;
-  color:#5b6475 !important;
+  color:#0C120C !important;
   border-radius:8px;
   padding:0 11px;
   font-size:11px;
-  font-weight:800;
+  font-weight:600;
 }
 .password-field button:hover{background:#F1F3F5 !important;color:#0C120C !important}
 .password-field button:focus-visible{

@@ -75,9 +75,9 @@ router.get("/progress", authenticateToken, authorizeRoles("admin", "manager"), (
 router.get("/students", authenticateToken, authorizeRoles("admin", "manager"), (req, res) => {
   try {
     const db = req.app.locals.db;
-    
+
     const students = db.prepare(`
-      SELECT 
+      SELECT
         id,
         name,
         email,
@@ -93,6 +93,60 @@ router.get("/students", authenticateToken, authorizeRoles("admin", "manager"), (
   } catch (error) {
     console.error("Admin students error:", error);
     res.status(500).json({ success: false, message: "Unable to fetch students" });
+  }
+});
+
+/* =========================================================
+   CREATE STUDENT
+   POST /api/admin/students
+========================================================= */
+router.post("/students", authenticateToken, authorizeRoles("admin"), (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const { name, email, password, department, program } = req.body || {};
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, message: "Name, email, and password are required" });
+    }
+
+    // Validate department/program exclusivity
+    if (department && program) {
+      return res.status(400).json({ success: false, message: "Cannot select both Department and Program. Choose one." });
+    }
+
+    // Check if email already exists
+    const existing = db.prepare("SELECT id FROM users WHERE LOWER(TRIM(email)) = ?").get(String(email).trim().toLowerCase());
+    if (existing) {
+      return res.status(400).json({ success: false, message: "Email already exists" });
+    }
+
+    // Check student limit
+    const { MAX_STUDENT_ACCOUNTS } = require("../config");
+    const studentCount = db.prepare("SELECT COUNT(*) AS count FROM users WHERE LOWER(role) = 'student' AND active = 1").get().count || 0;
+    if (studentCount >= MAX_STUDENT_ACCOUNTS) {
+      return res.status(400).json({ success: false, message: `Student limit of ${MAX_STUDENT_ACCOUNTS} has been reached` });
+    }
+
+    // Hash password
+    const bcrypt = require("bcryptjs");
+    const hashedPassword = bcrypt.hashSync(String(password), 12);
+
+    // Insert student
+    const result = db.prepare(`
+      INSERT INTO users (name, email, password, role, department, program, active)
+      VALUES (?, ?, ?, 'student', ?, ?, 1)
+    `).run(
+      String(name).trim(),
+      String(email).trim().toLowerCase(),
+      hashedPassword,
+      department ? String(department).trim().toLowerCase() : null,
+      program ? String(program).trim().toLowerCase() : null
+    );
+
+    res.status(201).json({ success: true, message: "Student created successfully", studentId: result.lastInsertRowid });
+  } catch (error) {
+    console.error("Create student error:", error);
+    res.status(500).json({ success: false, message: "Unable to create student" });
   }
 });
 

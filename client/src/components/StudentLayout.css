@@ -1,13 +1,14 @@
 .student-layout{min-height:100vh;background:transparent;color:var(--text-primary);display:flex;position:relative;overflow-x:hidden;z-index:1}
 .student-main{margin-left:0;width:100%;min-width:0;padding-top:78px;position:relative;z-index:1}
-.student-header{height:78px;background:rgba(8,14,30,0.55);backdrop-filter:blur(16px);border-bottom:1px solid rgba(250,154,2,0.25);padding:0 30px 0 70px;display:flex;align-items:center;justify-content:space-between;position:fixed;top:0;left:0;right:0;z-index:60;box-shadow:0 4px 24px rgba(0,0,0,0.3)}
+.student-header{height:78px;background:rgba(8,14,30,0.55);backdrop-filter:blur(16px);border-bottom:1px solid rgba(250,154,2,0.25);padding:0 30px 0 70px;display:flex;align-items:center;justify-content:space-between;position:fixed;top:0;left:0;right:0;z-index:60;box-shadow:0 4px 24px rgba(0,0,0,0.3);max-width:100%;box-sizing:border-box}
+.student-header>div:first-child{min-width:0;flex:1}
 .student-header>div:first-child span{font-size:10px;letter-spacing:1.6px;color:var(--text-accent-on-dark);font-weight:900}
-.student-header h1{font-size:20px;margin:3px 0 0;color:var(--text-on-dark)}
-.student-header-actions{display:flex;align-items:center;gap:14px}
-.student-header-user{display:flex;align-items:center;gap:10px;font-size:13px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.08);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.28)}
-.student-header-user>div{display:flex;flex-direction:column;text-align:left}
-.student-header-user strong{color:#F5F8FF;font-weight:700;font-size:13px;text-shadow:0 1px 3px rgba(0,0,0,0.5)}
-.student-header-user small{color:#C7D2E8;margin-top:2px;font-weight:500;font-size:11px;text-shadow:0 1px 2px rgba(0,0,0,0.4)}
+.student-header h1{font-size:20px;margin:3px 0 0;color:var(--text-on-dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.student-header-actions{display:flex;align-items:center;gap:14px;flex-shrink:0}
+.student-header-user{display:flex;align-items:center;gap:10px;font-size:13px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.08);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.28);max-width:250px;min-width:0}
+.student-header-user>div{display:flex;flex-direction:column;text-align:left;min-width:0}
+.student-header-user strong{color:#F5F8FF;font-weight:700;font-size:13px;text-shadow:0 1px 3px rgba(0,0,0,0.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.student-header-user small{color:#C7D2E8;margin-top:2px;font-weight:500;font-size:11px;text-shadow:0 1px 2px rgba(0,0,0,0.4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .student-content{padding:28px;max-width:1500px;margin:0 auto}
 .student-content>*{max-width:100%}
 

@@ -307,20 +307,20 @@
 }
 
 /* Surface Elements - Admin/Manager (Light) */
-.admin-layout .panel,
-.admin-layout .admin-stat,
-.admin-layout .summary-card,
-.admin-layout .task-card,
-.admin-layout .mission-card,
-.admin-layout .student-profile,
-.admin-layout .role-user,
-.admin-layout .navbar-profile,
-.admin-layout .login-card,
-.admin-layout .feedback-box,
-.admin-layout .upload-box {
+.role-layout .panel,
+.role-layout .admin-stat,
+.role-layout .summary-card,
+.role-layout .task-card,
+.role-layout .mission-card,
+.role-layout .student-profile,
+.role-layout .role-user,
+.role-layout .navbar-profile,
+.role-layout .login-card,
+.role-layout .feedback-box,
+.role-layout .upload-box {
   background: #FFFFFF !important;
   border-color: #E6E6E6 !important;
-  color: var(--text-on-light);
+  color: #111827;
   box-shadow: var(--shadow-md);
 }
 
@@ -339,18 +339,71 @@
   color: var(--text-on-light);
 }
 
-/* Input Fields */
-input,
-textarea,
-select {
-  background: var(--surface) !important;
-  color: var(--text-on-light) !important;
-  border-color: var(--border-color) !important;
+/* Input Fields - Admin/Manager (Light Theme) */
+.role-layout input,
+.role-layout textarea,
+.role-layout select {
+  background: #FFFFFF !important;
+  color: #111827 !important;
+  border: 1px solid #D1D5DB !important;
+  -webkit-text-fill-color: #111827;
+  color-scheme: light;
 }
 
-input::placeholder,
-textarea::placeholder {
-  color: var(--text-muted-on-light) !important;
+.role-layout input::placeholder,
+.role-layout textarea::placeholder {
+  color: #6B7280 !important;
+  opacity: 1;
+}
+
+.role-layout input:focus,
+.role-layout textarea:focus,
+.role-layout select:focus {
+  border-color: #FFB020 !important;
+  box-shadow: 0 0 0 3px rgba(255,176,32,.25) !important;
+  outline: none;
+}
+
+.role-layout input:disabled,
+.role-layout textarea:disabled,
+.role-layout select:disabled {
+  background: #F3F4F6 !important;
+  color: #6B7280 !important;
+  cursor: not-allowed;
+}
+
+.role-layout select option {
+  background: #FFFFFF;
+  color: #111827;
+}
+
+/* Input Fields - Student Portal (Dark Theme) */
+.student-layout input,
+.student-layout textarea,
+.student-layout select {
+  background: rgba(10,18,40,0.5) !important;
+  color: var(--text-primary) !important;
+  border-color: rgba(250,154,2,0.3) !important;
+}
+
+.student-layout input::placeholder,
+.student-layout textarea::placeholder {
+  color: var(--text-muted) !important;
+}
+
+/* Input Fields - Login Page (Light Theme) */
+body:not(.student-layout):not(.role-layout) input,
+body:not(.student-layout):not(.role-layout) textarea,
+body:not(.student-layout):not(.role-layout) select {
+  background: #FFFFFF !important;
+  color: #111827 !important;
+  border: 1px solid #D1D5DB !important;
+}
+
+body:not(.student-layout):not(.role-layout) input::placeholder,
+body:not(.student-layout):not(.role-layout) textarea::placeholder {
+  color: #6B7280 !important;
+  opacity: 1;
 }
 
 /* Text Colors - Student Portal */
@@ -364,46 +417,82 @@ textarea::placeholder {
 }
 
 .student-layout p,
-.student-layout span,
 .student-layout small {
   color: var(--text-muted-dark) !important;
 }
 
+/* Exclude button text and interactive elements from muted color */
+.student-layout button,
+.student-layout button span,
+.student-layout a,
+.student-layout a span {
+  color: inherit !important;
+}
+
+/* Ensure disabled buttons remain readable */
+.student-layout button:disabled,
+.student-layout button:disabled span {
+  opacity: 0.6 !important;
+  color: inherit !important;
+}
+
 /* Text Colors - Admin/Manager */
-.admin-layout h1,
-.admin-layout h2,
-.admin-layout h3,
-.admin-layout h4,
-.admin-layout h5,
-.admin-layout h6 {
-  color: var(--text-on-light);
+.role-layout h1,
+.role-layout h2,
+.role-layout h3,
+.role-layout h4,
+.role-layout h5,
+.role-layout h6 {
+  color: #111827;
 }
 
-.admin-layout p,
-.admin-layout span,
-.admin-layout small {
-  color: var(--text-muted-on-light);
+.role-layout p,
+.role-layout span,
+.role-layout small {
+  color: #4B5563;
 }
 
-.text-muted,
-.page-description,
-.task-card-top p,
-.feedback-box p {
-  color: var(--text-muted-on-light) !important;
+.text-muted:not(.student-layout .text-muted),
+.page-description:not(.student-layout .page-description),
+.task-card-top p:not(.student-layout .task-card-top p),
+.feedback-box p:not(.student-layout .feedback-box p) {
+  color: #4B5563 !important;
 }
 
-/* Notification Popup */
-.notification-pop {
+.student-layout .text-muted,
+.student-layout .page-description,
+.student-layout .task-card-top p,
+.student-layout .feedback-box p {
+  color: var(--text-muted-on-dark) !important;
+}
+
+/* Notification Popup - Admin/Manager (Light Theme) */
+.role-layout .notification-pop {
+  background: #FFFFFF !important;
+  border-color: #E6E6E6 !important;
+}
+
+.role-layout .notification-item {
+  background: #FFFFFF !important;
+  border-color: #E6E6E6 !important;
+}
+
+.role-layout .notification-item:hover {
+  background: #F9FAFB !important;
+}
+
+/* Notification Popup - Student Portal (Dark Theme) */
+.student-layout .notification-pop {
   background: var(--surface) !important;
   border-color: var(--border-color) !important;
 }
 
-.notification-item {
+.student-layout .notification-item {
   background: var(--surface) !important;
   border-color: var(--border-light) !important;
 }
 
-.notification-item:hover {
+.student-layout .notification-item:hover {
   background: var(--surface-hover) !important;
 }
 
@@ -416,10 +505,11 @@ textarea::placeholder {
 }
 
 /* Empty States - Admin/Manager */
-.admin-layout .empty-state,
-.admin-layout .workspace-empty {
-  background: var(--surface-soft) !important;
-  color: var(--text-subtle-on-light) !important;
+.role-layout .empty-state,
+.role-layout .workspace-empty {
+  background: #F9FAFB !important;
+  border: 1px dashed #D1D5DB;
+  color: #4B5563 !important;
 }
 
 /* Progress Bars - Student Portal */
@@ -429,9 +519,9 @@ textarea::placeholder {
 }
 
 /* Progress Bars - Admin/Manager */
-.admin-layout .progress-track,
-.admin-layout .admin-progress {
-  background: var(--surface-soft) !important;
+.role-layout .progress-track,
+.role-layout .admin-progress {
+  background: #F3F4F6 !important;
 }
 
 /* Status Badges - Student Portal */
@@ -444,11 +534,11 @@ textarea::placeholder {
 }
 
 /* Status Badges - Admin/Manager */
-.admin-layout .pill,
-.admin-layout .status,
-.admin-layout .workspace-status-badge {
-  background: var(--surface-soft) !important;
-  color: var(--text-on-light) !important;
+.role-layout .pill,
+.role-layout .status,
+.role-layout .workspace-status-badge {
+  background: #F3F4F6 !important;
+  color: #111827 !important;
 }
 
 /* Reduced Motion Support */

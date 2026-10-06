@@ -7,6 +7,13 @@ import "./MyTasks.css";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 
+const formatDate = (dateStr) => {
+  if (!dateStr) return "Not set";
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return "Not set";
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
 export default function MyTasks() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);

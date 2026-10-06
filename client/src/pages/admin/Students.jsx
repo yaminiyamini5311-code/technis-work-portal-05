@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useExclusiveSelect } from "../../hooks/useExclusiveSelect";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const DEPARTMENTS = [
@@ -21,7 +22,8 @@ const PROGRAMS = [
 export default function Students() {
   const [students, setStudents] = useState([]);
   const [maxStudents, setMaxStudents] = useState(100);
-  const [form, setForm] = useState({ name: "", email: "", password: "", department: "", program: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const { department, program, setDepartment, setProgram, reset, isDepartmentDisabled, isProgramDisabled } = useExclusiveSelect();
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -68,7 +70,7 @@ export default function Students() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token")}`
         },
-        body: JSON.stringify(form)
+        body: JSON.stringify({ ...form, department, program })
       });
 
       const d = await r.json();
@@ -79,7 +81,8 @@ export default function Students() {
       }
 
       setMsg("ID created successfully.");
-      setForm({ name: "", email: "", password: "", department: "", program: "" });
+      setForm({ name: "", email: "", password: "" });
+      reset();
       load();
     } catch (err) {
       setError(err.message || "An error occurred");
@@ -148,17 +151,23 @@ export default function Students() {
             <select
               id="student-department"
               name="student-department"
-              value={form.department}
-              onChange={(e) => setForm({ ...form, department: e.target.value })}
-              required
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              disabled={isProgramDisabled}
+              style={isProgramDisabled ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: 'rgba(0,0,0,0.05)' } : {}}
+              title={isProgramDisabled ? "Disabled because a Program is selected" : ""}
+              aria-disabled={isProgramDisabled}
             >
-              <option value="" disabled>Select department</option>
+              <option value="">Select department</option>
               {DEPARTMENTS.map((dept) => (
                 <option key={dept.value} value={dept.value}>
                   {dept.label}
                 </option>
               ))}
             </select>
+            {isProgramDisabled && (
+              <small style={{ fontSize: '10px', color: 'var(--text-muted-on-light)', marginTop: '2px' }}>Disabled because a Program is selected</small>
+            )}
           </label>
 
           <label htmlFor="student-program">
@@ -166,17 +175,23 @@ export default function Students() {
             <select
               id="student-program"
               name="student-program"
-              value={form.program}
-              onChange={(e) => setForm({ ...form, program: e.target.value })}
-              required
+              value={program}
+              onChange={(e) => setProgram(e.target.value)}
+              disabled={isDepartmentDisabled}
+              style={isDepartmentDisabled ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: 'rgba(0,0,0,0.05)' } : {}}
+              title={isDepartmentDisabled ? "Disabled because a Department is selected" : ""}
+              aria-disabled={isDepartmentDisabled}
             >
-              <option value="" disabled>Select program</option>
+              <option value="">Select program</option>
               {PROGRAMS.map((prog) => (
                 <option key={prog.value} value={prog.value}>
                   {prog.label}
                 </option>
               ))}
             </select>
+            {isDepartmentDisabled && (
+              <small style={{ fontSize: '10px', color: 'var(--text-muted-on-light)', marginTop: '2px' }}>Disabled because a Department is selected</small>
+            )}
           </label>
 
           <button 

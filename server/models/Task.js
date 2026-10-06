@@ -9,6 +9,7 @@ class Task {
         this.assigned_by = data.assigned_by;
         this.status = data.status;
         this.priority = data.priority;
+        this.start_date = data.start_date;
         this.due_date = data.due_date;
         this.completed_at = data.completed_at;
         this.feedback = data.feedback;

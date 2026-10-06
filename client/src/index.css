@@ -28,12 +28,12 @@
 html{scroll-behavior:smooth}
 
 /* Dark cosmic background for Student Portal */
-body.student-portal {
+.student-layout {
   background: transparent;
   color: var(--text-primary);
   min-height: 100vh;
 }
-html[data-space] body {
+html[data-space] .student-layout {
   background: transparent;
 }
 
@@ -42,7 +42,7 @@ html[data-space] body {
   content: '';
   position: fixed;
   inset: 0;
-  background: 
+  background:
     radial-gradient(circle at 20% 30%, var(--space-nebula-blue) 0%, transparent 40%),
     radial-gradient(circle at 80% 70%, var(--space-nebula-violet) 0%, transparent 35%),
     radial-gradient(circle at 50% 50%, var(--space-nebula-orange) 0%, transparent 50%);
@@ -57,12 +57,22 @@ html[data-space] body {
   100% { transform: translateX(2%) translateY(1%); }
 }
 
+@keyframes nebula-drift {
+  0% { transform: translateX(-2%) translateY(-1%); }
+  100% { transform: translateX(2%) translateY(1%); }
+}
+
 body{
   margin:0;
   min-width:320px;
   background:linear-gradient(135deg,var(--space-bg-deep) 0%,var(--space-bg-navy) 50%,var(--space-bg-deep) 100%);
   color:var(--text-on-light);
   overflow-x:hidden;
+}
+
+/* Light background for Admin/Manager Portal only */
+.role-layout {
+  background: #F3F3F3;
 }
 button,input,textarea,select{font:inherit}
 button{cursor:pointer}
@@ -110,9 +120,30 @@ img{max-width:100%}
 .empty-state{
   padding:30px;
   text-align:center;
-  color:var(--text-subtle-on-light);
-  background:var(--surface-soft);
   border-radius:10px;
+}
+
+/* Empty States - Admin/Manager (Light Theme) */
+.role-layout .empty-state,
+.role-layout .workspace-empty {
+  background: #F9FAFB;
+  border: 1px dashed #D1D5DB;
+  color: #4B5563;
+}
+
+/* Empty States - Student Portal (Dark Theme) */
+.student-layout .empty-state,
+.student-layout .workspace-empty {
+  background: var(--space-surface-hover);
+  color: var(--text-subtle-dark);
+  border-color: var(--space-border);
+}
+
+/* Global fallback */
+.empty-state:not(.role-layout .empty-state):not(.student-layout .empty-state) {
+  background: #F9FAFB;
+  border: 1px dashed #D1D5DB;
+  color: #4B5563;
 }
 .pill,.score-chip{
   padding:5px 9px;

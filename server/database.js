@@ -177,7 +177,7 @@ addColumnIfMissing("users", "department", "TEXT DEFAULT 'Techins'");
 addColumnIfMissing("users", "program", "TEXT");
 addColumnIfMissing("users", "active", "INTEGER NOT NULL DEFAULT 1");
 for (const [c, d] of [
-  ["task_code", "TEXT"], ["category", "TEXT DEFAULT 'General'"], ["program", "TEXT DEFAULT 'TECHINS'"], ["team", "TEXT DEFAULT 'General'"], ["task_type", "TEXT DEFAULT 'General'"],
+  ["task_code", "TEXT"], ["category", "TEXT DEFAULT 'General'"], ["program", "TEXT DEFAULT 'TECHINS'"], ["department", "TEXT"], ["team", "TEXT DEFAULT 'General'"], ["task_type", "TEXT DEFAULT 'General'"],
   ["what", "TEXT"], ["why", "TEXT"], ["how", "TEXT"], ["how_to_do", "TEXT"], ["expected_output", "TEXT"], ["submission_requirements", "TEXT"], ["resources", "TEXT"], ["notes", "TEXT"],
   ["workflow_status", "TEXT DEFAULT 'Assigned'"], ["start_date", "TEXT"], ["updated_at", "TEXT"]
 ]) addColumnIfMissing("tasks", c, d);

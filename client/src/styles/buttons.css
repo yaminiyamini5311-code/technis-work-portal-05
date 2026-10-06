@@ -3,14 +3,14 @@
    Primary/Secondary variants with accessible contrast
    ========================================================= */
 
-/* Primary Buttons (dark background, light text) */
-button,
-.button-primary,
-.gold-btn,
-.action-complete,
-.submit-activity-btn,
-.update-btn,
-.login-submit {
+/* Primary Buttons (dark background, light text) - Student Portal */
+.student-layout button,
+.student-layout .button-primary,
+.student-layout .gold-btn,
+.student-layout .action-complete,
+.student-layout .submit-activity-btn,
+.student-layout .update-btn,
+.student-layout .login-submit {
   background: var(--surface-dark) !important;
   color: var(--text-on-dark) !important;
   border: 1px solid var(--surface-dark) !important;
@@ -24,21 +24,21 @@ button,
   transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
-button:hover:not(:disabled),
-.button-primary:hover:not(:disabled),
-.gold-btn:hover:not(:disabled),
-.submit-activity-btn:hover:not(:disabled),
-.update-btn:hover:not(:disabled) {
+.student-layout button:hover:not(:disabled),
+.student-layout .button-primary:hover:not(:disabled),
+.student-layout .gold-btn:hover:not(:disabled),
+.student-layout .submit-activity-btn:hover:not(:disabled),
+.student-layout .update-btn:hover:not(:disabled) {
   background: var(--surface-dark-secondary) !important;
   color: var(--text-on-dark) !important;
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
 }
 
-button:disabled,
-.button-primary:disabled,
-.gold-btn:disabled,
-.submit-activity-btn:disabled {
+.student-layout button:disabled,
+.student-layout .button-primary:disabled,
+.student-layout .gold-btn:disabled,
+.student-layout .submit-activity-btn:disabled {
   background: var(--text-muted-on-light) !important;
   color: #E6E6E6 !important;
   border-color: var(--text-muted-on-light) !important;
@@ -47,12 +47,79 @@ button:disabled,
   transform: none !important;
 }
 
-/* Secondary Buttons (light background, dark text) */
-.button-secondary,
-.action-progress,
-.refresh-button,
-.refresh-btn,
-.back-button {
+/* Primary Buttons (dark background, light text) - Admin/Manager Portal */
+.role-layout .button-primary,
+.role-layout .gold-btn,
+.role-layout .action-complete,
+.role-layout .submit-activity-btn,
+.role-layout .update-btn,
+.role-layout .login-submit {
+  background: #0C120C !important;
+  color: #FFFFFF !important;
+  border: 1px solid #0C120C !important;
+  font-weight: 700 !important;
+  min-height: 42px;
+  padding: 11px 16px;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
+}
+
+.role-layout .button-primary:hover:not(:disabled),
+.role-layout .gold-btn:hover:not(:disabled),
+.role-layout .submit-activity-btn:hover:not(:disabled),
+.role-layout .update-btn:hover:not(:disabled) {
+  background: #182018 !important;
+  color: #FFFFFF !important;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.role-layout .button-primary:disabled,
+.role-layout .gold-btn:disabled,
+.role-layout .submit-activity-btn:disabled {
+  background: #9CA3AF !important;
+  color: #FFFFFF !important;
+  border-color: #9CA3AF !important;
+  opacity: 1 !important;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Primary Buttons - Login Page (Light Theme) */
+body:not(.student-layout):not(.role-layout) .button-primary,
+body:not(.student-layout):not(.role-layout) .gold-btn,
+body:not(.student-layout):not(.role-layout) .login-submit {
+  background: #0C120C !important;
+  color: #FFFFFF !important;
+  border: 1px solid #0C120C !important;
+  font-weight: 700 !important;
+  min-height: 42px;
+  padding: 11px 16px;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
+}
+
+body:not(.student-layout):not(.role-layout) .button-primary:hover:not(:disabled),
+body:not(.student-layout):not(.role-layout) .gold-btn:hover:not(:disabled),
+body:not(.student-layout):not(.role-layout) .login-submit:hover:not(:disabled) {
+  background: #182018 !important;
+  color: #FFFFFF !important;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Secondary Buttons (light background, dark text) - Student Portal */
+.student-layout .button-secondary,
+.student-layout .action-progress,
+.student-layout .refresh-button,
+.student-layout .refresh-btn,
+.student-layout .back-button {
   background: var(--surface) !important;
   color: var(--text-on-light) !important;
   border: 1px solid var(--border-color) !important;
@@ -65,11 +132,11 @@ button:disabled,
   transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
-.button-secondary:hover:not(:disabled),
-.action-progress:hover:not(:disabled),
-.refresh-button:hover:not(:disabled),
-.refresh-btn:hover:not(:disabled),
-.back-button:hover:not(:disabled) {
+.student-layout .button-secondary:hover:not(:disabled),
+.student-layout .action-progress:hover:not(:disabled),
+.student-layout .refresh-button:hover:not(:disabled),
+.student-layout .refresh-btn:hover:not(:disabled),
+.student-layout .back-button:hover:not(:disabled) {
   background: var(--surface-soft) !important;
   color: var(--text-on-light) !important;
   border-color: var(--primary-color) !important;
@@ -77,8 +144,8 @@ button:disabled,
   box-shadow: var(--shadow-sm);
 }
 
-.button-secondary:disabled,
-.action-progress:disabled {
+.student-layout .button-secondary:disabled,
+.student-layout .action-progress:disabled {
   background: var(--surface-soft) !important;
   color: var(--text-subtle-on-light) !important;
   border-color: var(--border-light) !important;
@@ -87,8 +154,76 @@ button:disabled,
   transform: none !important;
 }
 
-/* Accent Buttons (orange) */
-.button-accent {
+/* Secondary Buttons (light background, dark text) - Admin/Manager Portal */
+.role-layout .button-secondary,
+.role-layout .action-progress,
+.role-layout .refresh-button,
+.role-layout .refresh-btn,
+.role-layout .back-button {
+  background: #FFFFFF !important;
+  color: #111827 !important;
+  border: 1px solid #D1D5DB !important;
+  font-weight: 700 !important;
+  min-height: 42px;
+  padding: 11px 16px;
+  font-size: 13px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
+}
+
+.role-layout .button-secondary:hover:not(:disabled),
+.role-layout .action-progress:hover:not(:disabled),
+.role-layout .refresh-button:hover:not(:disabled),
+.role-layout .refresh-btn:hover:not(:disabled),
+.role-layout .back-button:hover:not(:disabled) {
+  background: #F9FAFB !important;
+  color: #111827 !important;
+  border-color: #FA9A02 !important;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.role-layout .button-secondary:disabled,
+.role-layout .action-progress:disabled {
+  background: #F3F4F6 !important;
+  color: #6B7280 !important;
+  border-color: #D1D5DB !important;
+  opacity: 1 !important;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Secondary Buttons - Login Page (Light Theme) */
+body:not(.student-layout):not(.role-layout) .button-secondary,
+body:not(.student-layout):not(.role-layout) .refresh-button,
+body:not(.student-layout):not(.role-layout) .refresh-btn,
+body:not(.student-layout):not(.role-layout) .back-button {
+  background: #FFFFFF !important;
+  color: #111827 !important;
+  border: 1px solid #D1D5DB !important;
+  font-weight: 700 !important;
+  min-height: 42px;
+  padding: 11px 16px;
+  font-size: 13px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
+}
+
+body:not(.student-layout):not(.role-layout) .button-secondary:hover:not(:disabled),
+body:not(.student-layout):not(.role-layout) .refresh-button:hover:not(:disabled),
+body:not(.student-layout):not(.role-layout) .refresh_btn:hover:not(:disabled),
+body:not(.student-layout):not(.role-layout) .back-button:hover:not(:disabled) {
+  background: #F9FAFB !important;
+  color: #111827 !important;
+  border-color: #FA9A02 !important;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Accent Buttons (orange) - Student Portal */
+.student-layout .button-accent {
   background: var(--primary-color) !important;
   color: var(--surface-dark) !important;
   border: 1px solid var(--primary-color) !important;
@@ -101,7 +236,7 @@ button:disabled,
   transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
-.button-accent:hover:not(:disabled) {
+.student-layout .button-accent:hover:not(:disabled) {
   background: var(--surface-dark) !important;
   color: var(--text-on-dark) !important;
   border-color: var(--surface-dark) !important;
@@ -109,8 +244,52 @@ button:disabled,
   box-shadow: var(--shadow-md);
 }
 
-/* Upload/File Buttons */
-.upload-button {
+/* Accent Buttons (orange) - Admin/Manager Portal */
+.role-layout .button-accent {
+  background: var(--primary-color) !important;
+  color: var(--surface-dark) !important;
+  border: 1px solid var(--primary-color) !important;
+  font-weight: 800 !important;
+  min-height: 42px;
+  padding: 11px 16px;
+  font-size: 13px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
+}
+
+.role-layout .button-accent:hover:not(:disabled) {
+  background: var(--surface-dark) !important;
+  color: var(--text-on-dark) !important;
+  border-color: var(--surface-dark) !important;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Accent Buttons (orange) - Login Page (Light Theme) */
+body:not(.student-layout):not(.role-layout) .button-accent {
+  background: var(--primary-color) !important;
+  color: var(--surface-dark) !important;
+  border: 1px solid var(--primary-color) !important;
+  font-weight: 800 !important;
+  min-height: 42px;
+  padding: 11px 16px;
+  font-size: 13px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
+}
+
+body:not(.student-layout):not(.role-layout) .button-accent:hover:not(:disabled) {
+  background: var(--surface-dark) !important;
+  color: var(--text-on-dark) !important;
+  border-color: var(--surface-dark) !important;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Upload/File Buttons - Student Portal */
+.student-layout .upload-button {
   background: var(--surface) !important;
   color: var(--text-on-light) !important;
   border: 1px solid var(--border-color) !important;
@@ -122,18 +301,56 @@ button:disabled,
   transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
-.upload-button:hover {
+.student-layout .upload-button:hover {
   background: var(--surface-soft) !important;
   color: var(--text-on-light) !important;
   border-color: var(--primary-color) !important;
+}
+
+/* Upload/File Buttons - Admin/Manager Portal */
+.role-layout .upload-button {
+  background: #FFFFFF !important;
+  color: #111827 !important;
+  border: 1px solid #D1D5DB !important;
+  font-weight: 700 !important;
+  padding: 10px 14px;
+  font-size: 12px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
+}
+
+.role-layout .upload-button:hover {
+  background: #F9FAFB !important;
+  color: #111827 !important;
+  border-color: #FA9A02 !important;
+}
+
+/* Upload/File Buttons - Login Page (Light Theme) */
+body:not(.student-layout):not(.role-layout) .upload-button {
+  background: #FFFFFF !important;
+  color: #111827 !important;
+  border: 1px solid #D1D5DB !important;
+  font-weight: 700 !important;
+  padding: 10px 14px;
+  font-size: 12px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
+}
+
+body:not(.student-layout):not(.role-layout) .upload-button:hover {
+  background: #F9FAFB !important;
+  color: #111827 !important;
+  border-color: #FA9A02 !important;
 }
 
 .upload-button input {
   display: none;
 }
 
-/* Chart Tab Buttons */
-.chart-tabs button {
+/* Chart Tab Buttons - Student Portal */
+.student-layout .chart-tabs button {
   color: var(--text-muted-on-light) !important;
   font-weight: 800 !important;
   padding: 9px 12px;
@@ -144,20 +361,66 @@ button:disabled,
   transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
-.chart-tabs button.active {
+.student-layout .chart-tabs button.active {
   background: var(--surface-dark) !important;
   color: var(--text-on-dark) !important;
   font-weight: 800 !important;
 }
 
-.chart-tabs button:hover:not(.active) {
+.student-layout .chart-tabs button:hover:not(.active) {
   background: rgba(250, 154, 2, 0.1) !important;
   color: var(--text-on-light) !important;
 }
 
-/* Quick Action Links/Buttons */
-.quick-actions a,
-.quick-actions button {
+/* Chart Tab Buttons - Admin/Manager Portal */
+.role-layout .chart-tabs button {
+  color: #6B7280 !important;
+  font-weight: 800 !important;
+  padding: 9px 12px;
+  font-size: 12px;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
+}
+
+.role-layout .chart-tabs button.active {
+  background: #0C120C !important;
+  color: #FFFFFF !important;
+  font-weight: 800 !important;
+}
+
+.role-layout .chart-tabs button:hover:not(.active) {
+  background: rgba(250, 154, 2, 0.1) !important;
+  color: #111827 !important;
+}
+
+/* Chart Tab Buttons - Login Page (Light Theme) */
+body:not(.student-layout):not(.role-layout) .chart-tabs button {
+  color: #6B7280 !important;
+  font-weight: 800 !important;
+  padding: 9px 12px;
+  font-size: 12px;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
+}
+
+body:not(.student-layout):not(.role-layout) .chart-tabs button.active {
+  background: #0C120C !important;
+  color: #FFFFFF !important;
+  font-weight: 800 !important;
+}
+
+body:not(.student-layout):not(.role-layout) .chart-tabs button:hover:not(.active) {
+  background: rgba(250, 154, 2, 0.1) !important;
+  color: #111827 !important;
+}
+
+/* Quick Action Links/Buttons - Student Portal */
+.student-layout .quick-actions a,
+.student-layout .quick-actions button {
   background: var(--surface-dark) !important;
   color: var(--text-on-dark) !important;
   font-weight: 700 !important;
@@ -168,15 +431,55 @@ button:disabled,
   transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
-.quick-actions a:hover,
-.quick-actions button:hover {
+.student-layout .quick-actions a:hover,
+.student-layout .quick-actions button:hover {
   background: var(--surface-dark-secondary) !important;
   color: var(--text-on-dark) !important;
   transform: translateY(-1px);
 }
 
-/* Panel/Form Buttons */
-.panel-head button {
+/* Quick Action Links/Buttons - Admin/Manager Portal */
+.role-layout .quick-actions a,
+.role-layout .quick-actions button {
+  background: #0C120C !important;
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+  padding: 11px 14px;
+  font-size: 12px;
+  text-decoration: none;
+  border-radius: 9px;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
+}
+
+.role-layout .quick-actions a:hover,
+.role-layout .quick-actions button:hover {
+  background: #182018 !important;
+  color: #FFFFFF !important;
+  transform: translateY(-1px);
+}
+
+/* Quick Action Links/Buttons - Login Page (Light Theme) */
+body:not(.student-layout):not(.role-layout) .quick-actions a,
+body:not(.student-layout):not(.role-layout) .quick-actions button {
+  background: #0C120C !important;
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+  padding: 11px 14px;
+  font-size: 12px;
+  text-decoration: none;
+  border-radius: 9px;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
+}
+
+body:not(.student-layout):not(.role-layout) .quick-actions a:hover,
+body:not(.student-layout):not(.role-layout) .quick-actions button:hover {
+  background: #182018 !important;
+  color: #FFFFFF !important;
+  transform: translateY(-1px);
+}
+
+/* Panel/Form Buttons - Student Portal */
+.student-layout .panel-head button {
   background: var(--surface) !important;
   color: var(--text-on-light) !important;
   border: 1px solid var(--border-color) !important;
@@ -186,10 +489,44 @@ button:disabled,
   border-radius: 8px;
 }
 
-.panel-head button:hover {
+.student-layout .panel-head button:hover {
   background: var(--surface-soft) !important;
   color: var(--text-on-light) !important;
   border-color: var(--primary-color) !important;
+}
+
+/* Panel/Form Buttons - Admin/Manager Portal */
+.role-layout .panel-head button {
+  background: #FFFFFF !important;
+  color: #111827 !important;
+  border: 1px solid #D1D5DB !important;
+  font-weight: 700 !important;
+  padding: 9px 13px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.role-layout .panel-head button:hover {
+  background: #F9FAFB !important;
+  color: #111827 !important;
+  border-color: #FA9A02 !important;
+}
+
+/* Panel/Form Buttons - Login Page (Light Theme) */
+body:not(.student-layout):not(.role-layout) .panel-head button {
+  background: #FFFFFF !important;
+  color: #111827 !important;
+  border: 1px solid #D1D5DB !important;
+  font-weight: 700 !important;
+  padding: 9px 13px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+body:not(.student-layout):not(.role-layout) .panel-head button:hover {
+  background: #F9FAFB !important;
+  color: #111827 !important;
+  border-color: #FA9A02 !important;
 }
 
 /* Notification Button - styled per layout in StudentLayout.css and RoleLayout.css */
@@ -210,8 +547,8 @@ button:disabled,
   outline-offset: 2px;
 }
 
-/* Password Show/Hide Button */
-.password-field button {
+/* Password Show/Hide Button - Student Portal */
+.student-layout .password-field button {
   background: var(--surface-soft) !important;
   color: var(--text-on-light) !important;
   font-weight: 800 !important;
@@ -221,14 +558,48 @@ button:disabled,
   border-radius: 6px;
 }
 
-.password-field button:hover {
+.student-layout .password-field button:hover {
   background: var(--surface-hover) !important;
   color: var(--text-on-light) !important;
   border-color: var(--border-color) !important;
 }
 
-/* Submission Actions */
-.submission-actions button {
+/* Password Show/Hide Button - Admin/Manager Portal */
+.role-layout .password-field button {
+  background: #F3F4F6 !important;
+  color: #111827 !important;
+  font-weight: 800 !important;
+  font-size: 11px;
+  padding: 0 11px;
+  border: 1px solid #D1D5DB !important;
+  border-radius: 6px;
+}
+
+.role-layout .password-field button:hover {
+  background: #E5E7EB !important;
+  color: #111827 !important;
+  border-color: #FA9A02 !important;
+}
+
+/* Password Show/Hide Button - Login Page (Light Theme) */
+body:not(.student-layout):not(.role-layout) .password-field button {
+  background: #F3F4F6 !important;
+  color: #111827 !important;
+  font-weight: 800 !important;
+  font-size: 11px;
+  padding: 0 11px;
+  border: 1px solid #D1D5DB !important;
+  border-radius: 6px;
+}
+
+body:not(.student-layout):not(.role-layout) .password-field button:hover {
+  background: #E5E7EB !important;
+  color: #111827 !important;
+  border-color: #FA9A02 !important;
+}
+
+/* Submission Actions - Student Portal */
+.student-layout .submission-actions button {
   background: var(--surface) !important;
   color: var(--text-on-light) !important;
   border: 1px solid var(--border-color) !important;
@@ -238,16 +609,49 @@ button:disabled,
   border-radius: 8px;
 }
 
-.submission-actions button:hover {
+.student-layout .submission-actions button:hover {
   background: var(--surface-soft) !important;
   color: var(--text-on-light) !important;
   border-color: var(--primary-color) !important;
 }
 
-/* Logout Buttons (on dark surfaces) */
-.student-logout,
-.role-logout,
-.navbar-logout {
+/* Submission Actions - Admin/Manager Portal */
+.role-layout .submission-actions button {
+  background: #FFFFFF !important;
+  color: #111827 !important;
+  border: 1px solid #D1D5DB !important;
+  font-weight: 700 !important;
+  font-size: 11px;
+  padding: 8px 11px;
+  border-radius: 8px;
+}
+
+.role-layout .submission-actions button:hover {
+  background: #F9FAFB !important;
+  color: #111827 !important;
+  border-color: #FA9A02 !important;
+}
+
+/* Submission Actions - Login Page (Light Theme) */
+body:not(.student-layout):not(.role-layout) .submission-actions button {
+  background: #FFFFFF !important;
+  color: #111827 !important;
+  border: 1px solid #D1D5DB !important;
+  font-weight: 700 !important;
+  font-size: 11px;
+  padding: 8px 11px;
+  border-radius: 8px;
+}
+
+body:not(.student-layout):not(.role-layout) .submission-actions button:hover {
+  background: #F9FAFB !important;
+  color: #111827 !important;
+  border-color: #FA9A02 !important;
+}
+
+/* Logout Buttons (on dark surfaces) - Student Portal */
+.student-layout .student-logout,
+.student-layout .navbar-logout {
   background: rgba(255, 255, 255, 0.05) !important;
   color: var(--text-on-dark) !important;
   border: 1px solid var(--border-on-dark) !important;
@@ -258,18 +662,61 @@ button:disabled,
   transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
-.student-logout:hover,
-.role-logout:hover,
-.navbar-logout:hover {
+.student-layout .student-logout:hover,
+.student-layout .navbar-logout:hover {
   background: rgba(255, 255, 255, 0.1) !important;
   color: var(--primary-color) !important;
   border-color: var(--primary-color) !important;
   transform: translateY(-1px);
 }
 
-/* Close/Cancel Buttons */
-.mobile-close-button,
-.navbar-close {
+/* Logout Buttons (on light surfaces) - Admin/Manager Portal */
+.role-layout .role-logout,
+.role-layout .navbar-logout {
+  background: #FFFFFF !important;
+  color: #111827 !important;
+  border: 1px solid #D1D5DB !important;
+  font-weight: 700 !important;
+  border-radius: 11px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
+}
+
+.role-layout .role-logout:hover,
+.role-layout .navbar-logout:hover {
+  background: #F9FAFB !important;
+  color: #FA9A02 !important;
+  border-color: #FA9A02 !important;
+  transform: translateY(-1px);
+}
+
+/* Logout Buttons - Login Page (Light Theme) */
+body:not(.student-layout):not(.role-layout) .student-logout,
+body:not(.student-layout):not(.role-layout) .role-logout,
+body:not(.student-layout):not(.role-layout) .navbar-logout {
+  background: #FFFFFF !important;
+  color: #111827 !important;
+  border: 1px solid #D1D5DB !important;
+  font-weight: 700 !important;
+  border-radius: 11px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
+}
+
+body:not(.student-layout):not(.role-layout) .student-logout:hover,
+body:not(.student-layout):not(.role-layout) .role-logout:hover,
+body:not(.student-layout):not(.role-layout) .navbar-logout:hover {
+  background: #F9FAFB !important;
+  color: #FA9A02 !important;
+  border-color: #FA9A02 !important;
+  transform: translateY(-1px);
+}
+
+/* Close/Cancel Buttons - Student Portal */
+.student-layout .mobile-close-button,
+.student-layout .navbar-close {
   background: transparent !important;
   color: var(--text-on-dark) !important;
   border: 1px solid var(--border-on-dark) !important;
@@ -283,11 +730,59 @@ button:disabled,
   transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
-.mobile-close-button:hover,
-.navbar-close:hover {
+.student-layout .mobile-close-button:hover,
+.student-layout .navbar-close:hover {
   background: rgba(255, 255, 255, 0.1) !important;
   color: var(--primary-color) !important;
   border-color: var(--primary-color) !important;
+  transform: rotate(90deg);
+}
+
+/* Close/Cancel Buttons - Admin/Manager Portal */
+.role-layout .mobile-close-button,
+.role-layout .navbar-close {
+  background: transparent !important;
+  color: #111827 !important;
+  border: 1px solid #D1D5DB !important;
+  font-size: 24px !important;
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
+}
+
+.role-layout .mobile-close-button:hover,
+.role-layout .navbar-close:hover {
+  background: #F9FAFB !important;
+  color: #FA9A02 !important;
+  border-color: #FA9A02 !important;
+  transform: rotate(90deg);
+}
+
+/* Close/Cancel Buttons - Login Page (Light Theme) */
+body:not(.student-layout):not(.role-layout) .mobile-close-button,
+body:not(.student-layout):not(.role-layout) .navbar-close {
+  background: transparent !important;
+  color: #111827 !important;
+  border: 1px solid #D1D5DB !important;
+  font-size: 24px !important;
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  transition: var(--anim-duration-fast) var(--anim-easing-standard);
+}
+
+body:not(.student-layout):not(.role-layout) .mobile-close-button:hover,
+body:not(.student-layout):not(.role-layout) .navbar-close:hover {
+  background: #F9FAFB !important;
+  color: #FA9A02 !important;
+  border-color: #FA9A02 !important;
   transform: rotate(90deg);
 }
 
