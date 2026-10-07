@@ -484,10 +484,53 @@
   .mission-admin-grid,
   .performance-admin-grid {
     grid-template-columns: 1fr;
+    gap: 15px;
   }
 
   .admin-two > .panel {
     height: auto;
+    min-height: unset;
+  }
+
+  .admin-two form.panel {
+    order: 1;
+  }
+
+  .admin-two > .panel:not(form) {
+    order: 2;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-simple {
+    padding: 15px;
+  }
+
+  .simple-head h2 {
+    font-size: 24px;
+  }
+
+  .panel {
+    padding: 20px 15px;
+  }
+
+  .admin-two {
+    gap: 15px;
+  }
+
+  .admin-two form label {
+    margin-bottom: 12px;
+  }
+
+  .admin-two form input,
+  .admin-two form select {
+    font-size: 14px;
+    padding: 10px 12px;
+  }
+
+  .gold-btn {
+    width: 100%;
+    padding: 12px;
   }
 }
 
@@ -517,5 +560,46 @@
 
   .table-wrap table {
     min-width: 700px;
+  }
+
+  .simple-head h2 {
+    font-size: 22px;
+  }
+
+  .simple-head p {
+    font-size: 13px;
+  }
+
+  .admin-two form h3 {
+    font-size: 18px;
+  }
+
+  .list-row {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-simple {
+    padding: 12px;
+  }
+
+  .simple-head {
+    margin-bottom: 15px;
+  }
+
+  .panel {
+    padding: 15px 12px;
+  }
+
+  .admin-two {
+    gap: 12px;
   }
 }
