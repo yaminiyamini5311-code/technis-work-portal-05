@@ -7,17 +7,18 @@ import "./RoleLayout.css";
 export default function RoleLayout({role}){
   let user={};
   try{user=JSON.parse(localStorage.getItem("user")||"{}")}catch{}
-  
+
+  const getWorkspaceTitle = () => {
+    if (role === "admin" || role === "ceo") return "Admin Workspace";
+    if (role === "manager") return "Manager Workspace";
+    return "Workspace";
+  };
+
   return <div className="role-layout">
-    {/* Single fixed background logo */}
-    <div className="role-background-logo" aria-hidden="true">
-      <img src="/techins-logo.jpg" alt="" />
-    </div>
-    
     <Navbar role={role} />
     <main className="role-main">
       <header className="role-topbar">
-        <div><span className="role-eyebrow">TECHINS WORK PORTAL</span><h1>{role==="admin"?"Admin Workspace":"Manager Workspace"}</h1></div>
+        <div><span className="role-eyebrow">TECHINS WORK PORTAL</span><h1>{getWorkspaceTitle()}</h1></div>
         <div className="role-top-actions">
           <NotificationBell/>
           <div className="role-top-user">

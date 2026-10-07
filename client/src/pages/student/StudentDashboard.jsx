@@ -77,13 +77,42 @@ export default function StudentDashboard(){
         </div>
       </div>
       <div className="overall-progress">
-        <div className="progress-ring">
-          <div className="bubbles-container">
-            <span className="bubble"></span>
-            <span className="bubble"></span>
-            <span className="bubble"></span>
+        <div className="progress-ring" role="progressbar" aria-valuenow={data.progress} aria-valuemin="0" aria-valuemax="100" aria-label="Overall progress">
+          <svg className="progress-svg" viewBox="0 0 100 100">
+            <circle className="progress-track" cx="50" cy="50" r="40" fill="none" />
+            <circle
+              className="progress-fill"
+              cx="50"
+              cy="50"
+              r="40"
+              fill="none"
+              strokeDasharray={`${2 * Math.PI * 40}`}
+              strokeDashoffset={`${2 * Math.PI * 40 * (1 - data.progress / 100)}`}
+            />
+            {/* Milestone ticks */}
+            {[25, 50, 75, 100].map(tick => (
+              <line
+                key={tick}
+                className="progress-tick"
+                x1="50"
+                y1="10"
+                x2="50"
+                y2="15"
+                transform={`rotate(${tick * 3.6} 50 50)`}
+              />
+            ))}
+            {/* Satellite/particle at tip */}
+            <circle
+              className="progress-satellite"
+              cx="50"
+              cy="10"
+              r="4"
+              transform={`rotate(${data.progress * 3.6} 50 50) translate(0 -40)`}
+            />
+          </svg>
+          <div className="progress-text">
+            <strong>{data.progress}%</strong>
           </div>
-          <strong>{data.progress}%</strong>
         </div>
         <div><span>Overall progress</span><small>Based on your current records</small></div>
       </div>
@@ -114,7 +143,18 @@ export default function StudentDashboard(){
             <div className="professional-task-row" key={t.id}>
               <div className="task-index"><TechinsIcon name="clipboard" size={18} variant="light" className="portal-icon" /></div>
               <div className="task-row-content"><strong>{t.title}</strong><small>{t.start_date ? `${formatDate(t.start_date)} - ` : ''}{t.due_date ? formatDate(t.due_date) : "No deadline"}</small></div>
-              <span className={`workspace-status-badge ${t.status}`}>{String(t.status).replace("_"," ")}</span>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {t.domain && <span className="domain-chip" style={{
+                  padding: '3px 8px',
+                  borderRadius: '12px',
+                  background: 'rgba(250,154,2,0.15)',
+                  color: '#FA9A02',
+                  fontSize: '9px',
+                  fontWeight: '700',
+                  textTransform: 'capitalize'
+                }}>{t.domain}</span>}
+                <span className={`workspace-status-badge ${t.status}`}>{String(t.status).replace("_"," ")}</span>
+              </div>
             </div>
           ):<div className="workspace-empty"><TechinsIcon name="folder" size={40} variant="light" className="icon-sway portal-icon" /><strong>No tasks assigned yet</strong><span>New assignments will appear here.</span></div>}
         </div>

@@ -5,7 +5,8 @@
 .student-header>div:first-child span{font-size:10px;letter-spacing:1.6px;color:var(--text-accent-on-dark);font-weight:900}
 .student-header h1{font-size:20px;margin:3px 0 0;color:var(--text-on-dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .student-header-actions{display:flex;align-items:center;gap:14px;flex-shrink:0}
-.student-header-user{display:flex;align-items:center;gap:10px;font-size:13px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.08);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.28);max-width:250px;min-width:0}
+.student-header-user{display:flex;align-items:center;gap:10px;font-size:13px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.08);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.28);max-width:250px;min-width:0;text-decoration:none;color:inherit;transition:all 0.2s ease}
+.student-header-user:hover{background:rgba(255,255,255,0.12);border-color:rgba(250,154,2,0.4)}
 .student-header-user>div{display:flex;flex-direction:column;text-align:left;min-width:0}
 .student-header-user strong{color:#F5F8FF;font-weight:700;font-size:13px;text-shadow:0 1px 3px rgba(0,0,0,0.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .student-header-user small{color:#C7D2E8;margin-top:2px;font-weight:500;font-size:11px;text-shadow:0 1px 2px rgba(0,0,0,0.4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -74,10 +75,10 @@
 }
 
 .notification-wrap{position:relative}
-.notification-button{width:38px;height:38px;min-width:38px;min-height:38px;border:1px solid rgba(255,255,255,0.28);background:rgba(255,255,255,0.08);backdrop-filter:blur(8px);border-radius:11px;color:#F5F8FF;font-size:18px;position:relative;cursor:pointer;opacity:1 !important;visibility:visible !important}
+.notification-button{width:44px;height:44px;min-width:44px;min-height:44px;border:1px solid rgba(255,255,255,0.28);background:rgba(255,255,255,0.08);backdrop-filter:blur(8px);border-radius:11px;color:#F5F8FF;font-size:18px;position:relative;cursor:pointer;opacity:1 !important;visibility:visible !important;display:grid;place-items:center}
 .notification-button:hover{background:rgba(255,255,255,0.12);border-color:rgba(250,154,2,0.6);transform:translateY(-1px)}
 .notification-button:focus-visible{outline:2px solid #FA9A02;outline-offset:2px}
-.notification-button b{position:absolute;right:-4px;top:-5px;min-width:16px;height:16px;border-radius:20px;background:#FA9A02;color:#0B1220;font-size:8px;display:grid;place-items:center}
+.notification-button b{position:absolute;right:-4px;top:-5px;min-width:16px;height:16px;border-radius:20px;background:#FA9A02;color:#0B1220;font-size:8px;font-weight:900;display:grid;place-items:center}
 .notification-pop{position:absolute;right:0;top:47px;width:310px;background:rgba(20,28,20,0.98);backdrop-filter:blur(16px);border:1px solid rgba(250,154,2,0.25);border-radius:15px;box-shadow:0 22px 50px rgba(0,0,0,0.7);z-index:80;overflow:hidden}
 .notification-pop>div{padding:14px 15px;border-bottom:1px solid rgba(250,154,2,0.15);display:flex;justify-content:space-between;color:var(--text-on-dark)}
 .notification-pop>div small{color:var(--text-muted-on-dark);font-size:9px}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import "./Login.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -126,7 +126,7 @@ export default function Login() {
 
           <div className="login-footer-line">
             <span />
-            <small>TECHINS · WORK PORTAL</small>
+            <small>New to TECHINS? <Link to="/register" style={{ color: '#FA9A02', textDecoration: 'none', fontWeight: '700' }}>Create an account</Link></small>
             <span />
           </div>
         </div>

@@ -59,6 +59,27 @@
   transform: translateY(0);
 }
 
+/* RoleLayout overrides for light theme - higher contrast */
+.role-layout .navbar-hamburger {
+  border: 1px solid #D1D5DB;
+  background: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(12, 18, 12, 0.08);
+}
+
+.role-layout .navbar-hamburger span {
+  background: #0B1220;
+}
+
+.role-layout .navbar-hamburger:hover {
+  border-color: #FA9A02;
+  background: #F9FAFB;
+  box-shadow: 0 4px 12px rgba(250, 154, 2, 0.2);
+}
+
+.role-layout .navbar-hamburger:hover span {
+  background: #FA9A02;
+}
+
 /* Backdrop */
 .navbar-backdrop {
   position: fixed;
@@ -91,13 +112,13 @@
   transform: translateX(-100%);
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 90;
-  box-shadow: 16px 0 50px rgba(0, 0, 0, 0.5);
   overflow-y: auto;
   overflow-x: hidden;
 }
 
 .navbar-menu.open {
   transform: translateX(0);
+  box-shadow: 16px 0 50px rgba(0, 0, 0, 0.5);
 }
 
 /* Custom scrollbar for navbar */

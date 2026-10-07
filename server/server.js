@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const bcrypt = require("bcryptjs");
+const path = require("path");
 
 dotenv.config();
 
@@ -111,6 +112,8 @@ const PORT = Number(process.env.PORT) || 5000;
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
+  "http://localhost:5175",
+  "http://localhost:5176",
   "https://technis-work-portal-05.vercel.app",
   "https://technis-work-portal-05-ep1h6tgcr.vercel.app",
 ];
@@ -175,6 +178,12 @@ app.use(
 );
 
 /* =========================================================
+   STATIC FILES (AVATAR UPLOADS)
+   ========================================================= */
+
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+/* =========================================================
    DATABASE CONNECTION
    ========================================================= */
 
@@ -193,10 +202,10 @@ function getSecret() {
 /* =========================================================
    DEFAULT ACCOUNTS
    =========================================================
-   
+
    ADMIN
-   Email    : admin@techins.com
-   Password : Admin@123
+   Email    : ceo@techins.com
+   Password : ceo@2006
 
    MANAGER
    Email    : manager@techins.com
@@ -223,8 +232,8 @@ function ensureDefaultAccounts() {
     const accounts = [
       {
         name: "TECHINS Admin",
-        email: "admin@techins.com",
-        password: "Admin@123",
+        email: "ceo@techins.com",
+        password: "ceo@2006",
         role: "admin",
         department: "Administration",
       },
@@ -425,7 +434,7 @@ function ensureDefaultAccounts() {
       "================================================="
     );
     console.log(
-      "ADMIN   : admin@techins.com / Admin@123"
+      "ADMIN   : ceo@techins.com / ceo@2006"
     );
     console.log(
       "MANAGER : manager@techins.com / Manager@123"

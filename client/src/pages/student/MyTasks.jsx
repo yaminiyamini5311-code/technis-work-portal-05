@@ -7,6 +7,14 @@ import "./MyTasks.css";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 
+const DOMAINS = [
+  { value: "edutins", label: "EduTins" },
+  { value: "resins", label: "ResIns" },
+  { value: "innovins", label: "InnoVins" },
+  { value: "systins", label: "SysTins" },
+  { value: "program", label: "Program" }
+];
+
 const formatDate = (dateStr) => {
   if (!dateStr) return "Not set";
   const d = new Date(dateStr + 'T00:00:00');
@@ -22,6 +30,7 @@ export default function MyTasks() {
   const [busy, setBusy] = useState(null);
   const [selectedFiles, setSelectedFiles] = useState({});
   const [comments, setComments] = useState({});
+  const [domainFilter, setDomainFilter] = useState("");
   const previousApproved = useRef(null);
 
   // Scroll reveal effect for space theme - sophisticated animation
@@ -105,7 +114,27 @@ export default function MyTasks() {
       <div className="tasks-container">
         <div className="page-header">
           <div><p className="page-label">STUDENT WORKSPACE</p><h1>My Tasks</h1><p className="page-description">Execute assignments, submit proof and follow every review step.</p></div>
-          <button className="refresh-button" onClick={load} disabled={loading}>↻ Refresh</button>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <select
+              value={domainFilter}
+              onChange={e => setDomainFilter(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                borderRadius: '8px',
+                border: '1px solid rgba(255,255,255,0.28)',
+                background: 'rgba(255,255,255,0.08)',
+                color: '#F5F8FF',
+                fontSize: '13px',
+                backdropFilter: 'blur(8px)'
+              }}
+            >
+              <option value="">All Domains</option>
+              {DOMAINS.map(d => (
+                <option key={d.value} value={d.value}>{d.label}</option>
+              ))}
+            </select>
+            <button className="refresh-button" onClick={load} disabled={loading}>↻ Refresh</button>
+          </div>
         </div>
         {error && <div className="task-alert">{error}</div>}
         {message && <div className="info-msg">{message}</div>}
@@ -128,7 +157,7 @@ export default function MyTasks() {
         <div className="overall-progress"><div className="progress-heading"><div><h2>Verified Task Progress</h2><p>Only approved tasks count as completed.</p></div><strong>{percent}%</strong></div><div className="progress-track"><div className="progress-fill" style={{ width: `${percent}%` }} /></div></div>
 
         <div className="tasks-list">
-          {tasks.length ? tasks.map((task) => {
+          {tasks.length ? tasks.filter(t => !domainFilter || t.domain === domainFilter).map((task) => {
             const workflow = task.workflow_status || (task.status === "completed" ? "Approved" : task.status === "in_progress" ? "In Progress" : "Assigned");
             const canSubmit = ["In Progress", "Revision Required", "Acknowledged", "Assigned"].includes(workflow);
             
@@ -147,6 +176,7 @@ export default function MyTasks() {
                 <div className="task-card-top"><div><span className="task-label">{task.task_code || "TASK"}</span><h2>{task.title}</h2><p>{task.description || "No description provided."}</p></div><span className={`status ${task.status} ${isOverdue ? 'overdue-badge' : ''}`}>{isOverdue ? '⚠ Overdue' : workflow}</span></div>
                 <div className="task-meta-grid">
                   <div><span>Priority</span><strong className={`priority ${task.priority}`}>{task.priority || "medium"}</strong></div>
+                  {task.domain && <div><span>Domain</span><strong style={{ textTransform: 'capitalize' }}>{task.domain}</strong></div>}
                   {task.start_date && <div><span>Start</span><strong>{formatDate(task.start_date)}</strong></div>}
                   <div><span>End</span><strong>{task.due_date ? formatDate(task.due_date) : "No deadline"}</strong></div>
                   <div><span>Assigned by</span><strong>{task.assigned_by_name || "Management"}</strong></div>

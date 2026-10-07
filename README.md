@@ -97,7 +97,7 @@ Set a strong `JWT_SECRET` in `server/.env`.
 Create an admin account without putting its password in source control:
 
 ```powershell
-node create-admin.js admin@techins.com "CHANGE_THIS_PASSWORD" "TECHINS Admin"
+node create-admin.js ceo@techins.com "CHANGE_THIS_PASSWORD" "TECHINS Admin"
 ```
 
 Optional manager:
@@ -147,7 +147,7 @@ Open the Vite URL shown in the terminal (usually `http://localhost:5173`).
 ### 3. Testing the Application
 
 **Login Credentials:**
-- Admin: `admin@techins.com` / (password set during admin creation)
+- Admin: `ceo@techins.com` / (password set during admin creation)
 - Manager: `manager@techins.com` / (password set during manager creation)
 - Students: Created by admin through the UI
 

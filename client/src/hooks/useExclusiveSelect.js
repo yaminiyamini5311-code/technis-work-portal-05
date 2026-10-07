@@ -1,12 +1,12 @@
 import { useState } from "react";
 
-export function useExclusiveSelect(initialState = { department: "", program: "" }) {
+export function useExclusiveSelect(initialState = { student: "", program: "" }) {
   const [values, setValues] = useState(initialState);
 
-  const setDepartment = (value) => {
+  const setStudent = (value) => {
     setValues(prev => ({
       ...prev,
-      department: value,
+      student: value,
       program: value ? "" : prev.program
     }));
   };
@@ -15,7 +15,7 @@ export function useExclusiveSelect(initialState = { department: "", program: "" 
     setValues(prev => ({
       ...prev,
       program: value,
-      department: value ? "" : prev.department
+      student: value ? "" : prev.student
     }));
   };
 
@@ -24,12 +24,12 @@ export function useExclusiveSelect(initialState = { department: "", program: "" 
   };
 
   return {
-    department: values.department,
+    student: values.student,
     program: values.program,
-    setDepartment,
+    setStudent,
     setProgram,
     reset,
-    isDepartmentDisabled: !!values.program,
-    isProgramDisabled: !!values.department
+    isStudentDisabled: !!values.program,
+    isProgramDisabled: !!values.student
   };
 }

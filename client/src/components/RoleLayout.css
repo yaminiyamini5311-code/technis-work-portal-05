@@ -11,21 +11,9 @@
 .role-content{padding:28px;max-width:1500px;margin:0 auto}
 .role-content>*{max-width:100%}
 
-/* Single fixed background logo (replaces floating logos) */
+/* Single fixed background logo (replaces floating logos) - removed for Admin/Manager light theme */
 .role-background-logo{
-  position:fixed;
-  inset:0;
-  display:grid;
-  place-items:center;
-  pointer-events:none;
-  z-index:0;
-  overflow:hidden;
-}
-.role-background-logo img{
-  width:clamp(260px,62vmin,760px);
-  height:auto;
-  opacity:0.05;
-  object-fit:contain;
+  display:none;
 }
 
 @media(prefers-reduced-motion:reduce){
@@ -35,7 +23,7 @@
 }
 
 .notification-wrap{position:relative}
-.notification-button{width:38px;height:38px;border:1px solid #D1D5DB;background:#FFFFFF;border-radius:11px;color:#111827;font-size:18px;position:relative;cursor:pointer;transition:all 0.2s ease;opacity:1 !important;visibility:visible !important}
+.notification-button{width:44px;height:44px;min-width:44px;min-height:44px;border:1px solid #D1D5DB;background:#FFFFFF;border-radius:11px;color:#0B1220;font-size:18px;position:relative;cursor:pointer;transition:all 0.2s ease;opacity:1 !important;visibility:visible !important;display:grid;place-items:center}
 .notification-button:hover{background:#F9FAFB;border-color:#FA9A02;color:#FA9A02;transform:translateY(-1px)}
 .notification-button:focus-visible{outline:2px solid #FA9A02;outline-offset:2px}
 .notification-button b{position:absolute;right:-4px;top:-5px;min-width:16px;height:16px;border-radius:20px;background:#FA9A02;color:#FFFFFF;font-size:8px;font-weight:900;display:grid;place-items:center}

@@ -198,6 +198,23 @@ const icons = {
       <rect x="3" y="3" width="8" height="8" rx="1.5" fill="currentColor" opacity="0.1" className="icon-fill"/>
     </svg>
   ),
+
+  bell: (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="icon-stroke"/>
+      <path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="icon-accent-stroke"/>
+      <circle cx="12" cy="8" r="1.5" fill="currentColor" className="icon-accent"/>
+      <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" fill="currentColor" opacity="0.08" className="icon-fill"/>
+    </svg>
+  ),
+
+  upload: (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 16V4M8 8l4-4 4 4M4 20h16" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="icon-stroke"/>
+      <circle cx="12" cy="4" r="1.5" fill="currentColor" className="icon-accent"/>
+      <path d="M8 8l4-4 4-4" fill="currentColor" opacity="0.12" className="icon-fill"/>
+    </svg>
+  ),
 };
 
 export default function TechinsIcon({ 

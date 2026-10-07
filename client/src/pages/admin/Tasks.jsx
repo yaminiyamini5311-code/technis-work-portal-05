@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useExclusiveSelect } from "../../hooks/useExclusiveSelect";
 import "../../styles/admin.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -13,21 +14,31 @@ const PROGRAMS = [
   { value: "unlock", label: "Unlock" }
 ];
 
+const DOMAINS = [
+  { value: "edutins", label: "EduTins" },
+  { value: "resins", label: "ResIns" },
+  { value: "innovins", label: "InnoVins" },
+  { value: "systins", label: "SysTins" },
+  { value: "program", label: "Program" }
+];
+
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
   const [students, setStudents] = useState([]);
-  const [form, setForm] = useState({ 
-    title: "", 
-    description: "", 
-    assigned_to: "", 
-    priority: "medium", 
+  const [domainFilter, setDomainFilter] = useState("");
+  const [form, setForm] = useState({
+    title: "",
+    description: "",
+    priority: "medium",
     start_date: "",
-    due_date: "", 
-    program: "", 
+    due_date: "",
+    domain: "edutins",
     how_to_do: "",
-    expected_output: "", 
-    submission_requirements: "" 
+    expected_output: "",
+    submission_requirements: ""
   });
+
+  const { student, program, setStudent, setProgram, reset, isStudentDisabled, isProgramDisabled } = useExclusiveSelect();
   const [selected, setSelected] = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [review, setReview] = useState({ decision: "revision", comment: "" });
@@ -54,37 +65,49 @@ export default function Tasks() {
   useEffect(() => { load(); }, []);
 
   const create = async (event) => {
-    event.preventDefault(); 
-    setMessage(""); 
+    event.preventDefault();
+    setMessage("");
     setError("");
-    
+
+    // Validate that either student or program is selected
+    if (!student && !program) {
+      return setError("Select a student or a program");
+    }
+
     // Validate start/end dates
     if (form.start_date && form.due_date && form.start_date > form.due_date) {
       return setError("Starting Date cannot be after Ending Date");
     }
-    
-    const res = await fetch(`${API_URL}/api/tasks`, { 
-      method: "POST", 
-      headers: { ...auth(), "Content-Type": "application/json" }, 
-      body: JSON.stringify({ ...form, assigned_to: Number(form.assigned_to) }) 
+
+    const payload = {
+      ...form,
+      assigned_to: student ? Number(student) : null,
+      program: program || null,
+      domain: form.domain
+    };
+
+    const res = await fetch(`${API_URL}/api/tasks`, {
+      method: "POST",
+      headers: { ...auth(), "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
-    
+
     if (!res.ok) return setError(data.message || "Unable to create task");
-    
+
     setMessage(`Task ${data.taskCode} assigned successfully.`);
-    setForm({ 
-      title: "", 
-      description: "", 
-      assigned_to: "", 
-      priority: "medium", 
+    setForm({
+      title: "",
+      description: "",
+      priority: "medium",
       start_date: "",
-      due_date: "", 
-      program: "", 
+      due_date: "",
+      domain: "edutins",
       how_to_do: "",
-      expected_output: "", 
-      submission_requirements: "" 
+      expected_output: "",
+      submission_requirements: ""
     });
+    reset();
     load();
   };
 
@@ -138,24 +161,35 @@ export default function Tasks() {
           autoComplete="off"
         />
         
-        <select 
-          id="task-student"
-          name="task-student"
-          value={form.assigned_to} 
-          onChange={e => setForm({ ...form, assigned_to: e.target.value })} 
-          required
-          autoComplete="off"
-        >
-          <option value="">Select student</option>
-          {students.map(s => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <label htmlFor="task-student" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Select Student
+          </label>
+          <select
+            id="task-student"
+            name="task-student"
+            value={student}
+            onChange={e => setStudent(e.target.value)}
+            disabled={isStudentDisabled}
+            autoComplete="off"
+            style={isStudentDisabled ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#F3F4F6' } : {}}
+            title={isStudentDisabled ? "Disabled because a program is selected" : ""}
+            aria-disabled={isStudentDisabled}
+          >
+            <option value="">Select student</option>
+            {students.map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+          {isStudentDisabled && (
+            <small style={{ fontSize: '10px', color: 'var(--text-muted-on-light)', marginTop: '2px' }}>Disabled because a program is selected</small>
+          )}
+        </div>
         
-        <select 
+        <select
           id="task-priority"
           name="task-priority"
-          value={form.priority} 
+          value={form.priority}
           onChange={e => setForm({ ...form, priority: e.target.value })}
           autoComplete="off"
         >
@@ -164,6 +198,24 @@ export default function Tasks() {
           <option>high</option>
           <option>critical</option>
         </select>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <label htmlFor="task-domain" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Domain <span style={{ color: '#FA9A02' }}>*</span>
+          </label>
+          <select
+            id="task-domain"
+            name="task-domain"
+            value={form.domain}
+            onChange={e => setForm({ ...form, domain: e.target.value })}
+            required
+            autoComplete="off"
+          >
+            {DOMAINS.map(d => (
+              <option key={d.value} value={d.value}>{d.label}</option>
+            ))}
+          </select>
+        </div>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <label htmlFor="task-start-date" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Starting Date</label>
@@ -189,19 +241,30 @@ export default function Tasks() {
           />
         </div>
         
-        <select 
-          id="task-program"
-          name="task-program"
-          value={form.program} 
-          onChange={e => setForm({ ...form, program: e.target.value })} 
-          required
-          autoComplete="off"
-        >
-          <option value="" disabled>Select program</option>
-          {PROGRAMS.map(prog => (
-            <option key={prog.value} value={prog.value}>{prog.label}</option>
-          ))}
-        </select>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <label htmlFor="task-program" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Program (group target)
+          </label>
+          <select
+            id="task-program"
+            name="task-program"
+            value={program}
+            onChange={e => setProgram(e.target.value)}
+            disabled={isProgramDisabled}
+            autoComplete="off"
+            style={isProgramDisabled ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#F3F4F6' } : {}}
+            title={isProgramDisabled ? "Disabled because a student is selected" : ""}
+            aria-disabled={isProgramDisabled}
+          >
+            <option value="">Select program</option>
+            {PROGRAMS.map(prog => (
+              <option key={prog.value} value={prog.value}>{prog.label}</option>
+            ))}
+          </select>
+          {isProgramDisabled && (
+            <small style={{ fontSize: '10px', color: 'var(--text-muted-on-light)', marginTop: '2px' }}>Disabled because a student is selected</small>
+          )}
+        </div>
         
         <textarea 
           id="task-description"
@@ -215,7 +278,7 @@ export default function Tasks() {
         <textarea 
           id="task-how-to-do"
           name="task-how-to-do"
-          placeholder="How to Do - Explain step by step how the student should complete this task…" 
+          placeholder="How to Do" 
           value={form.how_to_do} 
           onChange={e => setForm({ ...form, how_to_do: e.target.value })} 
           autoComplete="off"
@@ -248,13 +311,26 @@ export default function Tasks() {
             <span className="section-kicker">LIVE TASKS</span>
             <h3>All assignments</h3>
           </div>
-          <button onClick={load}>Refresh</button>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <select
+              value={domainFilter}
+              onChange={e => setDomainFilter(e.target.value)}
+              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #D0D0D0', fontSize: '13px' }}
+            >
+              <option value="">All Domains</option>
+              {DOMAINS.map(d => (
+                <option key={d.value} value={d.value}>{d.label}</option>
+              ))}
+            </select>
+            <button onClick={load}>Refresh</button>
+          </div>
         </div>
-        
+
         <table>
           <thead>
             <tr>
               <th>Task</th>
+              <th>Domain</th>
               <th>Student</th>
               <th>Program</th>
               <th>Workflow</th>
@@ -266,11 +342,24 @@ export default function Tasks() {
             </tr>
           </thead>
           <tbody>
-            {tasks.map(t => (
+            {tasks.filter(t => !domainFilter || t.domain === domainFilter).map(t => (
               <tr key={t.id}>
                 <td>
                   <strong>{t.task_code || `T-${t.id}`}</strong>
                   <small>{t.title}</small>
+                </td>
+                <td>
+                  <span className="domain-chip" style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    background: '#F7F7F7',
+                    color: '#0C120C',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    textTransform: 'capitalize'
+                  }}>
+                    {t.domain ? DOMAINS.find(d => d.value === t.domain)?.label || t.domain : '—'}
+                  </span>
                 </td>
                 <td>{t.student_name}</td>
                 <td>{t.program ? t.program.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '—'}</td>
@@ -290,8 +379,8 @@ export default function Tasks() {
             ))}
           </tbody>
         </table>
-        
-        {!tasks.length && <div className="empty-state">No tasks yet.</div>}
+
+        {!tasks.filter(t => !domainFilter || t.domain === domainFilter).length && <div className="empty-state">No tasks yet.</div>}
       </div>
 
       {selected && (
@@ -305,7 +394,7 @@ export default function Tasks() {
               </div>
               <button onClick={() => setSelected(null)}>Close</button>
             </div>
-            
+
             {submissions.length ? (
               <>
                 <div className="submission-manager">
@@ -318,13 +407,22 @@ export default function Tasks() {
                   </div>
                   <span className="pill completed">{submissions[0].status}</span>
                 </div>
-                
-                <textarea 
-                  value={review.comment} 
-                  onChange={e => setReview({ ...review, comment: e.target.value })} 
-                  placeholder="Review comments / revision reason" 
-                />
-                
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '20px' }}>
+                  <label htmlFor="review-comment" style={{ fontSize: '12px', fontWeight: '600', color: '#5F625F', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Review comments <span style={{ color: '#FA9A02' }}>*</span>
+                  </label>
+                  <textarea
+                    id="review-comment"
+                    name="review-comment"
+                    value={review.comment}
+                    onChange={e => setReview({ ...review, comment: e.target.value })}
+                    placeholder="Review comments / revision reason"
+                    required
+                    style={{ minHeight: '120px', padding: '12px 14px', fontSize: '14px', color: '#0C120C', fontWeight: '600' }}
+                  />
+                </div>
+
                 <div className="quick-actions">
                   <button onClick={() => submitReview("revision")}>Request Revision</button>
                   <button className="gold-btn" onClick={() => submitReview("approve")}>Approve</button>

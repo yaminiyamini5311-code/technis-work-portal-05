@@ -5,7 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const { sendTaskAssignmentEmail } = require("../utils/email");
 const { writeAudit } = require("../utils/audit");
-const { ALLOWED_PROGRAMS } = require("../config");
+const { ALLOWED_DOMAINS, ALLOWED_PROGRAMS } = require("../config");
 
 const router = express.Router();
 const upload = multer({
@@ -72,25 +72,45 @@ router.get("/", authenticateToken, (req,res)=>{
   res.json({success:true,tasks:taskQuery(db)});
 });
 
-router.post("/", authenticateToken, authorizeRoles("admin","manager"), async (req,res)=>{
+router.post("/", authenticateToken, authorizeRoles("admin","ceo","manager"), async (req,res)=>{
   try {
-    const b=req.body||{}; const title=String(b.title||"").trim(); const assignedTo=Number(b.assigned_to);
-    if(!title || !assignedTo) return res.status(400).json({success:false,message:"Task title and student are required"});
+    const b=req.body||{}; const title=String(b.title||"").trim();
+    if(!title) return res.status(400).json({success:false,message:"Task title is required"});
 
+    const assignedTo = b.assigned_to ? Number(b.assigned_to) : null;
     const program = b.program ? String(b.program).trim().toLowerCase() : null;
+    const domain = b.domain ? String(b.domain).trim().toLowerCase() : null;
+
+    // Validate domain
+    if (!domain || !ALLOWED_DOMAINS.includes(domain)) {
+      return res.status(400).json({success:false,message:"Invalid domain. Choose from: " + ALLOWED_DOMAINS.join(", ")});
+    }
+
+    // Validate that exactly one target is provided
+    if (!assignedTo && !program) {
+      return res.status(400).json({success:false,message:"Select a student or a program"});
+    }
+    if (assignedTo && program) {
+      return res.status(400).json({success:false,message:"Cannot select both student and program. Choose one."});
+    }
+
     if (program && !ALLOWED_PROGRAMS.includes(program)) {
       return res.status(400).json({success:false,message:"Invalid program. Choose from: " + ALLOWED_PROGRAMS.join(", ")});
     }
 
-    const department = b.department ? String(b.department).trim().toLowerCase() : null;
+    const db=req.app.locals.db;
+    let studentsToNotify = [];
 
-    // Validate department/program exclusivity
-    if (program && department) {
-      return res.status(400).json({success:false,message:"Cannot select both Department and Program. Choose one."});
+    if (assignedTo) {
+      const student=db.prepare("SELECT id,name,email FROM users WHERE id=? AND LOWER(role)='student' AND active=1").get(assignedTo);
+      if(!student) return res.status(404).json({success:false,message:"Student not found"});
+      studentsToNotify.push(student);
+    } else if (program) {
+      // Find all students in this program
+      studentsToNotify = db.prepare("SELECT id,name,email FROM users WHERE LOWER(program)=? AND LOWER(role)='student' AND active=1").all(program);
+      if(studentsToNotify.length === 0) return res.status(404).json({success:false,message:"No active students found in this program"});
     }
 
-    const db=req.app.locals.db; const student=db.prepare("SELECT id,name,email FROM users WHERE id=? AND LOWER(role)='student' AND active=1").get(assignedTo);
-    if(!student) return res.status(404).json({success:false,message:"Student not found"});
     const priority=String(b.priority||"medium").toLowerCase(); if(!priorityValues.has(priority)) return res.status(400).json({success:false,message:"Invalid priority"});
     const taskCode=nextTaskCode(db); const workflow=String(b.workflow_status||"Assigned");
     if(!STATUS.includes(workflow)) return res.status(400).json({success:false,message:"Invalid task workflow status"});
@@ -102,13 +122,20 @@ router.post("/", authenticateToken, authorizeRoles("admin","manager"), async (re
 
     const how_to_do = b.how_to_do ? String(b.how_to_do).trim().substring(0, 5000) : null;
 
-    const result=db.prepare(`INSERT INTO tasks (task_code,title,category,program,department,team,task_type,description,what,why,how,how_to_do,expected_output,submission_requirements,resources,notes,assigned_to,assigned_by,status,workflow_status,priority,start_date,due_date,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
-      taskCode,title,String(b.category||"").trim()||null,program,department,String(b.team||"").trim()||null,String(b.task_type||"General"),String(b.description||"").trim(),String(b.what||"").trim(),String(b.why||"").trim(),String(b.how||"").trim(),how_to_do,String(b.expected_output||"").trim(),String(b.submission_requirements||"").trim(),String(b.resources||"").trim(),String(b.notes||"").trim(),assignedTo,req.user.id,legacyStatus(workflow),workflow,priority,b.start_date||null,b.due_date||null,new Date().toISOString(),new Date().toISOString()
-    );
-    const id=Number(result.lastInsertRowid); notify(db,assignedTo,"task_assigned","New task assigned",`${title} (${taskCode}) has been assigned to you.`,id);
-    writeAudit(db,{actorId:req.user.id,action:"task_created",entityType:"task",entityId:id,newValue:{task_code:taskCode,title,assigned_to:assignedTo,workflow_status:workflow}});
-    try { await sendTaskAssignmentEmail({to:student.email,studentName:student.name,taskTitle:title,description:String(b.description||""),dueDate:b.due_date,appUrl:process.env.APP_URL}); } catch(e) { console.error("Task email notification failed:",e.message); }
-    res.status(201).json({success:true,message:"Task assigned successfully",taskId:id,taskCode});
+    // Create tasks for each target student
+    const taskIds = [];
+    for (const student of studentsToNotify) {
+      const result=db.prepare(`INSERT INTO tasks (task_code,title,category,program,department,domain,team,task_type,description,what,why,how,how_to_do,expected_output,submission_requirements,resources,notes,assigned_to,assigned_by,status,workflow_status,priority,start_date,due_date,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+        taskCode,title,String(b.category||"").trim()||null,program,null,domain,String(b.team||"").trim()||null,String(b.task_type||"General"),String(b.description||"").trim(),String(b.what||"").trim(),String(b.why||"").trim(),String(b.how||"").trim(),how_to_do,String(b.expected_output||"").trim(),String(b.submission_requirements||"").trim(),String(b.resources||"").trim(),String(b.notes||"").trim(),student.id,req.user.id,legacyStatus(workflow),workflow,priority,b.start_date||null,b.due_date||null,new Date().toISOString(),new Date().toISOString()
+      );
+      const id=Number(result.lastInsertRowid);
+      taskIds.push(id);
+      notify(db,student.id,"task_assigned","New task assigned",`${title} (${taskCode}) has been assigned to you.`,id);
+      writeAudit(db,{actorId:req.user.id,action:"task_created",entityType:"task",entityId:id,newValue:{task_code:taskCode,title,assigned_to:student.id,workflow_status:workflow}});
+      try { await sendTaskAssignmentEmail({to:student.email,studentName:student.name,taskTitle:title,description:String(b.description||""),dueDate:b.due_date,appUrl:process.env.APP_URL}); } catch(e) { console.error("Task email notification failed:",e.message); }
+    }
+
+    res.status(201).json({success:true,message:"Task assigned successfully",taskId:taskIds[0],taskCode});
   } catch(e){ console.error("Create task error:",e); res.status(500).json({success:false,message:"Unable to create task"}); }
 });
 
@@ -172,21 +199,22 @@ router.get("/:id/submissions", authenticateToken, (req,res)=>{
   const rows=db.prepare("SELECT s.*,u.name AS reviewer_name,(SELECT COUNT(*) FROM submission_files sf WHERE sf.submission_id=s.id) file_count FROM submissions s LEFT JOIN users u ON u.id=s.reviewer_id WHERE s.task_id=? ORDER BY s.version DESC").all(task.id); res.json({success:true,submissions:rows});
 });
 router.get("/:id/files", authenticateToken, (req,res)=>{
-  const db=req.app.locals.db; const task=db.prepare("SELECT id,assigned_to FROM tasks WHERE id=?").get(Number(req.params.id)); if(!task)return res.status(404).json({success:false,message:"Task not found"}); if(!["admin","manager"].includes(req.user.role)&&task.assigned_to!==req.user.id)return res.status(403).json({success:false,message:"Access denied"});
+  const db=req.app.locals.db; const task=db.prepare("SELECT id,assigned_to FROM tasks WHERE id=?").get(Number(req.params.id)); if(!task)return res.status(404).json({success:false,message:"Task not found"}); const effectiveRole=req.user.role==="ceo"?"admin":req.user.role; if(!["admin","manager"].includes(effectiveRole)&&task.assigned_to!==req.user.id)return res.status(403).json({success:false,message:"Access denied"});
   res.json({success:true,files:db.prepare("SELECT id,original_name,mime_type,size,created_at FROM task_files WHERE task_id=? ORDER BY id DESC").all(task.id)});
 });
 router.get("/:id/files/:fileId/download", authenticateToken, (req,res)=>{
-  const db=req.app.locals.db; const file=db.prepare("SELECT tf.*,t.assigned_to FROM task_files tf JOIN tasks t ON t.id=tf.task_id WHERE tf.id=? AND tf.task_id=?").get(Number(req.params.fileId),Number(req.params.id)); if(!file)return res.status(404).json({success:false,message:"File not found"}); if(!["admin","manager"].includes(req.user.role)&&file.assigned_to!==req.user.id)return res.status(403).json({success:false,message:"Access denied"}); if(!fs.existsSync(file.storage_path))return res.status(404).json({success:false,message:"Stored file is unavailable"}); res.download(file.storage_path,file.original_name);
+  const db=req.app.locals.db; const file=db.prepare("SELECT tf.*,t.assigned_to FROM task_files tf JOIN tasks t ON t.id=tf.task_id WHERE tf.id=? AND tf.task_id=?").get(Number(req.params.fileId),Number(req.params.id)); if(!file)return res.status(404).json({success:false,message:"File not found"}); const effectiveRole=req.user.role==="ceo"?"admin":req.user.role; if(!["admin","manager"].includes(effectiveRole)&&file.assigned_to!==req.user.id)return res.status(403).json({success:false,message:"Access denied"}); if(!fs.existsSync(file.storage_path))return res.status(404).json({success:false,message:"Stored file is unavailable"}); res.download(file.storage_path,file.original_name);
 });
 
-router.post("/review", authenticateToken, authorizeRoles("admin","manager"), (req,res)=>{
+router.post("/review", authenticateToken, authorizeRoles("admin","ceo","manager"), (req,res)=>{
   const db=req.app.locals.db; const submission=db.prepare("SELECT s.*,t.*,s.student_id FROM submissions s JOIN tasks t ON t.id=s.task_id WHERE s.id=?").get(Number(req.body?.submission_id)); if(!submission)return res.status(404).json({success:false,message:"Submission not found"});
-  if(req.user.role==="manager"&&submission.assigned_by!==req.user.id)return res.status(403).json({success:false,message:"You can only review tasks assigned by you"});
+  const effectiveRole=req.user.role==="ceo"?"admin":req.user.role;
+  if(effectiveRole==="manager"&&submission.assigned_by!==req.user.id)return res.status(403).json({success:false,message:"You can only review tasks assigned by you"});
   const decision=String(req.body?.decision||"").toLowerCase(); const comment=String(req.body?.comment||"").trim(); if(!["approve","revision"].includes(decision)||!comment)return res.status(400).json({success:false,message:"Decision and review comment are required"});
   const next=decision==="approve"?"Approved":"Revision Required"; const now=new Date().toISOString(); db.transaction(()=>{db.prepare("UPDATE submissions SET status=?,reviewer_id=?,reviewed_at=?,review_comments=? WHERE id=?").run(next,req.user.id,now,comment,submission.id);transition(db,submission,next,req.user.id,comment);notify(db,submission.student_id,decision==="approve"?"task_approved":"revision_required",decision==="approve"?"Task approved":"Revision required",`${submission.title}: ${comment}`,submission.task_id);writeAudit(db,{actorId:req.user.id,action:decision==="approve"?"submission_approved":"revision_requested",entityType:"submission",entityId:submission.id,previousValue:{status:submission.status},newValue:{status:next,review_comments:comment}});});
   res.json({success:true,message:decision==="approve"?"Submission approved":"Revision requested",status:next});
 });
-router.patch("/:id/feedback", authenticateToken, authorizeRoles("admin","manager"), (req,res)=>{const db=req.app.locals.db;const task=db.prepare("SELECT * FROM tasks WHERE id=?").get(Number(req.params.id));if(!task)return res.status(404).json({success:false,message:"Task not found"});if(req.user.role==="manager"&&task.assigned_by!==req.user.id)return res.status(403).json({success:false,message:"Access denied"});const feedback=String(req.body?.feedback||"").trim()||null;db.prepare("UPDATE tasks SET feedback=?,updated_at=? WHERE id=?").run(feedback,new Date().toISOString(),task.id);notify(db,task.assigned_to,"feedback","New task feedback",feedback||"New feedback was added.",task.id);writeAudit(db,{actorId:req.user.id,action:"feedback_added",entityType:"task",entityId:task.id,newValue:{feedback}});res.json({success:true,message:"Task feedback updated"});});
-router.patch("/:id/outcome", authenticateToken, authorizeRoles("student","member"), (req,res)=>{const db=req.app.locals.db;const task=db.prepare("SELECT * FROM tasks WHERE id=? AND assigned_to=?").get(Number(req.params.id),req.user.id);if(!task)return res.status(404).json({success:false,message:"Task not found"});const outcome=String(req.body?.outcome||"").trim();if(!outcome)return res.status(400).json({success:false,message:"Task outcome is required"});const now=new Date().toISOString();db.prepare("UPDATE tasks SET outcome=?,outcome_submitted_at=?,updated_at=? WHERE id=?").run(outcome,now,now,task.id);if(!["Submitted","Under Review","Revision Required","Resubmitted"].includes(task.workflow_status))transition(db,task,"Submitted",req.user.id,"Outcome submitted");db.prepare("SELECT id FROM users WHERE LOWER(role) IN ('admin','manager') AND active=1").all().forEach(u=>notify(db,u.id,"task_outcome","New task outcome submitted",`${task.title} received an outcome from a student.`,task.id));writeAudit(db,{actorId:req.user.id,action:"task_outcome_submitted",entityType:"task",entityId:task.id,newValue:{outcome,submitted_at:now}});res.json({success:true,message:"Task outcome saved"});});
+router.patch("/:id/feedback", authenticateToken, authorizeRoles("admin","ceo","manager"), (req,res)=>{const db=req.app.locals.db;const task=db.prepare("SELECT * FROM tasks WHERE id=?").get(Number(req.params.id));if(!task)return res.status(404).json({success:false,message:"Task not found"});const effectiveRole=req.user.role==="ceo"?"admin":req.user.role;if(effectiveRole==="manager"&&task.assigned_by!==req.user.id)return res.status(403).json({success:false,message:"Access denied"});const feedback=String(req.body?.feedback||"").trim()||null;db.prepare("UPDATE tasks SET feedback=?,updated_at=? WHERE id=?").run(feedback,new Date().toISOString(),task.id);notify(db,task.assigned_to,"feedback","New task feedback",feedback||"New feedback was added.",task.id);writeAudit(db,{actorId:req.user.id,action:"feedback_added",entityType:"task",entityId:task.id,newValue:{feedback}});res.json({success:true,message:"Task feedback updated"});});
+router.patch("/:id/outcome", authenticateToken, authorizeRoles("student","member"), (req,res)=>{const db=req.app.locals.db;const task=db.prepare("SELECT * FROM tasks WHERE id=? AND assigned_to=?").get(Number(req.params.id),req.user.id);if(!task)return res.status(404).json({success:false,message:"Task not found"});const outcome=String(req.body?.outcome||"").trim();if(!outcome)return res.status(400).json({success:false,message:"Task outcome is required"});const now=new Date().toISOString();db.prepare("UPDATE tasks SET outcome=?,outcome_submitted_at=?,updated_at=? WHERE id=?").run(outcome,now,now,task.id);if(!["Submitted","Under Review","Revision Required","Resubmitted"].includes(task.workflow_status))transition(db,task,"Submitted",req.user.id,"Outcome submitted");db.prepare("SELECT id FROM users WHERE LOWER(role) IN ('admin','ceo','manager') AND active=1").all().forEach(u=>notify(db,u.id,"task_outcome","New task outcome submitted",`${task.title} received an outcome from a student.`,task.id));writeAudit(db,{actorId:req.user.id,action:"task_outcome_submitted",entityType:"task",entityId:task.id,newValue:{outcome,submitted_at:now}});res.json({success:true,message:"Task outcome saved"});});
 
 module.exports = router;

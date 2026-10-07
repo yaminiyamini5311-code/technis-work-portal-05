@@ -100,7 +100,7 @@ router.get("/students", authenticateToken, authorizeRoles("admin", "manager"), (
    CREATE STUDENT
    POST /api/admin/students
 ========================================================= */
-router.post("/students", authenticateToken, authorizeRoles("admin"), (req, res) => {
+router.post("/students", authenticateToken, authorizeRoles("admin", "ceo"), (req, res) => {
   try {
     const db = req.app.locals.db;
     const { name, email, password, department, program } = req.body || {};
@@ -151,15 +151,80 @@ router.post("/students", authenticateToken, authorizeRoles("admin"), (req, res) 
 });
 
 /* =========================================================
+   GET PENDING APPROVALS
+   GET /api/admin/pending-approvals
+========================================================= */
+router.get("/pending-approvals", authenticateToken, authorizeRoles("admin", "ceo"), (req, res) => {
+  try {
+    const db = req.app.locals.db;
+
+    const pending = db.prepare(`
+      SELECT
+        id,
+        name,
+        email,
+        role,
+        phone,
+        created_at
+      FROM users
+      WHERE active = 0
+      ORDER BY created_at DESC
+    `).all();
+
+    res.json({ success: true, pending });
+  } catch (error) {
+    console.error("Pending approvals error:", error);
+    res.status(500).json({ success: false, message: "Unable to fetch pending approvals" });
+  }
+});
+
+/* =========================================================
+   APPROVE USER
+   POST /api/admin/approve-user/:id
+========================================================= */
+router.post("/approve-user/:id", authenticateToken, authorizeRoles("admin", "ceo"), (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const userId = Number(req.params.id);
+
+    const user = db.prepare("SELECT id, name, email, role FROM users WHERE id = ?").get(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    if (Number(user.active) === 1) {
+      return res.status(400).json({ success: false, message: "User is already active" });
+    }
+
+    db.prepare("UPDATE users SET active = 1 WHERE id = ?").run(userId);
+
+    // Write audit log
+    const { writeAudit } = require("../utils/audit");
+    writeAudit(db, {
+      actorId: req.user.id,
+      action: "user_approved",
+      entityType: "user",
+      entityId: userId,
+      newValue: { name: user.name, email: user.email, role: user.role, active: 1 },
+    });
+
+    res.json({ success: true, message: "User approved successfully" });
+  } catch (error) {
+    console.error("Approve user error:", error);
+    res.status(500).json({ success: false, message: "Unable to approve user" });
+  }
+});
+
+/* =========================================================
    GET FEEDBACK
    GET /api/admin/feedback
 ========================================================= */
 router.get("/feedback", authenticateToken, authorizeRoles("admin", "manager"), (req, res) => {
   try {
     const db = req.app.locals.db;
-    
+
     const feedback = db.prepare(`
-      SELECT 
+      SELECT
         t.id,
         t.task_code,
         t.title,
@@ -177,6 +242,47 @@ router.get("/feedback", authenticateToken, authorizeRoles("admin", "manager"), (
   } catch (error) {
     console.error("Admin feedback error:", error);
     res.status(500).json({ success: false, message: "Unable to fetch feedback" });
+  }
+});
+
+/* =========================================================
+   CREATE FEEDBACK
+   POST /api/admin/feedback
+========================================================= */
+router.post("/feedback", authenticateToken, authorizeRoles("admin", "manager"), (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const { user_id, score, strengths, improvements, feedback } = req.body || {};
+
+    if (!user_id || !feedback) {
+      return res.status(400).json({ success: false, message: "Student and feedback are required" });
+    }
+
+    // Verify student exists
+    const student = db.prepare("SELECT id, name FROM users WHERE id = ? AND LOWER(role) = 'student' AND active = 1").get(Number(user_id));
+    if (!student) {
+      return res.status(404).json({ success: false, message: "Student not found" });
+    }
+
+    // Insert into performance table
+    const period = new Date().toISOString().slice(0, 7); // YYYY-MM format
+    const result = db.prepare(`
+      INSERT INTO performance (user_id, period, score, strengths, improvements, feedback, reviewed_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      Number(user_id),
+      period,
+      score ? Number(score) : null,
+      Array.isArray(strengths) ? strengths.join(", ") : (strengths || ""),
+      Array.isArray(improvements) ? improvements.join(", ") : (improvements || ""),
+      String(feedback).trim(),
+      req.user.id
+    );
+
+    res.status(201).json({ success: true, message: "Feedback saved successfully", feedbackId: result.lastInsertRowid });
+  } catch (error) {
+    console.error("Create feedback error:", error);
+    res.status(500).json({ success: false, message: "Unable to save feedback" });
   }
 });
 

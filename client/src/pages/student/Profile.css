@@ -1,0 +1,331 @@
+/* =========================================================
+   STUDENT PROFILE PAGE - Unique Dark Space Design
+   ========================================================= */
+
+.student-dashboard-page .profile-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .student-dashboard-page .profile-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================================
+   IDENTITY CARD (Left)
+   ========================================================= */
+
+.student-dashboard-page .profile-identity-card {
+  background: rgba(12, 20, 48, 0.82);
+  border: 1px solid rgba(255, 176, 32, 0.25);
+  border-radius: 20px;
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 20px;
+}
+
+.student-dashboard-page .profile-avatar-wrapper {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  padding: 4px;
+  background: linear-gradient(135deg, #FFB020, #FF8A00);
+  box-shadow: 0 0 30px rgba(255, 176, 32, 0.4);
+}
+
+.student-dashboard-page .profile-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(12, 20, 48, 0.9);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 3px solid rgba(12, 20, 48, 0.9);
+}
+
+.student-dashboard-page .profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.student-dashboard-page .profile-avatar-initial {
+  font-size: 48px;
+  font-weight: 800;
+  color: #FFB020;
+  text-transform: uppercase;
+}
+
+.student-dashboard-page .profile-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: #F5F8FF;
+  margin: 0;
+}
+
+.student-dashboard-page .profile-email {
+  font-size: 14px;
+  color: #C7D2E8;
+  margin: 0;
+  word-break: break-all;
+}
+
+.student-dashboard-page .profile-role-badge {
+  background: rgba(255, 176, 32, 0.15);
+  color: #FFB020;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 1px solid rgba(255, 176, 32, 0.3);
+}
+
+.student-dashboard-page .profile-upload-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.student-layout .student-dashboard-page .profile-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #F5F8FF !important;
+  border: 1px solid rgba(255, 194, 77, 0.4) !important;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-text-fill-color: #F5F8FF !important;
+}
+
+.student-layout .student-dashboard-page .profile-upload-btn:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: #FFB020 !important;
+  transform: translateY(-1px);
+}
+
+.student-layout .student-dashboard-page .profile-upload-btn:focus-visible {
+  outline: 2px solid #FFB020;
+  outline-offset: 2px;
+}
+
+.student-layout .student-dashboard-page .profile-upload-btn .techins-icon {
+  color: #F5F8FF !important;
+}
+
+.student-dashboard-page .profile-upload-helper {
+  font-size: 11px;
+  color: #A9B6D0;
+  text-align: center;
+}
+
+/* =========================================================
+   DETAILS CARD (Right)
+   ========================================================= */
+
+.student-dashboard-page .profile-details-card {
+  background: rgba(12, 20, 48, 0.82);
+  border: 1px solid rgba(255, 176, 32, 0.25);
+  border-radius: 20px;
+  padding: 32px;
+}
+
+.student-dashboard-page .profile-details-eyebrow {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: #FFB020;
+  font-weight: 900;
+  text-transform: uppercase;
+  margin: 0 0 8px 0;
+}
+
+.student-dashboard-page .profile-details-heading {
+  font-size: 24px;
+  font-weight: 700;
+  color: #F5F8FF;
+  margin: 0 0 24px 0;
+}
+
+.student-dashboard-page .profile-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 700px) {
+  .student-dashboard-page .profile-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.student-dashboard-page .profile-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.student-dashboard-page .profile-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #FFB020;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0;
+}
+
+.student-layout .student-dashboard-page .profile-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #F5F8FF !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  -webkit-text-fill-color: #F5F8FF !important;
+  color-scheme: dark;
+  caret-color: #FFB020;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.student-layout .student-dashboard-page .profile-input::placeholder {
+  color: #A9B6D0 !important;
+  opacity: 1 !important;
+}
+
+.student-layout .student-dashboard-page .profile-input:-webkit-autofill {
+  -webkit-text-fill-color: #F5F8FF !important;
+  box-shadow: 0 0 0 1000px #121a3a inset !important;
+  caret-color: #FFB020 !important;
+}
+
+.student-layout .student-dashboard-page .profile-input:focus {
+  border-color: #FFB020 !important;
+  box-shadow: 0 0 0 3px rgba(255, 176, 32, 0.25) !important;
+  outline: none;
+}
+
+.student-layout .student-dashboard-page .profile-input:disabled {
+  background: rgba(255, 255, 255, 0.03) !important;
+  color: #C7D2E8 !important;
+  -webkit-text-fill-color: #C7D2E8 !important;
+  cursor: not-allowed;
+  opacity: 1 !important;
+}
+
+.student-layout .student-dashboard-page .profile-input:disabled:-webkit-autofill {
+  -webkit-text-fill-color: #C7D2E8 !important;
+  box-shadow: 0 0 0 1000px #0f1428 inset !important;
+}
+
+.student-dashboard-page .profile-input-wrapper {
+  position: relative;
+}
+
+.student-layout .student-dashboard-page .profile-lock-icon {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #C7D2E8 !important;
+  pointer-events: none;
+}
+
+.student-dashboard-page .profile-label-suffix {
+  font-size: 11px;
+  color: #A9B6D0;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  margin-left: 4px;
+}
+
+.student-dashboard-page .profile-save-section {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+@media (max-width: 600px) {
+  .student-dashboard-page .profile-save-section {
+    justify-content: stretch;
+  }
+}
+
+.student-layout .student-dashboard-page .profile-save-btn {
+  background: linear-gradient(135deg, #FFB020, #FF8A00) !important;
+  color: #0B1430 !important;
+  border: none !important;
+  border-radius: 12px;
+  height: 46px;
+  padding: 0 28px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 140px;
+  -webkit-text-fill-color: #0B1430 !important;
+}
+
+@media (max-width: 600px) {
+  .student-layout .student-dashboard-page .profile-save-btn {
+    width: 100%;
+  }
+}
+
+.student-layout .student-dashboard-page .profile-save-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(255, 176, 32, 0.4) !important;
+}
+
+.student-layout .student-dashboard-page .profile-save-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.student-layout .student-dashboard-page .profile-save-btn:focus-visible {
+  outline: 2px solid #FFB020;
+  outline-offset: 2px;
+}
+
+/* Fade-in animation */
+.student-dashboard-page .profile-container {
+  animation: profileFadeIn 0.3s ease-out;
+}
+
+@keyframes profileFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

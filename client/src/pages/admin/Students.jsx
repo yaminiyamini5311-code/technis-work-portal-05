@@ -102,7 +102,7 @@ export default function Students() {
       </div>
 
       <div className="admin-two">
-        <form className="panel" onSubmit={create} autocomplete="off">
+        <form className="panel" onSubmit={create} autoComplete="off">
           <h3>Create ID</h3>
 
           <label htmlFor="student-name">
@@ -114,7 +114,7 @@ export default function Students() {
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               required
-              autocomplete="off"
+              autoComplete="off"
             />
           </label>
 
@@ -128,7 +128,7 @@ export default function Students() {
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               required
-              autocomplete="off"
+              autoComplete="off"
             />
           </label>
 

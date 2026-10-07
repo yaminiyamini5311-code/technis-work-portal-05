@@ -24,11 +24,12 @@ router.get("/", authenticateToken, (req, res) => {
   if (["student", "member"].includes(req.user.role)) {
     return res.json({ success: true, missions: getMissions(db, "WHERE m.assigned_to = ?", [req.user.id]) });
   }
-  if (!["admin", "manager"].includes(req.user.role)) return res.status(403).json({ success: false, message: "Access denied" });
+  const effectiveRole = req.user.role === "ceo" ? "admin" : req.user.role;
+  if (!["admin", "manager"].includes(effectiveRole)) return res.status(403).json({ success: false, message: "Access denied" });
   res.json({ success: true, missions: getMissions(db) });
 });
 
-router.post("/", authenticateToken, authorizeRoles("admin"), (req, res) => {
+router.post("/", authenticateToken, authorizeRoles("admin", "ceo"), (req, res) => {
   try {
     const { title, description, assigned_to, due_date = null } = req.body || {};
     if (!String(title || "").trim() || !assigned_to) return res.status(400).json({ success: false, message: "Title and student are required" });
@@ -50,7 +51,8 @@ router.put("/:id", authenticateToken, (req, res) => {
   const mission = db.prepare("SELECT * FROM missions WHERE id = ?").get(Number(req.params.id));
   if (!mission) return res.status(404).json({ success: false, message: "Mission not found" });
 
-  const isAdmin = req.user.role === "admin";
+  const effectiveRole = req.user.role === "ceo" ? "admin" : req.user.role;
+  const isAdmin = effectiveRole === "admin";
   const isOwner = ["student", "member"].includes(req.user.role) && mission.assigned_to === req.user.id;
   if (!isAdmin && !isOwner) return res.status(403).json({ success: false, message: "Access denied" });
 

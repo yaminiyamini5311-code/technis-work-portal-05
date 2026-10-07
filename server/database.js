@@ -176,11 +176,23 @@ function addColumnIfMissing(table, column, definition) {
 addColumnIfMissing("users", "department", "TEXT DEFAULT 'Techins'");
 addColumnIfMissing("users", "program", "TEXT");
 addColumnIfMissing("users", "active", "INTEGER NOT NULL DEFAULT 1");
+addColumnIfMissing("users", "phone", "TEXT");
+addColumnIfMissing("users", "avatar", "TEXT");
+
+// Ensure role constraint allows 'ceo'
+const checkRoleConstraint = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get();
+if (checkRoleConstraint && !checkRoleConstraint.sql.includes('CHECK')) {
+  // No check constraint exists, roles are free-form strings
+  console.log("Role constraint check: No CHECK constraint on users.role (free-form)");
+}
 for (const [c, d] of [
-  ["task_code", "TEXT"], ["category", "TEXT DEFAULT 'General'"], ["program", "TEXT DEFAULT 'TECHINS'"], ["department", "TEXT"], ["team", "TEXT DEFAULT 'General'"], ["task_type", "TEXT DEFAULT 'General'"],
+  ["task_code", "TEXT"], ["category", "TEXT DEFAULT 'General'"], ["program", "TEXT DEFAULT 'TECHINS'"], ["department", "TEXT"], ["domain", "TEXT DEFAULT 'edutins'"], ["team", "TEXT DEFAULT 'General'"], ["task_type", "TEXT DEFAULT 'General'"],
   ["what", "TEXT"], ["why", "TEXT"], ["how", "TEXT"], ["how_to_do", "TEXT"], ["expected_output", "TEXT"], ["submission_requirements", "TEXT"], ["resources", "TEXT"], ["notes", "TEXT"],
   ["workflow_status", "TEXT DEFAULT 'Assigned'"], ["start_date", "TEXT"], ["updated_at", "TEXT"]
 ]) addColumnIfMissing("tasks", c, d);
+
+// Backfill domain for existing tasks
+db.prepare("UPDATE tasks SET domain='edutins' WHERE domain IS NULL OR domain=''").run();
 for (const [c, d] of [["next_steps","TEXT"]]) addColumnIfMissing("daily_activities", c, d);
 addColumnIfMissing("notifications", "related_task_id", "INTEGER");
 

@@ -77,13 +77,80 @@
 .progress-ring{
   width:82px;height:82px;border-radius:50%;
   display:grid;place-items:center;
-  border:7px solid rgba(183,183,183,.2);
-  border-top-color:var(--primary-color);
-  border-right-color:var(--primary-color);
   flex:none;
   position:relative;
 }
-.progress-ring strong{font-size:19px;color:var(--text-on-dark);position:relative;z-index:2}
+.progress-svg{
+  width:100%;
+  height:100%;
+  transform:rotate(-90deg);
+}
+.progress-track{
+  stroke:rgba(183,183,183,.2);
+  stroke-width:7;
+}
+.progress-fill{
+  stroke:var(--primary-color);
+  stroke-width:7;
+  stroke-linecap:round;
+  transition:stroke-dashoffset 0.8s ease;
+  filter:drop-shadow(0 0 8px rgba(250,154,2,0.6));
+}
+.progress-tick{
+  stroke:rgba(255,255,255,0.3);
+  stroke-width:2;
+}
+.progress-satellite{
+  fill:#FA9A02;
+  filter:drop-shadow(0 0 6px rgba(250,154,2,0.8));
+  animation:satellite-pulse 2s ease-in-out infinite;
+}
+.progress-text{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%, -50%);
+  z-index:2;
+}
+.progress-text strong{
+  font-size:19px;
+  color:var(--text-on-dark);
+  font-weight:800;
+}
+@keyframes satellite-pulse{
+  0%,100%{opacity:1;transform:scale(1)}
+  50%{opacity:0.8;transform:scale(1.2)}
+}
+@media(prefers-reduced-motion:reduce){
+  .progress-fill,.progress-satellite{transition:none;animation:none}
+}
+
+/* Challenges Section - Constellation Animation (for mission rows) */
+.mission-row{
+  position:relative;
+  transition:all 0.3s ease;
+}
+.mission-row::before{
+  content:'';
+  position:absolute;
+  left:0;
+  top:0;
+  bottom:0;
+  width:2px;
+  background:linear-gradient(180deg,transparent,var(--primary-color),transparent);
+  opacity:0;
+  animation:constellation-line 2s ease-in-out infinite;
+}
+.mission-row:hover::before{
+  opacity:0.5;
+}
+@keyframes constellation-line{
+  0%,100%{opacity:0}
+  50%{opacity:0.3}
+}
+@media(prefers-reduced-motion:reduce){
+  .mission-row::before{animation:none}
+}
 .overall-progress span{display:block;font-size:12px;font-weight:800;color:var(--text-on-dark)}
 .overall-progress small{display:block;margin-top:5px;color:var(--text-subtle-on-dark);font-size:10px;line-height:1.5}
 

@@ -60,19 +60,20 @@ router.get("/me", authenticateToken, authorizeRoles("student", "member"), (req, 
 });
 
 router.get("/", authenticateToken, (req, res) => {
-  if (!["admin", "manager"].includes(req.user.role)) return res.status(403).json({ success: false, message: "Access denied" });
+  const effectiveRole = req.user.role === "ceo" ? "admin" : req.user.role;
+  if (!["admin", "manager"].includes(effectiveRole)) return res.status(403).json({ success: false, message: "Access denied" });
   const db = req.app.locals.db;
   const students = db.prepare("SELECT id, name, email, department FROM users WHERE LOWER(role)='student' ORDER BY name").all();
   res.json({ success: true, students: students.map((s) => buildStudentPerformance(db, s.id)) });
 });
 
-router.get("/student/:id", authenticateToken, authorizeRoles("admin", "manager"), (req, res) => {
+router.get("/student/:id", authenticateToken, authorizeRoles("admin", "ceo", "manager"), (req, res) => {
   const result = buildStudentPerformance(req.app.locals.db, Number(req.params.id));
   if (!result) return res.status(404).json({ success: false, message: "Student not found" });
   res.json({ success: true, ...result });
 });
 
-router.post("/review", authenticateToken, authorizeRoles("admin"), (req, res) => {
+router.post("/review", authenticateToken, authorizeRoles("admin", "ceo"), (req, res) => {
   const { user_id, score, strengths = [], improvements = [], feedback = "", period = "general" } = req.body || {};
   const db = req.app.locals.db;
   const student = db.prepare("SELECT id FROM users WHERE id = ? AND LOWER(role)='student'").get(Number(user_id));

@@ -193,3 +193,33 @@
   perspective: 1000px;
   perspective-origin: center center;
 }
+
+/* Challenge ping animation */
+.activity-challenges {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.challenge-ping {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #FA9A02;
+  box-shadow: 0 0 12px rgba(250, 154, 2, 0.8);
+  animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes ping {
+  75%, 100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .challenge-ping {
+    animation: none;
+  }
+}

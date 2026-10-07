@@ -2,6 +2,7 @@ import { useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import TechinsLoader from "./components/TechinsLoader";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import StudentLayout from "./components/StudentLayout";
 import RoleLayout from "./components/RoleLayout";
 import StudentDashboard from "./pages/student/StudentDashboard";
@@ -11,6 +12,7 @@ import Missions from "./pages/student/Missions";
 import WorkHistory from "./pages/student/WorkHistory";
 import StudentPerformance from "./pages/student/Performance";
 import StudentFeedback from "./pages/student/Feedback";
+import Profile from "./pages/student/Profile";
 import ActivityMonitor from "./pages/manager/ActivityMonitor";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import Students from "./pages/admin/Students";
@@ -26,9 +28,11 @@ function Protected({ role, children }) {
   let user = {};
   try { user = JSON.parse(localStorage.getItem("user") || "{}"); } catch {}
   const current = String(user.role || "").toLowerCase();
+  // Treat CEO as admin for routing
+  const effectiveRole = current === "ceo" ? "admin" : current;
   if (!token || !user.id) return <Navigate to="/login" replace />;
-  if (role && current !== role && !(role === "student" && current === "member")) {
-    return <Navigate to={current === "admin" ? "/admin" : current === "manager" ? "/manager" : "/student"} replace />;
+  if (role && effectiveRole !== role && !(role === "student" && effectiveRole === "member")) {
+    return <Navigate to={effectiveRole === "admin" ? "/admin" : effectiveRole === "manager" ? "/manager" : "/student"} replace />;
   }
   return children;
 }
@@ -41,6 +45,7 @@ export default function App() {
       <BrowserRouter><Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
 
     <Route element={<Protected role="student"><StudentLayout /></Protected>}>
       <Route path="/student" element={<StudentDashboard />} />
@@ -50,6 +55,7 @@ export default function App() {
       <Route path="/student/work-history" element={<WorkHistory />} />
       <Route path="/student/performance" element={<StudentPerformance />} />
       <Route path="/student/feedback" element={<StudentFeedback />} />
+      <Route path="/student/profile" element={<Profile />} />
     </Route>
 
     <Route element={<Protected role="manager"><RoleLayout role="manager" /></Protected>}>
@@ -72,6 +78,10 @@ export default function App() {
       <Route path="/admin/feedback" element={<Feedback />} />
       <Route path="/admin/audit" element={<AuditLogs />} />
     </Route>
+
+    {/* Redirect old CEO routes to Admin */}
+    <Route path="/ceo" element={<Navigate to="/admin" replace />} />
+    <Route path="/ceo/*" element={<Navigate to="/admin" replace />} />
 
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes></BrowserRouter>

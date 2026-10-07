@@ -28,7 +28,8 @@ function ActivityCard({ activity }) {
       </p>
 
       {activity.challenges && (
-        <p>
+        <p className="activity-challenges">
+          <span className="challenge-ping" aria-hidden="true"></span>
           <strong>Challenges:</strong>{" "}
           {activity.challenges}
         </p>
