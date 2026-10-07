@@ -3,7 +3,7 @@
  */
 
 // Maximum number of active student accounts allowed
-const MAX_STUDENT_ACCOUNTS = 25;
+const MAX_STUDENT_ACCOUNTS = 100;
 
 // Allowed department values
 const ALLOWED_DEPARTMENTS = [

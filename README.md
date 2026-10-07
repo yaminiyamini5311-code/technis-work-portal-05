@@ -38,7 +38,7 @@ The system is designed around one rule: important organizational actions must be
 ## Important capabilities
 
 - Backend-enforced role authorization
-- Maximum 25 active students
+- Maximum 100 active students
 - Human-readable task IDs such as `TNS-2026-0001`
 - Controlled task lifecycle with submission/review/revision/approval states
 - Server-generated submission timestamps

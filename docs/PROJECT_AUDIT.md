@@ -31,7 +31,7 @@ Audit performed against the existing `TECHINS_WORK_PORTAL_FIXED` source and the 
 - Review endpoint for approval/revision
 - Revision notifications
 - Audit logging for task/submission/activity/user actions
-- Backend maximum of 25 active students retained
+- Backend maximum of 100 active students retained
 - Admin manager creation endpoint
 - Admin user enable/disable endpoint
 - Admin audit-log endpoint and UI

@@ -142,7 +142,7 @@ export default function Students() {
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               required
-              autocomplete="new-password"
+              autoComplete="new-password"
             />
           </label>
 
