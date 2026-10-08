@@ -23,3 +23,7 @@ proof/
 *.html
 NUL
 **/NUL
+
+# Credentials and sensitive data
+TECHINS_60_Master_Credentials.*
+server/verify-students.js
