@@ -404,26 +404,71 @@ router.post("/signup", async (req, res) => {
       }
     }
 
+    // Hash password outside the transaction (bcrypt is slow)
     const passwordHash = await bcrypt.hash(password, 12);
 
     // Manager and CEO accounts require admin approval
     const requiresApproval = role === "manager" || role === "ceo";
     const active = requiresApproval ? 0 : 1;
 
-    const result = db
-      .prepare(`
-        INSERT INTO users (name, email, password, role, phone, active)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `)
-      .run(name, email, passwordHash, role, phone, active);
+    let insertedId;
+    try {
+      insertedId = db.transaction(() => {
+        // Re-check student limit inside transaction for student role
+        if (role === "student") {
+          const studentCount = db
+            .prepare(
+              "SELECT COUNT(*) AS count FROM users WHERE LOWER(role) = 'student' AND active = 1"
+            )
+            .get();
+          if (Number(studentCount?.count || 0) >= MAX_STUDENT_ACCOUNTS) {
+            const err = new Error(`Student limit reached (${MAX_STUDENT_ACCOUNTS}).`);
+            err.code = "LIMIT_REACHED";
+            throw err;
+          }
+        }
 
-    // Write audit log
+        // Re-check email uniqueness inside transaction
+        const dupCheck = db
+          .prepare("SELECT id FROM users WHERE LOWER(TRIM(email)) = ? LIMIT 1")
+          .get(email);
+        if (dupCheck) {
+          const err = new Error("A user with this email already exists");
+          err.code = "DUPLICATE_EMAIL";
+          throw err;
+        }
+
+        const result = db
+          .prepare(
+            "INSERT INTO users (name, email, password, role, phone, active) VALUES (?, ?, ?, ?, ?, ?)"
+          )
+          .run(name, email, passwordHash, role, phone, active);
+
+        return Number(result.lastInsertRowid);
+      });
+    } catch (txErr) {
+      if (txErr.code === "LIMIT_REACHED") {
+        return res.status(409).json({
+          success: false,
+          message: `Student limit reached (${MAX_STUDENT_ACCOUNTS}). No more student accounts can be created.`,
+        });
+      }
+      if (txErr.code === "DUPLICATE_EMAIL") {
+        return res.status(409).json({
+          success: false,
+          message: "A user with this email already exists",
+        });
+      }
+      throw txErr;
+    }
+
+    // Write audit log after transaction commits
     const { writeAudit } = require("../utils/audit");
     writeAudit(db, {
-      actorId: result.lastInsertRowid,
+      actorId: insertedId,
       action: "user_registered",
       entityType: "user",
-      entityId: result.lastInsertRowid,
+      entityId: insertedId,
       newValue: { name, email, role, active },
     });
 
@@ -434,7 +479,7 @@ router.post("/signup", async (req, res) => {
     return res.status(201).json({
       success: true,
       message,
-      userId: Number(result.lastInsertRowid),
+      userId: insertedId,
       requiresApproval,
     });
   } catch (error) {

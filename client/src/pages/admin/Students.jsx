@@ -21,6 +21,7 @@ const PROGRAMS = [
 
 export default function Students() {
   const [students, setStudents] = useState([]);
+  const [total, setTotal] = useState(0);
   const [maxStudents, setMaxStudents] = useState(100);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const { department, program, setDepartment, setProgram, reset, isDepartmentDisabled, isProgramDisabled } = useExclusiveSelect();
@@ -30,24 +31,18 @@ export default function Students() {
 
   const load = async () => {
     try {
-      const [studentsRes, statsRes] = await Promise.all([
-        fetch(`${API_URL}/api/admin/students`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-        }),
-        fetch(`${API_URL}/api/admin/stats`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-        })
-      ]);
+      const studentsRes = await fetch(`${API_URL}/api/admin/students`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
 
       const studentsData = await studentsRes.json();
-      const statsData = await statsRes.json();
 
       if (!studentsRes.ok) throw new Error(studentsData.message || "Unable to load students");
       
       setStudents(studentsData.students || []);
-      if (statsData.success && statsData.stats?.maxStudents) {
-        setMaxStudents(statsData.stats.maxStudents);
-      }
+      // Use server-provided total and limit for accurate count
+      if (typeof studentsData.total === "number") setTotal(studentsData.total);
+      if (typeof studentsData.limit === "number") setMaxStudents(studentsData.limit);
     } catch (e) {
       setError(e.message);
     }
@@ -91,14 +86,14 @@ export default function Students() {
     }
   };
 
-  const isLimitReached = students.length >= maxStudents;
+  const isLimitReached = total >= maxStudents;
 
   return (
     <div className="admin-simple">
       <div className="simple-head">
         <span>TEAM MANAGEMENT</span>
         <h2>Students</h2>
-        <p>{students.length} / {maxStudents} student accounts.</p>
+        <p>{total} / {maxStudents} student accounts.</p>
       </div>
 
       <div className="admin-two">

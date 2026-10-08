@@ -82,6 +82,7 @@ router.get("/students", authenticateToken, authorizeRoles("admin", "manager"), (
         name,
         email,
         department,
+        program,
         created_at,
         active
       FROM users
@@ -89,18 +90,31 @@ router.get("/students", authenticateToken, authorizeRoles("admin", "manager"), (
       ORDER BY name ASC
     `).all();
 
-    res.json({ success: true, students });
+    // Count only active+pending (not rejected/deleted) toward the limit.
+    // Active students (active=1) are full members.
+    // There are no "pending" students in this flow (admin creates directly).
+    const activeCount = db.prepare(
+      "SELECT COUNT(*) AS count FROM users WHERE LOWER(role) = 'student' AND active = 1"
+    ).get().count || 0;
+
+    res.json({
+      success: true,
+      students,
+      total: activeCount,
+      limit: MAX_STUDENT_ACCOUNTS,
+    });
   } catch (error) {
     console.error("Admin students error:", error);
     res.status(500).json({ success: false, message: "Unable to fetch students" });
   }
 });
 
+
 /* =========================================================
    CREATE STUDENT
    POST /api/admin/students
 ========================================================= */
-router.post("/students", authenticateToken, authorizeRoles("admin", "ceo"), (req, res) => {
+router.post("/students", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
   try {
     const db = req.app.locals.db;
     const { name, email, password, department, program } = req.body || {};
@@ -114,41 +128,79 @@ router.post("/students", authenticateToken, authorizeRoles("admin", "ceo"), (req
       return res.status(400).json({ success: false, message: "Cannot select both Department and Program. Choose one." });
     }
 
-    // Check if email already exists
-    const existing = db.prepare("SELECT id FROM users WHERE LOWER(TRIM(email)) = ?").get(String(email).trim().toLowerCase());
-    if (existing) {
-      return res.status(400).json({ success: false, message: "Email already exists" });
-    }
-
-    // Check student limit
-    const { MAX_STUDENT_ACCOUNTS } = require("../config");
-    const studentCount = db.prepare("SELECT COUNT(*) AS count FROM users WHERE LOWER(role) = 'student' AND active = 1").get().count || 0;
-    if (studentCount >= MAX_STUDENT_ACCOUNTS) {
-      return res.status(400).json({ success: false, message: `Student limit of ${MAX_STUDENT_ACCOUNTS} has been reached` });
-    }
-
-    // Hash password
+    // Hash password before entering the transaction (bcrypt is slow, keep outside)
     const bcrypt = require("bcryptjs");
-    const hashedPassword = bcrypt.hashSync(String(password), 12);
+    const hashedPassword = await bcrypt.hash(String(password), 12);
 
-    // Insert student
-    const result = db.prepare(`
-      INSERT INTO users (name, email, password, role, department, program, active)
-      VALUES (?, ?, ?, 'student', ?, ?, 1)
-    `).run(
-      String(name).trim(),
-      String(email).trim().toLowerCase(),
-      hashedPassword,
-      department ? String(department).trim().toLowerCase() : null,
-      program ? String(program).trim().toLowerCase() : null
-    );
+    // Wrap limit check + INSERT in a transaction to prevent concurrent over-creation.
+    // NOTE: db.transaction(callback) in this project executes immediately and returns
+    //       the callback's return value (it is NOT like better-sqlite3 which returns a fn).
+    let studentId;
+    try {
+      studentId = db.transaction(() => {
+        // Re-check email uniqueness inside the transaction
+        const existing = db.prepare(
+          "SELECT id FROM users WHERE LOWER(TRIM(email)) = ?"
+        ).get(String(email).trim().toLowerCase());
+        if (existing) {
+          const err = new Error("Email already exists");
+          err.code = "DUPLICATE_EMAIL";
+          throw err;
+        }
 
-    res.status(201).json({ success: true, message: "Student created successfully", studentId: result.lastInsertRowid });
+        // Re-count inside the transaction so two concurrent requests cannot
+        // both pass the limit check and both insert the 100th student.
+        const studentCount = db.prepare(
+          "SELECT COUNT(*) AS count FROM users WHERE LOWER(role) = 'student' AND active = 1"
+        ).get().count || 0;
+
+        if (studentCount >= MAX_STUDENT_ACCOUNTS) {
+          const err = new Error(`Student limit reached (${MAX_STUDENT_ACCOUNTS}). Cannot create more student accounts.`);
+          err.code = "LIMIT_REACHED";
+          throw err;
+        }
+
+        const result = db.prepare(`
+          INSERT INTO users (name, email, password, role, department, program, active)
+          VALUES (?, ?, ?, 'student', ?, ?, 1)
+        `).run(
+          String(name).trim(),
+          String(email).trim().toLowerCase(),
+          hashedPassword,
+          department ? String(department).trim().toLowerCase() : null,
+          program ? String(program).trim().toLowerCase() : null
+        );
+
+        return Number(result.lastInsertRowid);
+      });
+    } catch (txErr) {
+      if (txErr.code === "DUPLICATE_EMAIL") {
+        return res.status(409).json({ success: false, message: "Email already exists" });
+      }
+      if (txErr.code === "LIMIT_REACHED") {
+        return res.status(409).json({ success: false, message: txErr.message });
+      }
+      throw txErr; // Re-throw unexpected errors to the outer catch
+    }
+
+    // Fetch the created student to return the real DB row (not an echo of input)
+    const created = db.prepare(
+      "SELECT id, name, email, department, program, created_at, active FROM users WHERE id = ?"
+    ).get(studentId);
+
+    res.status(201).json({
+      success: true,
+      message: "Student created successfully",
+      studentId,
+      student: created,
+    });
   } catch (error) {
     console.error("Create student error:", error);
     res.status(500).json({ success: false, message: "Unable to create student" });
   }
 });
+
+
 
 /* =========================================================
    GET PENDING APPROVALS

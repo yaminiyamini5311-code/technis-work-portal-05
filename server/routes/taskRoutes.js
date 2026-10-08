@@ -125,7 +125,7 @@ router.post("/", authenticateToken, authorizeRoles("admin","ceo","manager"), asy
     // Create tasks for each target student
     const taskIds = [];
     for (const student of studentsToNotify) {
-      const result=db.prepare(`INSERT INTO tasks (task_code,title,category,program,department,domain,team,task_type,description,what,why,how,how_to_do,expected_output,submission_requirements,resources,notes,assigned_to,assigned_by,status,workflow_status,priority,start_date,due_date,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      const result=db.prepare(`INSERT INTO tasks (task_code,title,category,program,department,domain,team,task_type,description,what,why,how,how_to_do,expected_output,submission_requirements,resources,notes,assigned_to,assigned_by,status,workflow_status,priority,start_date,due_date,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
         taskCode,title,String(b.category||"").trim()||null,program,null,domain,String(b.team||"").trim()||null,String(b.task_type||"General"),String(b.description||"").trim(),String(b.what||"").trim(),String(b.why||"").trim(),String(b.how||"").trim(),how_to_do,String(b.expected_output||"").trim(),String(b.submission_requirements||"").trim(),String(b.resources||"").trim(),String(b.notes||"").trim(),student.id,req.user.id,legacyStatus(workflow),workflow,priority,b.start_date||null,b.due_date||null,new Date().toISOString(),new Date().toISOString()
       );
       const id=Number(result.lastInsertRowid);

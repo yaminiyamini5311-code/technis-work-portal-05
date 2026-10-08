@@ -214,5 +214,28 @@ db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_task_code ON tasks(task_cod
 // Preserve the existing transaction helper used by the project.
 db.transaction = (callback) => { db.exec("BEGIN"); try { const result = callback(); db.exec("COMMIT"); return result; } catch (error) { try { db.exec("ROLLBACK"); } catch (_) {} throw error; } };
 
+// ----------------------------------------------------------
+// GRACEFUL SHUTDOWN — checkpoint WAL so data is durably
+// written to the main .db file before the process exits.
+// Without this, a SIGTERM/SIGINT (nodemon restart, Render
+// redeploy, Ctrl-C) leaves data only in the WAL file.
+// ----------------------------------------------------------
+let _dbClosed = false;
+function shutdownDb() {
+  if (_dbClosed) return;
+  _dbClosed = true;
+  try {
+    db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+    db.close();
+    console.log("SQLite: WAL checkpointed and database closed cleanly.");
+  } catch (e) {
+    console.error("SQLite shutdown error:", e.message);
+  }
+}
+process.once("exit", shutdownDb);
+process.once("SIGINT",  () => { shutdownDb(); process.exit(0); });
+process.once("SIGTERM", () => { shutdownDb(); process.exit(0); });
+
+
 console.log(`SQLite database connected: ${dbPath}`);
 module.exports = db;
