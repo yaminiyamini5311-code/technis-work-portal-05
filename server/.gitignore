@@ -6,3 +6,5 @@ npm-debug.log*
 *.db-wal
 *.db-shm
 uploads/
+students-seed-data.csv
+*-seed-data.csv

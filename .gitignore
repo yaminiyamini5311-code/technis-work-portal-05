@@ -31,3 +31,5 @@ server/import-students.js
 server/approve-*.js
 server/add-*.js
 server/check-*.js
+server/students-seed-data.csv
+server/*-seed-data.csv

@@ -21,6 +21,8 @@ services:
         sync: false
       - key: DB_PATH
         value: /var/data/techins.db
+      - key: STUDENT_SEED_DATA
+        sync: false
     disk:
       name: techins-data
       mountPath: /var/data

@@ -192,6 +192,22 @@ app.locals.db = db;
 console.log("SQLite database connected");
 
 /* =========================================================
+   STUDENT SEEDING (if STUDENT_SEED_DATA is set)
+   ========================================================= */
+
+if (process.env.STUDENT_SEED_DATA) {
+  try {
+    const { seedStudents } = require("./seed-students");
+    console.log("STUDENT_SEED_DATA is set, running student seed...");
+    seedStudents(process.env.STUDENT_SEED_DATA);
+    console.log("Student seed completed");
+  } catch (error) {
+    console.error("Student seed failed:", error);
+    process.exit(1);
+  }
+}
+
+/* =========================================================
    JWT SECRET
    ========================================================= */
 
