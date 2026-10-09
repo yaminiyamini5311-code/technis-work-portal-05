@@ -9,6 +9,7 @@ const {
 } = require("../middleware/authMiddleware");
 
 const { MAX_STUDENT_ACCOUNTS, ALLOWED_DEPARTMENTS, ALLOWED_PROGRAMS } = require("../config");
+const { isStudentEmailAllowed } = require("../utils/allowlist");
 
 const router = express.Router();
 
@@ -56,7 +57,8 @@ router.post("/login", async (req, res) => {
           password,
           role,
           department,
-          active
+          active,
+          registration_status
         FROM users
         WHERE LOWER(TRIM(email)) = ?
         LIMIT 1
@@ -77,13 +79,14 @@ router.post("/login", async (req, res) => {
       email: user.email,
       role: user.role,
       active: user.active,
+      registration_status: user.registration_status,
       hashExists: Boolean(user.password),
     });
 
     if (Number(user.active) !== 1) {
       return res.status(401).json({
         success: false,
-        message: "Account is pending admin approval or has been deactivated",
+        message: "Account is pending CEO approval or has been deactivated",
       });
     }
 
@@ -146,6 +149,7 @@ router.post("/login", async (req, res) => {
         email: user.email,
         role,
         department: user.department,
+        registration_status: user.registration_status || "approved",
       },
     });
   } catch (error) {
@@ -158,6 +162,50 @@ router.post("/login", async (req, res) => {
         process.env.NODE_ENV === "production"
           ? undefined
           : error.message,
+    });
+  }
+});
+
+/* =========================================================
+   GET CURRENT USER
+   GET /api/auth/me
+   Returns current user's data including registration_status
+========================================================= */
+router.get("/me", authenticateToken, (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    
+    const user = db.prepare(`
+      SELECT id, name, email, role, department, active, registration_status
+      FROM users
+      WHERE id = ?
+      LIMIT 1
+    `).get(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    return res.json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        active: user.active,
+        registration_status: user.registration_status || "approved"
+      }
+    });
+  } catch (error) {
+    console.error("GET ME ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to fetch user data"
     });
   }
 });
@@ -359,6 +407,14 @@ router.post("/signup", async (req, res) => {
       });
     }
 
+    // ALLOWLIST CHECK: Only for student role
+    if (role === "student" && !isStudentEmailAllowed(email)) {
+      return res.status(403).json({
+        success: false,
+        message: "This email is not authorized to register",
+      });
+    }
+
     const db = req.app.locals.db;
 
     if (!db) {
@@ -407,9 +463,11 @@ router.post("/signup", async (req, res) => {
     // Hash password outside the transaction (bcrypt is slow)
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // Manager and CEO accounts require admin approval
+    // Manager and CEO accounts require admin approval (active = 0)
+    // Students start with active = 1 but registration_status = 'pending'
     const requiresApproval = role === "manager" || role === "ceo";
     const active = requiresApproval ? 0 : 1;
+    const registrationStatus = role === "student" ? "pending" : "approved";
 
     let insertedId;
     try {
@@ -440,12 +498,35 @@ router.post("/signup", async (req, res) => {
 
         const result = db
           .prepare(
-            "INSERT INTO users (name, email, password, role, phone, active) VALUES (?, ?, ?, ?, ?, ?)"
+            "INSERT INTO users (name, email, password, role, phone, active, registration_status) VALUES (?, ?, ?, ?, ?, ?, ?)"
           )
-          .run(name, email, passwordHash, role, phone, active);
+          .run(name, email, passwordHash, role, phone, active, registrationStatus);
 
-        return Number(result.lastInsertRowid);
-      });
+        const userId = Number(result.lastInsertRowid);
+
+        // Notify all CEO/Admin users about new student registration
+        if (role === "student") {
+          const ceoAdmins = db.prepare(
+            "SELECT id FROM users WHERE LOWER(role) IN ('admin', 'ceo') AND active = 1"
+          ).all();
+          
+          const notifyStmt = db.prepare(
+            "INSERT INTO notifications (user_id, type, title, message, created_at) VALUES (?, ?, ?, ?, ?)"
+          );
+          
+          for (const admin of ceoAdmins) {
+            notifyStmt.run(
+              admin.id,
+              "registration_pending",
+              "New Student Registration",
+              `${name} (${email}) has registered and is awaiting approval.`,
+              new Date().toISOString()
+            );
+          }
+        }
+
+        return userId;
+      })();
     } catch (txErr) {
       if (txErr.code === "LIMIT_REACHED") {
         return res.status(409).json({
@@ -473,7 +554,7 @@ router.post("/signup", async (req, res) => {
     });
 
     const message = requiresApproval
-      ? "Account created successfully. Your registration is pending admin approval."
+      ? "Account created successfully. Your registration is pending CEO approval."
       : "Account created successfully. You can now log in.";
 
     return res.status(201).json({

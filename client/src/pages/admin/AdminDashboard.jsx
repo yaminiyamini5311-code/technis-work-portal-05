@@ -35,6 +35,7 @@ export default function AdminDashboard() {
   const [period,setPeriod]=useState("week"); 
   const [chart,setChart]=useState({labels:[],values:[]}); 
   const [submissions,setSubmissions]=useState([]); 
+  const [pendingRegistrations,setPendingRegistrations]=useState([]);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
   
@@ -43,13 +44,14 @@ export default function AdminDashboard() {
   const load=async()=>{
     try{
       setError("");
-      const [stats,progress,sub]=await Promise.all([
+      const [stats,progress,sub,pending]=await Promise.all([
         fetch(`${API_URL}/api/admin/stats`,{headers}),
         fetch(`${API_URL}/api/admin/progress?period=${period}`,{headers}),
-        fetch(`${API_URL}/api/tasks/submissions`,{headers})
+        fetch(`${API_URL}/api/tasks/submissions`,{headers}),
+        fetch(`${API_URL}/api/admin/pending-registrations`,{headers})
       ]); 
       
-      const [a,b,c]=await Promise.all([stats.json(),progress.json(),sub.json()]); 
+      const [a,b,c,d]=await Promise.all([stats.json(),progress.json(),sub.json(),pending.json()]); 
       
       if(stats.ok && a.success) {
         setData(a.stats);
@@ -72,6 +74,10 @@ export default function AdminDashboard() {
       if(sub.ok && c.success) {
         setSubmissions(c.submissions||[]);
       }
+
+      if(pending.ok && d.success) {
+        setPendingRegistrations(d.pending||[]);
+      }
     } catch(err) {
       console.error("Dashboard load error:", err);
       setError("Unable to load dashboard data. Please try again.");
@@ -84,12 +90,95 @@ export default function AdminDashboard() {
   const maxStudents = data?.maxStudents || 100;
   const capacity=useMemo(()=>Math.min(((data?.students||0)/maxStudents)*100,100),[data, maxStudents]);
   
-  if(loading&&!data)return <div className="portal-loading"><div className="loader-dot"/><h2>Loading admin workspace</h2><p>Syncing the latest team data.</p></div>;
+  const handleApprove = async (userId) => {
+    try {
+      const response = await fetch(`${API_URL}/api/admin/approve-registration/${userId}`, {
+        method: 'POST',
+        headers
+      });
+      const result = await response.json();
+      if (response.ok) {
+        // Reload dashboard to refresh pending list
+        load();
+      } else {
+        alert(result.message || 'Failed to approve registration');
+      }
+    } catch (error) {
+      console.error('Approve error:', error);
+      alert('Failed to approve registration');
+    }
+  };
+
+  const handleReject = async (userId) => {
+    if (!confirm('Are you sure you want to reject this registration?')) return;
+    try {
+      const response = await fetch(`${API_URL}/api/admin/reject-registration/${userId}`, {
+        method: 'POST',
+        headers
+      });
+      const result = await response.json();
+      if (response.ok) {
+        // Reload dashboard to refresh pending list
+        load();
+      } else {
+        alert(result.message || 'Failed to reject registration');
+      }
+    } catch (error) {
+      console.error('Reject error:', error);
+      alert('Failed to reject registration');
+    }
+  };
+  
+  if(loading&&!data)return <div className="portal-loading"><div className="loader-dot"/><h2>Loading CEO workspace</h2><p>Syncing the latest team data.</p></div>;
   
   if(error && !data) return <div className="portal-loading"><div className="error-icon">⚠</div><h2>Unable to load dashboard</h2><p>{error}</p><button onClick={load}>Retry</button></div>;
   
   return <div className="admin-simple page-enter">
-    <div className="simple-head"><span>ADMIN CONTROL CENTER</span><h2>Command dashboard</h2><p>One view for students, assignments, missions, daily work and performance.</p></div>
+    <div className="simple-head"><span>CEO CONTROL CENTER</span><h2>Command dashboard</h2><p>One view for students, assignments, missions, daily work and performance.</p></div>
+
+    {/* Pending Registrations Panel */}
+    {pendingRegistrations.length > 0 && (
+      <section className="panel pending-registrations-panel">
+        <div className="panel-head">
+          <div>
+            <span className="section-kicker">REGISTRATION REQUESTS</span>
+            <h3>Pending Student Approvals</h3>
+            <p>{pendingRegistrations.length} student{pendingRegistrations.length===1?'':'s'} waiting for approval.</p>
+          </div>
+        </div>
+        <div className="pending-registrations-list">
+          {pendingRegistrations.map(student => (
+            <div className="pending-registration-item" key={student.id}>
+              <div className="pending-student-avatar">
+                {student.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="pending-student-info">
+                <strong>{student.name}</strong>
+                <small>{student.email}</small>
+                <small className="registration-date">
+                  Registered: {new Date(student.created_at).toLocaleString()}
+                </small>
+              </div>
+              <div className="pending-actions">
+                <button 
+                  className="approve-btn"
+                  onClick={() => handleApprove(student.id)}
+                >
+                  Approve
+                </button>
+                <button 
+                  className="reject-btn"
+                  onClick={() => handleReject(student.id)}
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    )}
+
     <div className="admin-stat-grid">
       {[['Students',data?.students||0,'01'],['Tasks',data?.tasks||0,'02'],['Completed',data?.completedTasks||0,'03'],['Pending',data?.pendingTasks||0,'04'],['Missions',data?.missions||0,'05'],["Today's activity",data?.activitiesToday||0,'06']].map(([label,value,no])=><div className="admin-stat" key={label}><small>{no}</small><span>{label}</span><strong>{value}</strong></div>)}
     </div>

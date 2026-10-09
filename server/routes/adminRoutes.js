@@ -338,4 +338,135 @@ router.post("/feedback", authenticateToken, authorizeRoles("admin", "manager"), 
   }
 });
 
+/* =========================================================
+   GET PENDING STUDENT REGISTRATIONS
+   GET /api/admin/pending-registrations
+========================================================= */
+router.get("/pending-registrations", authenticateToken, authorizeRoles("admin", "ceo"), (req, res) => {
+  try {
+    const db = req.app.locals.db;
+
+    const pending = db.prepare(`
+      SELECT
+        id,
+        name,
+        email,
+        phone,
+        created_at,
+        registration_status
+      FROM users
+      WHERE LOWER(role) = 'student'
+        AND registration_status = 'pending'
+      ORDER BY created_at DESC
+    `).all();
+
+    res.json({ success: true, pending });
+  } catch (error) {
+    console.error("Pending registrations error:", error);
+    res.status(500).json({ success: false, message: "Unable to fetch pending registrations" });
+  }
+});
+
+/* =========================================================
+   APPROVE STUDENT REGISTRATION
+   POST /api/admin/approve-registration/:id
+========================================================= */
+router.post("/approve-registration/:id", authenticateToken, authorizeRoles("admin", "ceo"), (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const userId = Number(req.params.id);
+
+    const user = db.prepare("SELECT id, name, email, role, registration_status FROM users WHERE id = ?").get(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    if (user.role !== "student") {
+      return res.status(400).json({ success: false, message: "Only student registrations can be approved" });
+    }
+
+    // Idempotent: allow pending->approved and rejected->approved
+    if (user.registration_status === "approved") {
+      return res.json({ success: true, message: "Student is already approved" });
+    }
+
+    db.prepare("UPDATE users SET registration_status = 'approved' WHERE id = ?").run(userId);
+
+    // Mark related notifications as read
+    db.prepare(`
+      UPDATE notifications
+      SET read_at = CURRENT_TIMESTAMP
+      WHERE type = 'registration_pending'
+        AND message LIKE ?
+        AND read_at IS NULL
+    `).run(`%${user.email}%`);
+
+    // Write audit log
+    const { writeAudit } = require("../utils/audit");
+    writeAudit(db, {
+      actorId: req.user.id,
+      action: "registration_approved",
+      entityType: "user",
+      entityId: userId,
+      newValue: { name: user.name, email: user.email, registration_status: "approved" },
+    });
+
+    res.json({ success: true, message: "Student registration approved successfully" });
+  } catch (error) {
+    console.error("Approve registration error:", error);
+    res.status(500).json({ success: false, message: "Unable to approve registration" });
+  }
+});
+
+/* =========================================================
+   REJECT STUDENT REGISTRATION
+   POST /api/admin/reject-registration/:id
+========================================================= */
+router.post("/reject-registration/:id", authenticateToken, authorizeRoles("admin", "ceo"), (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const userId = Number(req.params.id);
+
+    const user = db.prepare("SELECT id, name, email, role, registration_status FROM users WHERE id = ?").get(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    if (user.role !== "student") {
+      return res.status(400).json({ success: false, message: "Only student registrations can be rejected" });
+    }
+
+    // Idempotent: allow pending->rejected (silently succeed if already rejected)
+    if (user.registration_status === "rejected") {
+      return res.json({ success: true, message: "Student is already rejected" });
+    }
+
+    db.prepare("UPDATE users SET registration_status = 'rejected' WHERE id = ?").run(userId);
+
+    // Mark related notifications as read
+    db.prepare(`
+      UPDATE notifications
+      SET read_at = CURRENT_TIMESTAMP
+      WHERE type = 'registration_pending'
+        AND message LIKE ?
+        AND read_at IS NULL
+    `).run(`%${user.email}%`);
+
+    // Write audit log
+    const { writeAudit } = require("../utils/audit");
+    writeAudit(db, {
+      actorId: req.user.id,
+      action: "registration_rejected",
+      entityType: "user",
+      entityId: userId,
+      newValue: { name: user.name, email: user.email, registration_status: "rejected" },
+    });
+
+    res.json({ success: true, message: "Student registration rejected" });
+  } catch (error) {
+    console.error("Reject registration error:", error);
+    res.status(500).json({ success: false, message: "Unable to reject registration" });
+  }
+});
+
 module.exports = router;

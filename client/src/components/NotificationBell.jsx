@@ -13,6 +13,13 @@ export function getNotificationTarget(notification, role) {
   // Treat CEO as admin for routing
   const effectiveRole = role === "ceo" ? "admin" : role;
 
+  // Registration pending notifications - navigate to pending registrations panel
+  if (type === "registration_pending") {
+    if (role === "admin" || role === "ceo") {
+      return "/admin";  // CEO Dashboard where pending registrations panel is shown
+    }
+  }
+
   // Task-related notifications - navigate to tasks list (task detail not implemented)
   if (type === "task_assigned" || type === "task_updated" || type === "task_due" || type === "task_started" || type === "task_approved") {
     if (related_task_id) {

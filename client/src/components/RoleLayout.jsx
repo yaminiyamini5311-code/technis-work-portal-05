@@ -9,7 +9,7 @@ export default function RoleLayout({role}){
   try{user=JSON.parse(localStorage.getItem("user")||"{}")}catch{}
 
   const getWorkspaceTitle = () => {
-    if (role === "admin" || role === "ceo") return "Admin Workspace";
+    if (role === "admin" || role === "ceo") return "CEO Workspace";
     if (role === "manager") return "Manager Workspace";
     return "Workspace";
   };

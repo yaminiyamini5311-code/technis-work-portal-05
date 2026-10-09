@@ -178,6 +178,7 @@ addColumnIfMissing("users", "program", "TEXT");
 addColumnIfMissing("users", "active", "INTEGER NOT NULL DEFAULT 1");
 addColumnIfMissing("users", "phone", "TEXT");
 addColumnIfMissing("users", "avatar", "TEXT");
+addColumnIfMissing("users", "registration_status", "TEXT NOT NULL DEFAULT 'approved'");
 
 // Ensure role constraint allows 'ceo'
 const checkRoleConstraint = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get();

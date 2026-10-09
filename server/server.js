@@ -3,6 +3,7 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const bcrypt = require("bcryptjs");
 const path = require("path");
+const { authenticateToken, checkStudentRegistrationStatus } = require("./middleware/authMiddleware");
 
 dotenv.config();
 
@@ -508,6 +509,8 @@ app.use(
 if (studentRoutes) {
   app.use(
     "/api/student",
+    authenticateToken,
+    checkStudentRegistrationStatus,
     studentRoutes
   );
 }
@@ -530,6 +533,8 @@ if (studentsRoutes) {
 if (notificationRoutes) {
   app.use(
     "/api/notifications",
+    authenticateToken,
+    checkStudentRegistrationStatus,
     notificationRoutes
   );
 }
@@ -541,6 +546,8 @@ if (notificationRoutes) {
 if (taskRoutes) {
   app.use(
     "/api/tasks",
+    authenticateToken,
+    checkStudentRegistrationStatus,
     taskRoutes
   );
 }
@@ -552,6 +559,8 @@ if (taskRoutes) {
 if (missionRoutes) {
   app.use(
     "/api/missions",
+    authenticateToken,
+    checkStudentRegistrationStatus,
     missionRoutes
   );
 }
@@ -563,6 +572,8 @@ if (missionRoutes) {
 if (activityRoutes) {
   app.use(
     "/api/activities",
+    authenticateToken,
+    checkStudentRegistrationStatus,
     activityRoutes
   );
 }
@@ -574,6 +585,8 @@ if (activityRoutes) {
 if (performanceRoutes) {
   app.use(
     "/api/performance",
+    authenticateToken,
+    checkStudentRegistrationStatus,
     performanceRoutes
   );
 }
