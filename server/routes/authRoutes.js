@@ -10,6 +10,7 @@ const {
 
 const { MAX_STUDENT_ACCOUNTS, ALLOWED_DEPARTMENTS, ALLOWED_PROGRAMS } = require("../config");
 const { isStudentEmailAllowed } = require("../utils/allowlist");
+const { runInTransaction } = require("../database");
 
 const router = express.Router();
 
@@ -28,6 +29,7 @@ router.post("/login", async (req, res) => {
     console.log("LOGIN REQUEST:", {
       email,
       passwordReceived: Boolean(password),
+      passwordLength: password ? password.length : 0
     });
 
     if (!email || !password) {
@@ -47,6 +49,8 @@ router.post("/login", async (req, res) => {
         message: "Database connection unavailable",
       });
     }
+
+    console.log("LOGIN: Querying database for email:", email);
 
     const user = db
       .prepare(`
@@ -471,7 +475,7 @@ router.post("/signup", async (req, res) => {
 
     let insertedId;
     try {
-      insertedId = db.transaction(() => {
+      insertedId = runInTransaction(db, () => {
         // Re-check student limit inside transaction for student role
         if (role === "student") {
           const studentCount = db
@@ -526,7 +530,7 @@ router.post("/signup", async (req, res) => {
         }
 
         return userId;
-      })();
+      });
     } catch (txErr) {
       if (txErr.code === "LIMIT_REACHED") {
         return res.status(409).json({
@@ -565,9 +569,20 @@ router.post("/signup", async (req, res) => {
     });
   } catch (error) {
     console.error("SIGNUP ERROR:", error);
+    console.error("SIGNUP ERROR STACK:", error.stack);
+    
+    // Provide more specific error message without exposing internals
+    let errorMessage = "Unable to create account";
+    if (error.message && error.message.includes("UNIQUE constraint failed")) {
+      errorMessage = "A user with this email already exists";
+    } else if (error.message && error.message.includes("database")) {
+      errorMessage = "Database error occurred. Please try again.";
+    }
+    
     return res.status(500).json({
       success: false,
-      message: "Unable to create account",
+      message: errorMessage,
+      ...(process.env.NODE_ENV !== "production" && { debug: error.message })
     });
   }
 });

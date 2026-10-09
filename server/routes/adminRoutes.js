@@ -1,6 +1,7 @@
 const express = require("express");
 const { authenticateToken, authorizeRoles } = require("../middleware/authMiddleware");
 const { MAX_STUDENT_ACCOUNTS } = require("../config");
+const { runInTransaction } = require("../database");
 
 const router = express.Router();
 
@@ -133,11 +134,9 @@ router.post("/students", authenticateToken, authorizeRoles("admin", "ceo"), asyn
     const hashedPassword = await bcrypt.hash(String(password), 12);
 
     // Wrap limit check + INSERT in a transaction to prevent concurrent over-creation.
-    // NOTE: db.transaction(callback) in this project executes immediately and returns
-    //       the callback's return value (it is NOT like better-sqlite3 which returns a fn).
     let studentId;
     try {
-      studentId = db.transaction(() => {
+      studentId = runInTransaction(db, () => {
         // Re-check email uniqueness inside the transaction
         const existing = db.prepare(
           "SELECT id FROM users WHERE LOWER(TRIM(email)) = ?"

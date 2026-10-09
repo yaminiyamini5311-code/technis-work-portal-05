@@ -212,8 +212,19 @@ for (const table of ["tasks","missions","daily_activities"]) {
 
 db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_task_code ON tasks(task_code); CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON tasks(assigned_to); CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date); CREATE INDEX IF NOT EXISTS idx_submissions_task ON submissions(task_id); CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id,read_at); CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at);`);
 
-// Preserve the existing transaction helper used by the project.
-db.transaction = (callback) => { db.exec("BEGIN"); try { const result = callback(); db.exec("COMMIT"); return result; } catch (error) { try { db.exec("ROLLBACK"); } catch (_) {} throw error; } };
+// Standalone transaction helper — node:sqlite's DatabaseSync does NOT support
+// property assignment on the native object, so we export a plain function instead.
+function runInTransaction(database, callback) {
+  database.exec("BEGIN");
+  try {
+    const result = callback();
+    database.exec("COMMIT");
+    return result;
+  } catch (error) {
+    try { database.exec("ROLLBACK"); } catch (_) {}
+    throw error;
+  }
+}
 
 // ----------------------------------------------------------
 // GRACEFUL SHUTDOWN — checkpoint WAL so data is durably
@@ -239,3 +250,4 @@ process.once("SIGTERM", () => { shutdownDb(); process.exit(0); });
 
 console.log(`SQLite database connected: ${dbPath}`);
 module.exports = db;
+module.exports.runInTransaction = runInTransaction;
