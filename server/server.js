@@ -245,14 +245,6 @@ function ensureDefaultAccounts() {
         role: "manager",
         department: "Techins",
       },
-
-      {
-        name: "TECHINS Student",
-        email: "student@techins.com",
-        password: "Student@123",
-        role: "student",
-        department: "Techins",
-      },
     ];
 
     /* =====================================================
@@ -438,9 +430,6 @@ function ensureDefaultAccounts() {
     );
     console.log(
       "MANAGER : manager@techins.com / Manager@123"
-    );
-    console.log(
-      "STUDENT : student@techins.com / Student@123"
     );
     console.log(
       "================================================="

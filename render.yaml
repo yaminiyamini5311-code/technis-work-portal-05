@@ -19,3 +19,9 @@ services:
         sync: false
       - key: EMAIL_FROM
         sync: false
+      - key: DB_PATH
+        value: /var/data/techins.db
+    disk:
+      name: techins-data
+      mountPath: /var/data
+      sizeGB: 1

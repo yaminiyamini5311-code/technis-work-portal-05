@@ -1,7 +1,7 @@
 const path = require("path");
 const { DatabaseSync } = require("node:sqlite");
 
-const dbPath = path.join(__dirname, "techins.db");
+const dbPath = process.env.DB_PATH ? process.env.DB_PATH : path.join(__dirname, "techins.db");
 const db = new DatabaseSync(dbPath);
 db.exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;");
 
@@ -235,7 +235,6 @@ function shutdownDb() {
 process.once("exit", shutdownDb);
 process.once("SIGINT",  () => { shutdownDb(); process.exit(0); });
 process.once("SIGTERM", () => { shutdownDb(); process.exit(0); });
-
 
 console.log(`SQLite database connected: ${dbPath}`);
 module.exports = db;
