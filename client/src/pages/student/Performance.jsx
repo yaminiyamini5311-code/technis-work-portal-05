@@ -38,7 +38,7 @@ function Performance() {
 
       try {
         const response = await axios.get(
-          `${API_URL}/api/performance/me`,
+          `${API_URL}/api/performance`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -46,7 +46,17 @@ function Performance() {
           }
         );
 
-        setPerformance(response.data);
+        const data = response.data;
+        // Handle both direct array and wrapped response
+        if (Array.isArray(data)) {
+          // If array, use first record or aggregate
+          setPerformance(data.length > 0 ? data[0] : null);
+        } else if (data.records && Array.isArray(data.records)) {
+          // If wrapped in records, use first record
+          setPerformance(data.records.length > 0 ? data.records[0] : null);
+        } else {
+          setPerformance(data);
+        }
       } catch (err) {
         console.error("Performance error:", err);
 

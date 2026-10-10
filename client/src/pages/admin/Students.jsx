@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useExclusiveSelect } from "../../hooks/useExclusiveSelect";
+import PasswordInput from "../../components/PasswordInput";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const DEPARTMENTS = [
@@ -129,13 +130,12 @@ export default function Students() {
 
           <label htmlFor="student-password">
             Temporary password
-            <input
+            <PasswordInput
               id="student-password"
               name="student-password"
-              type="password"
-              placeholder="Temporary password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
+              placeholder="Temporary password"
               required
               autoComplete="new-password"
             />

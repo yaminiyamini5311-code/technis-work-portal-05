@@ -196,3 +196,33 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
   outline:3px solid rgba(250,154,2,.4);
   outline-offset:2px;
 }
+
+/* Password Input with Toggle Icon */
+.password-field{position:relative}
+.password-field input{padding-right:50px}
+.password-field button{
+  position:absolute;
+  right:7px;
+  top:50%;
+  transform:translateY(-50%);
+  width:36px;
+  height:36px;
+  border:none;
+  background:transparent !important;
+  color:#9A9A9A !important;
+  border-radius:6px;
+  padding:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  transition:color 0.2s,background-color 0.2s;
+}
+.password-field button:hover{
+  color:#5B6475 !important;
+  background:rgba(0,0,0,0.04) !important;
+}
+.password-field button:focus-visible{
+  outline:2px solid #FA9A02;
+  outline-offset:2px;
+}

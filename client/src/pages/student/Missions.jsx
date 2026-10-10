@@ -40,7 +40,7 @@ function Missions() {
             }
 
             const response = await axios.get(
-                `${API_URL}/api/missions/my`,
+                `${API_URL}/api/missions`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,

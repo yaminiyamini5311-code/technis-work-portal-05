@@ -70,7 +70,7 @@ function WorkHistory() {
              */
             requests.push(
                 axios.get(
-                    `${API_URL}/api/missions/my`,
+                    `${API_URL}/api/missions`,
                     authConfig
                 ).catch(() => ({ data: [] }))
             );

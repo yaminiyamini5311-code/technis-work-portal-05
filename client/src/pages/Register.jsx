@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
+import PasswordInput from "../components/PasswordInput";
 import "./Login.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -166,30 +167,24 @@ export default function Register() {
             </select>
 
             <label htmlFor="register-password">Password</label>
-            <div className="password-field">
-              <input
-                id="register-password"
-                type="password"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder="Min 8 characters"
-                autoComplete="new-password"
-                required
-              />
-            </div>
+            <PasswordInput
+              id="register-password"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              placeholder="Min 8 characters"
+              autoComplete="new-password"
+              required
+            />
 
             <label htmlFor="register-confirm">Confirm password</label>
-            <div className="password-field">
-              <input
-                id="register-confirm"
-                type="password"
-                value={form.confirmPassword}
-                onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-                placeholder="Re-enter password"
-                autoComplete="new-password"
-                required
-              />
-            </div>
+            <PasswordInput
+              id="register-confirm"
+              value={form.confirmPassword}
+              onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+              placeholder="Re-enter password"
+              autoComplete="new-password"
+              required
+            />
 
             <button className="login-submit" disabled={loading} type="submit">
               {loading ? <span className="button-loader" /> : <>Create Account <span aria-hidden="true">→</span></>}

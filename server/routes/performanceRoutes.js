@@ -5,11 +5,15 @@ const { writeAudit } = require("../utils/audit_mongo");
 const router = express.Router();
 function toId(id) { try { return new ObjectId(id); } catch { return id; } }
 
-router.get("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), async (req, res) => {
+router.get("/", authenticateToken, async (req, res) => {
   try {
     const db = req.db;
-    // CEO, admin, and manager can see all performance records
-    const records = await db.collection("performance").find({}).sort({ created_at: -1 }).toArray();
+    // Students see only their own performance records, managers/CEO see all
+    let query = {};
+    if (["student", "member"].includes(req.user.role)) {
+      query = { user_id: req.user.id };
+    }
+    const records = await db.collection("performance").find(query).sort({ created_at: -1 }).toArray();
     const result = await Promise.all(records.map(async p => {
       const u = await db.collection("users").findOne({ _id: toId(p.user_id) }, { projection: { name: 1, email: 1 } });
       const r = p.reviewed_by ? await db.collection("users").findOne({ _id: toId(p.reviewed_by) }, { projection: { name: 1 } }) : null;
