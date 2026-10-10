@@ -6,6 +6,7 @@ const { authenticateToken, authorizeRoles, getSecret } = require("../middleware/
 const { MAX_STUDENT_ACCOUNTS, ALLOWED_DEPARTMENTS, ALLOWED_PROGRAMS } = require("../config");
 const { isStudentEmailAllowed } = require("../utils/allowlist");
 const { writeAudit } = require("../utils/audit_mongo");
+const { createCeoNotification } = require("../utils/ceoNotification");
 
 const router = express.Router();
 
@@ -331,21 +332,13 @@ router.post("/signup", async (req, res) => {
     });
     const insertedId = String(result.insertedId);
 
-    // Notify CEO/Admin users about new student registration
+    // Notify CEO/Admin users about new student registration (with authorization check)
     if (role === "student") {
-      const ceoAdmins = await db.collection("users").find(
-        { role: { $in: ["admin", "ceo"] }, active: 1 },
-        { projection: { _id: 1 } }
-      ).toArray();
-      const notifDocs = ceoAdmins.map(admin => ({
-        user_id: String(admin._id),
+      await createCeoNotification(db, email, {
         type: "registration_pending",
         title: "New Student Registration",
-        message: `${name} (${email}) has registered and is awaiting approval.`,
-        read_at: null,
-        created_at: new Date().toISOString()
-      }));
-      if (notifDocs.length) await db.collection("notifications").insertMany(notifDocs);
+        message: `${name} (${email}) has registered and is awaiting approval.`
+      });
     }
 
     await writeAudit(db, { actorId: insertedId, action: "user_registered", entityType: "user", entityId: insertedId, newValue: { name, email, role, active } });

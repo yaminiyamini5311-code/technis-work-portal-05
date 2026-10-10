@@ -7,6 +7,7 @@ const path = require("path");
 const { sendTaskAssignmentEmail } = require("../utils/email");
 const { writeAudit } = require("../utils/audit_mongo");
 const { ALLOWED_DOMAINS, ALLOWED_PROGRAMS } = require("../config");
+const { createCeoNotification, createUserNotification } = require("../utils/ceoNotification");
 
 const router = express.Router();
 const upload = multer({
@@ -51,11 +52,11 @@ async function nextSubmissionCode(db) {
 }
 
 async function notify(db, userId, type, title, message, taskId = null) {
-  await db.collection("notifications").insertOne({
-    user_id: String(userId), type, title, message,
-    related_task_id: taskId ? String(taskId) : null,
-    read_at: null,
-    created_at: new Date().toISOString()
+  await createUserNotification(db, userId, {
+    type,
+    title,
+    message,
+    related_task_id: taskId
   });
 }
 
@@ -427,10 +428,14 @@ router.patch("/:id/outcome", authenticateToken, checkStudentRegistrationStatus, 
       await transition(db, task, "Submitted", req.user.id, "Outcome submitted");
     }
 
-    const admins = await db.collection("users").find({ role: { $in: ["admin", "ceo", "manager"] }, active: 1 }, { projection: { _id: 1 } }).toArray();
-    for (const u of admins) {
-      await notify(db, String(u._id), "task_outcome", "New task outcome submitted", `${task.title} received an outcome from a student.`, String(task._id));
-    }
+    // Notify CEO/Admin about task outcome (with authorization check)
+    await createCeoNotification(db, req.user.email, {
+      type: "task_outcome",
+      title: "New task outcome submitted",
+      message: `${task.title} received an outcome from a student.`,
+      related_task_id: String(task._id)
+    });
+    
     await writeAudit(db, { actorId: req.user.id, action: "task_outcome_submitted", entityType: "task", entityId: String(task._id), newValue: { outcome, submitted_at: now } });
 
     res.json({ success: true, message: "Task outcome saved" });

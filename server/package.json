@@ -10,6 +10,7 @@
     "seed:admin": "node create-admin.js",
     "seed:manager": "node create-manager.js",
     "seed:user": "node createUsers.js",
+    "seed:authorized": "node scripts/seedAuthorized.js",
     "migrate": "node migrate-to-mongodb.js",
     "generate:ceo-hash": "node scripts/generate-ceo-hash.js",
     "verify:config": "node scripts/verify-ceo-config.js"

@@ -212,6 +212,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const missionRoutes      = require("./routes/missionRoutes");
 const performanceRoutes  = require("./routes/performanceRoutes");
 const auditRoutes        = require("./routes/auditRoutes");
+const authorizedUsersRoutes = require("./routes/authorizedUsersRoutes");
 
 app.use("/api/auth",         authRoutes);
 app.use("/api/admin",        adminRoutes);
@@ -223,6 +224,7 @@ app.use("/api/notifications",authenticateToken, notificationRoutes);
 app.use("/api/missions",     missionRoutes);
 app.use("/api/performance",  performanceRoutes);
 app.use("/api/audit-logs",   auditRoutes);
+app.use("/api/authorized-users", authorizedUsersRoutes);
 
 // ─── 404 ───────────────────────────────────────────────────────────────────
 app.use((req, res) => {

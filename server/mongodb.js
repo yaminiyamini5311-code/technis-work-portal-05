@@ -109,6 +109,13 @@ async function ensureIndexes(db) {
     await db.collection("performance").createIndex({ user_id: 1 });
     await db.collection("audit_logs").createIndex({ created_at: -1 });
     await db.collection("task_status_history").createIndex({ task_id: 1 });
+    
+    // Authorized users collection indexes
+    await db.collection("authorized_users").createIndex({ email: 1 }, { unique: true });
+    await db.collection("authorized_users").createIndex({ learnerId: 1 }, { unique: true, sparse: true });
+    await db.collection("authorized_users").createIndex({ role: 1 });
+    await db.collection("authorized_users").createIndex({ active: 1 });
+    
     console.log("[MongoDB] Indexes ensured.");
   } catch (err) {
     console.error("[MongoDB] Index creation error (non-fatal):", err.message);
