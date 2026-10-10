@@ -1,15 +1,39 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const { ObjectId } = require("mongodb");
-const { authenticateToken, authorizeRoles, getSecret } = require("../middleware/authMiddleware");
-const { MAX_STUDENT_ACCOUNTS, ALLOWED_DEPARTMENTS, ALLOWED_PROGRAMS } = require("../config");
-const { isStudentEmailAllowed } = require("../utils/allowlist");
+const { requireAuth, requireCEO, requireApproved, requireRole, getSecret } = require("../middleware/authMiddleware");
 const { writeAudit } = require("../utils/audit_mongo");
 
 const router = express.Router();
 
 function toId(id) { try { return new ObjectId(id); } catch { return id; } }
+
+// Rate limiting state (in-memory, resets on restart - good enough for serverless)
+const loginAttempts = new Map();
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
+const MAX_ATTEMPTS = 10;
+
+function checkRateLimit(email) {
+  const now = Date.now();
+  const attempts = loginAttempts.get(email) || { count: 0, resetAt: now + RATE_LIMIT_WINDOW };
+  
+  if (now > attempts.resetAt) {
+    attempts.count = 0;
+    attempts.resetAt = now + RATE_LIMIT_WINDOW;
+  }
+  
+  attempts.count++;
+  loginAttempts.set(email, attempts);
+  
+  return attempts.count <= MAX_ATTEMPTS;
+}
+
+async function isEmailAllowed(db, email) {
+  const allowed = await db.collection("allowed_emails").findOne({ email: email.trim().toLowerCase() });
+  return allowed;
+}
 
 /* ─── LOGIN ─────────────────────────────────────────────────────────────── */
 router.post("/login", async (req, res) => {
