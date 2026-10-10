@@ -81,10 +81,8 @@ const corsOptions = {
 };
 
 // Apply CORS BEFORE all routes, middleware, and rate limiters
+// Note: app.use(cors()) already handles preflight OPTIONS requests
 app.use(cors(corsOptions));
-
-// Handle preflight OPTIONS requests for all routes
-app.options("*", cors(corsOptions));
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
