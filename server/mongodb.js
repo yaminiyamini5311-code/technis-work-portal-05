@@ -1,7 +1,9 @@
 const { MongoClient } = require("mongodb");
 
-const MONGODB_URI = process.env.MONGODB_URI;
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || "techins";
+// Read and sanitize MongoDB connection string
+// Trim whitespace that might be added accidentally in Vercel env vars
+const MONGODB_URI = process.env.MONGODB_URI ? process.env.MONGODB_URI.trim() : null;
+const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME ? process.env.MONGODB_DB_NAME.trim() : "techins";
 
 // Globally cached client and connection promise for serverless reuse
 let _client = null;
@@ -16,6 +18,7 @@ let _connecting = null;
  * - Resets _connecting promise on failure so next request can retry
  * - Increased timeouts (20s) for slow Vercel cold starts
  * - Never calls process.exit() - returns errors instead
+ * - Never logs the connection URI (contains credentials)
  */
 async function connect() {
   // Return cached connection if available
@@ -60,15 +63,20 @@ async function connect() {
       
       console.error("[MongoDB] Connection failed:", err.message);
       console.error("[MongoDB] Error code:", err.code);
-      console.error("[MongoDB] Stack trace:", err.stack);
       
-      // Provide helpful error messages for common issues
+      // Provide helpful error messages for common issues without exposing credentials
       if (err.message.includes("timeout") || err.message.includes("ETIMEDOUT")) {
         console.error("[MongoDB] TIMEOUT - Possible causes:");
         console.error("  1. MongoDB Atlas IP allowlist doesn't include 0.0.0.0/0");
         console.error("  2. Network connectivity issues from Vercel region");
         console.error("  3. MongoDB Atlas cluster is paused or unavailable");
         console.error("  4. Connection string is incorrect");
+      } else if (err.message.includes("bad auth") || err.message.includes("authentication failed")) {
+        console.error("[MongoDB] AUTHENTICATION FAILED - Possible causes:");
+        console.error("  1. Username or password is incorrect in MONGODB_URI");
+        console.error("  2. Password contains special characters that need URL encoding");
+        console.error("  3. Database user doesn't have correct permissions");
+        console.error("  4. Check: Encode password special chars: @ = %40, : = %3A, / = %2F, ? = %3F, # = %23, [ = %5B, ] = %5D, % = %25");
       }
       
       throw new Error(`MongoDB connection failed: ${err.message}`);
