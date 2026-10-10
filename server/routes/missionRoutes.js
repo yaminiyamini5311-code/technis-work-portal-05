@@ -1,6 +1,6 @@
 const express = require("express");
 const { ObjectId } = require("mongodb");
-const { authenticateToken, authorizeRoles } = require("../middleware/authMiddleware");
+const { authenticateToken, authorizeRoles, checkStudentRegistrationStatus } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 function toId(id) { try { return new ObjectId(id); } catch { return id; } }
@@ -19,7 +19,7 @@ router.get("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), as
   } catch (e) { res.status(500).json({ success: false, message: "Unable to fetch missions" }); }
 });
 
-router.post("/", authenticateToken, authorizeRoles("admin", "manager"), async (req, res) => {
+router.post("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), async (req, res) => {
   try {
     const db = req.db;
     const { title, description, assigned_to, due_date } = req.body || {};
@@ -36,7 +36,7 @@ router.post("/", authenticateToken, authorizeRoles("admin", "manager"), async (r
   } catch (e) { res.status(500).json({ success: false, message: "Unable to create mission" }); }
 });
 
-router.patch("/:id/progress", authenticateToken, authorizeRoles("student", "member"), async (req, res) => {
+router.patch("/:id/progress", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), async (req, res) => {
   try {
     const db = req.db;
     const mission = await db.collection("missions").findOne({ _id: toId(req.params.id), assigned_to: req.user.id });
@@ -45,6 +45,37 @@ router.patch("/:id/progress", authenticateToken, authorizeRoles("student", "memb
     await db.collection("missions").updateOne({ _id: mission._id }, { $set: { progress, status: progress >= 100 ? "completed" : "in_progress", completed_at: progress >= 100 ? new Date().toISOString() : null } });
     res.json({ success: true, message: "Progress updated" });
   } catch (e) { res.status(500).json({ success: false, message: "Unable to update progress" }); }
+});
+
+router.put("/:id", authenticateToken, authorizeRoles("ceo", "admin", "manager"), async (req, res) => {
+  try {
+    const db = req.db;
+    const { title, description, assigned_to, due_date, status, progress, feedback } = req.body || {};
+    const mission = await db.collection("missions").findOne({ _id: toId(req.params.id) });
+    if (!mission) return res.status(404).json({ success: false, message: "Mission not found" });
+    
+    const updates = {};
+    if (title !== undefined) updates.title = String(title).trim();
+    if (description !== undefined) updates.description = String(description).trim();
+    if (assigned_to !== undefined) updates.assigned_to = String(assigned_to);
+    if (due_date !== undefined) updates.due_date = due_date;
+    if (status !== undefined) updates.status = String(status);
+    if (progress !== undefined) updates.progress = Math.min(100, Math.max(0, Number(progress)));
+    if (feedback !== undefined) updates.feedback = String(feedback).trim();
+    
+    await db.collection("missions").updateOne({ _id: mission._id }, { $set: updates });
+    res.json({ success: true, message: "Mission updated" });
+  } catch (e) { res.status(500).json({ success: false, message: "Unable to update mission" }); }
+});
+
+router.delete("/:id", authenticateToken, authorizeRoles("ceo", "admin", "manager"), async (req, res) => {
+  try {
+    const db = req.db;
+    const mission = await db.collection("missions").findOne({ _id: toId(req.params.id) });
+    if (!mission) return res.status(404).json({ success: false, message: "Mission not found" });
+    await db.collection("missions").deleteOne({ _id: mission._id });
+    res.json({ success: true, message: "Mission deleted" });
+  } catch (e) { res.status(500).json({ success: false, message: "Unable to delete mission" }); }
 });
 
 module.exports = router;

@@ -4,7 +4,7 @@ const { authenticateToken, authorizeRoles } = require("../middleware/authMiddlew
 const router = express.Router();
 function toId(id) { try { return new ObjectId(id); } catch { return id; } }
 
-router.get("/", authenticateToken, async (req, res) => {
+router.get("/", authenticateToken, authorizeRoles("ceo", "admin", "manager", "student", "member"), async (req, res) => {
   try {
     const db = req.db;
     let records;

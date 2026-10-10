@@ -218,10 +218,10 @@ app.use("/api/admin",        adminRoutes);
 app.use("/api/tasks",        authenticateToken, taskRoutes);
 app.use("/api/student",      authenticateToken, checkStudentRegistrationStatus, studentRoutes);
 app.use("/api/students",     studentsRoutes);
-app.use("/api/activities",   authenticateToken, checkStudentRegistrationStatus, activityRoutes);
+app.use("/api/activities",   activityRoutes);
 app.use("/api/notifications",authenticateToken, notificationRoutes);
-app.use("/api/missions",     authenticateToken, checkStudentRegistrationStatus, missionRoutes);
-app.use("/api/performance",  authenticateToken, checkStudentRegistrationStatus, performanceRoutes);
+app.use("/api/missions",     missionRoutes);
+app.use("/api/performance",  performanceRoutes);
 app.use("/api/audit-logs",   auditRoutes);
 
 // ─── 404 ───────────────────────────────────────────────────────────────────

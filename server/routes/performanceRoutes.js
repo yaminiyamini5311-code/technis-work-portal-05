@@ -23,7 +23,7 @@ router.get("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), as
 });
 
 /* POST add performance review */
-router.post("/", authenticateToken, authorizeRoles("admin", "manager"), async (req, res) => {
+router.post("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), async (req, res) => {
   try {
     const db = req.db;
     const { user_id, period, score, strengths, improvements, feedback } = req.body || {};

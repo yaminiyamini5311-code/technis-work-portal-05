@@ -1,18 +1,18 @@
 const express = require("express");
 const { ObjectId } = require("mongodb");
-const { authenticateToken, authorizeRoles } = require("../middleware/authMiddleware");
+const { authenticateToken, authorizeRoles, checkStudentRegistrationStatus } = require("../middleware/authMiddleware");
 const { writeAudit } = require("../utils/audit_mongo");
 
 const router = express.Router();
 function toId(id) { try { return new ObjectId(id); } catch { return id; } }
 
-router.get("/me", authenticateToken, authorizeRoles("student", "member"), async (req, res) => {
+router.get("/me", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), async (req, res) => {
   const db = req.db;
   const activities = await db.collection("daily_activities").find({ user_id: req.user.id }).sort({ date: -1 }).toArray();
   res.json({ success: true, activities: activities.map(a => ({ ...a, id: String(a._id) })) });
 });
 
-router.get("/my", authenticateToken, authorizeRoles("student", "member"), async (req, res) => {
+router.get("/my", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), async (req, res) => {
   const db = req.db;
   const activities = await db.collection("daily_activities").find({ user_id: req.user.id }).sort({ date: -1 }).toArray();
   res.json({ success: true, activities: activities.map(a => ({ ...a, id: String(a._id) })) });
@@ -31,7 +31,7 @@ router.get("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), as
   } catch (e) { console.error("Activity GET:", e); res.status(500).json({ success: false, message: "Unable to fetch activities" }); }
 });
 
-router.post("/", authenticateToken, authorizeRoles("student", "member"), async (req, res) => {
+router.post("/", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), async (req, res) => {
   try {
     const { work_title, description, hours_worked = 0, status = "completed", blockers = "", next_steps = "", date } = req.body || {};
     if (!String(work_title || "").trim() || !String(description || "").trim()) {
