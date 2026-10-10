@@ -35,6 +35,7 @@ const allowedOrigins = [
   "http://localhost:5176",
   "https://technis-work-portal-05.vercel.app",
   "https://technis-work-portal-05-ep1h6tgcr.vercel.app",
+  "https://technis-portal-server.vercel.app",
 ];
 
 if (process.env.FRONTEND_URL) {
@@ -75,25 +76,44 @@ app.get("/", (req, res) => {
 });
 
 app.get("/api/health", async (req, res) => {
-  if (missing.length) {
-    return res.status(503).json({
-      success: false,
-      status: "misconfigured",
-      missing_env: missing,
-      message: `Missing env vars: ${missing.join(", ")}. Add them in Vercel → Settings → Environment Variables.`,
-    });
+  // Basic health check — returns 200 without touching database
+  const health = {
+    success: true,
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV || "development",
+  };
+
+  // Include config check if requested
+  if (req.query.check === "config") {
+    if (missing.length) {
+      return res.status(503).json({
+        success: false,
+        status: "misconfigured",
+        missing_env: missing,
+        message: `Missing env vars: ${missing.join(", ")}. Add them in Vercel → Settings → Environment Variables.`,
+      });
+    }
+    health.config = "ok";
   }
-  try {
-    const dbHealth = await healthCheck();
-    res.status(dbHealth.connected ? 200 : 503).json({
-      success: dbHealth.connected,
-      status: dbHealth.connected ? "healthy" : "unhealthy",
-      timestamp: new Date().toISOString(),
-      database: dbHealth,
-    });
-  } catch (error) {
-    res.status(503).json({ success: false, status: "unhealthy", error: error.message });
+
+  // Include database check if requested (optional deep check)
+  if (req.query.check === "db" || req.query.check === "all") {
+    try {
+      const dbHealth = await healthCheck();
+      health.database = dbHealth;
+      if (!dbHealth.connected) {
+        health.status = "degraded";
+        return res.status(503).json(health);
+      }
+    } catch (error) {
+      health.database = { connected: false, error: error.message };
+      health.status = "degraded";
+      return res.status(503).json(health);
+    }
   }
+
+  res.status(200).json(health);
 });
 
 // ─── ENV GUARD MIDDLEWARE ───────────────────────────────────────────────────
@@ -197,12 +217,17 @@ async function initOnce() {
   if (_initialized) return;
   _initialized = true;
   try {
+    console.log("[TECHINS] Initializing serverless function...");
     const db = await connect();
+    console.log("[TECHINS] Database connected");
     await ensureDefaultAccounts(db);
     console.log("[TECHINS] Server initialized successfully");
   } catch (err) {
     _initialized = false; // allow retry on next request
-    console.error("[TECHINS] Init failed:", err.message);
+    console.error("[TECHINS] Initialization failed");
+    console.error("[TECHINS] Error message:", err.message);
+    console.error("[TECHINS] Stack trace:", err.stack);
+    // Don't throw — let the request continue and get caught by middleware
   }
 }
 
@@ -217,13 +242,19 @@ if (process.env.NODE_ENV !== "production") {
   const PORT = Number(process.env.PORT) || 5000;
   (async () => {
     try {
+      console.log("[TECHINS] Starting local development server...");
       const db = await connect();
+      console.log("[TECHINS] Database connected successfully");
       await ensureDefaultAccounts(db);
+      console.log("[TECHINS] Default accounts ensured");
       app.listen(PORT, () => {
         console.log(`[TECHINS] Server running on http://localhost:${PORT}`);
       });
     } catch (err) {
-      console.error("[TECHINS] Failed to start:", err.message);
+      console.error("[TECHINS] Failed to start server");
+      console.error("[TECHINS] Error message:", err.message);
+      console.error("[TECHINS] Stack trace:", err.stack);
+      console.error("[TECHINS] If this is a database error, check your MONGODB_URI in .env");
       process.exit(1);
     }
   })();

@@ -34,7 +34,10 @@ async function connect() {
     } catch (err) {
       _client = null;
       _db = null;
-      throw err;
+      _connecting = null;
+      console.error("[MongoDB] Connection failed:", err.message);
+      console.error("[MongoDB] Stack trace:", err.stack);
+      throw new Error(`MongoDB connection failed: ${err.message}`);
     } finally {
       _connecting = null;
     }
@@ -93,7 +96,7 @@ async function disconnect() {
   }
 }
 
-process.once("SIGINT", () => disconnect().then(() => process.exit(0)));
-process.once("SIGTERM", () => disconnect().then(() => process.exit(0)));
+// REMOVED process.exit() handlers — Vercel manages lifecycle
+// Local dev cleanup is optional; connection will close on process end anyway
 
 module.exports = { connect, disconnect, healthCheck };
