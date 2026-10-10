@@ -28,9 +28,8 @@ const { authenticateToken, checkStudentRegistrationStatus } = require("./middlew
 const app = express();
 
 // ─── CORS CONFIGURATION ────────────────────────────────────────────────────
-// Allowlist-based CORS from CORS_ORIGINS environment variable.
-// Format: comma-separated list of origins (trailing slashes automatically stripped)
-// Example: https://frontend.vercel.app,https://app.example.com
+// Allowlist-based CORS from CORS_ORIGINS environment variable
+// Must be registered BEFORE all routes, middleware, and rate limiters
 
 function buildCorsOriginsList() {
   const origins = new Set();
@@ -44,15 +43,6 @@ function buildCorsOriginsList() {
   // Add from CORS_ORIGINS environment variable (primary config)
   if (process.env.CORS_ORIGINS) {
     process.env.CORS_ORIGINS
-      .split(",")
-      .map(url => url.trim().replace(/\/$/, ""))  // Strip trailing slashes
-      .filter(Boolean)
-      .forEach(url => origins.add(url));
-  }
-  
-  // Backward compatibility: also check FRONTEND_URL
-  if (process.env.FRONTEND_URL) {
-    process.env.FRONTEND_URL
       .split(",")
       .map(url => url.trim().replace(/\/$/, ""))  // Strip trailing slashes
       .filter(Boolean)
@@ -77,23 +67,23 @@ const corsOptions = {
       return callback(null, true);
     }
     
-    // Log blocked origin for debugging
-    console.warn("[CORS] ❌ Blocked origin:", origin);
-    console.warn("[CORS] Allowed origins:", allowedOrigins.join(", "));
+    // Log blocked origin with console.error for visibility
+    console.error("[CORS] BLOCKED origin:", origin);
+    console.error("[CORS] Allowed origins are:", allowedOrigins.join(", "));
     
-    // Return false instead of throwing error (prevents 500, returns 403)
+    // Return false instead of throwing (prevents 500 error)
     return callback(null, false);
   },
-  credentials: true,  // Allow cookies and authorization headers
+  credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  optionsSuccessStatus: 200  // For legacy browser support
+  optionsSuccessStatus: 200
 };
 
-// Apply CORS middleware BEFORE all routes and auth
+// Apply CORS BEFORE all routes, middleware, and rate limiters
 app.use(cors(corsOptions));
 
-// Handle preflight requests for all routes
+// Handle preflight OPTIONS requests for all routes
 app.options("*", cors(corsOptions));
 
 app.use(express.json({ limit: "1mb" }));
