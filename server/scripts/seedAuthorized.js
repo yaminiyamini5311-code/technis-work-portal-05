@@ -113,7 +113,10 @@ async function seed() {
     await client.connect();
     console.log("✓ Connected to MongoDB Atlas");
     
-    const db = client.db();
+    // Use explicit database name to match server configuration
+    const dbName = process.env.MONGODB_DB_NAME || "techins";
+    const db = client.db(dbName);
+    console.log(`✓ Using database: ${dbName}`);
     const collection = db.collection(COLLECTION_NAME);
     
     // Create indexes

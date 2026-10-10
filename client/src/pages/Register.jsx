@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
 import "./Login.css";
@@ -7,6 +7,7 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function Register() {
   const navigate = useNavigate();
+  const errorRef = useRef(null);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -17,6 +18,13 @@ export default function Register() {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Scroll error into view when it appears
+  useEffect(() => {
+    if (error && errorRef.current) {
+      errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [error]);
 
   const validateForm = () => {
     if (!form.name.trim()) return "Name is required";
@@ -106,6 +114,12 @@ export default function Register() {
             <p>Create your TECHINS workspace account.</p>
           </div>
 
+          {error && (
+            <div ref={errorRef} className="login-error login-error-prominent" role="alert">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={submit}>
             <label htmlFor="register-name">Full name</label>
             <input
@@ -176,8 +190,6 @@ export default function Register() {
                 required
               />
             </div>
-
-            {error && <div className="login-error" role="alert">{error}</div>}
 
             <button className="login-submit" disabled={loading} type="submit">
               {loading ? <span className="button-loader" /> : <>Create Account <span aria-hidden="true">→</span></>}

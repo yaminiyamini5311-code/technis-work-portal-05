@@ -271,6 +271,17 @@
   font-size:12px;
   text-align:center;
 }
+.login-error-prominent{
+  margin-bottom:24px;
+  margin-top:16px;
+  padding:14px 16px;
+  font-size:14px;
+  font-weight:600;
+  background:#FFF5E0;
+  border:2px solid #FA9A02;
+  color:#4D3600;
+  box-shadow:0 4px 12px rgba(250,154,2,.15);
+}
 .login-footer-line{
   display:flex;
   align-items:center;

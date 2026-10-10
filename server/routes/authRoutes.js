@@ -4,7 +4,6 @@ const jwt = require("jsonwebtoken");
 const { ObjectId } = require("mongodb");
 const { authenticateToken, authorizeRoles, getSecret } = require("../middleware/authMiddleware");
 const { MAX_STUDENT_ACCOUNTS, ALLOWED_DEPARTMENTS, ALLOWED_PROGRAMS } = require("../config");
-const { isStudentEmailAllowed } = require("../utils/allowlist");
 const { writeAudit } = require("../utils/audit_mongo");
 const { createCeoNotification } = require("../utils/ceoNotification");
 
@@ -304,9 +303,9 @@ router.post("/signup", async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid role. Allowed: student, manager" });
     }
     
-    if (role === "student" && !isStudentEmailAllowed(email)) {
-      return res.status(403).json({ success: false, message: "This email is not authorized to register" });
-    }
+    // NOTE: Signup is open to all emails. Authorization is enforced only for CEO Portal notifications.
+    // Only emails in the authorized_users collection will trigger CEO notifications.
+    // See utils/ceoNotification.js for authorization logic.
 
     const db = req.db;
     if (!db) return res.status(500).json({ success: false, message: "Database connection unavailable" });
