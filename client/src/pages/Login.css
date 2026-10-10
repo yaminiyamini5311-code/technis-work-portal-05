@@ -209,6 +209,39 @@
   border-color:#FA9A02;
   box-shadow:0 0 0 4px rgba(250,154,2,.12);
 }
+.password-field{
+  position:relative;
+  display:flex;
+  align-items:center;
+}
+.password-field input{
+  padding-right:46px;
+}
+.password-field button{
+  position:absolute;
+  right:12px;
+  top:50%;
+  transform:translateY(-50%);
+  background:transparent;
+  border:none;
+  padding:8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  color:#68717D;
+  transition:color .2s;
+  outline:none;
+}
+.password-field button:hover{
+  color:#0C120C;
+}
+.password-field button:focus-visible{
+  color:#FA9A02;
+  outline:2px solid rgba(250,154,2,.4);
+  outline-offset:2px;
+  border-radius:6px;
+}
 .login-submit{
   width:100%;
   min-height:54px;
