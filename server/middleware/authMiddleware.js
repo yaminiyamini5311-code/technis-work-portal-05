@@ -18,8 +18,9 @@ function authenticateToken(req, res, next) {
   try {
     const decoded = jwt.verify(token, getSecret());
     req.user = {
-      id: String(decoded.id),
-      role: String(decoded.role || "").toLowerCase()
+      id: decoded.id ? String(decoded.id) : "ceo",  // CEO tokens don't have id
+      role: String(decoded.role || "").toLowerCase(),
+      email: decoded.email || null
     };
     next();
   } catch (error) {
@@ -41,6 +42,7 @@ function authorizeRoles(...allowedRoles) {
 /**
  * CEO-only authorization middleware
  * Enforces that ONLY the CEO account can access CEO-specific resources
+ * Validates JWT token role directly (no database lookup)
  */
 function authorizeCEO(req, res, next) {
   if (!req.user) {
@@ -48,7 +50,7 @@ function authorizeCEO(req, res, next) {
   }
   
   if (req.user.role !== "ceo") {
-    console.error("SECURITY VIOLATION: Non-CEO attempted to access CEO resource:", req.user.email);
+    console.error("[SECURITY] Non-CEO attempted to access CEO resource");
     return res.status(403).json({ 
       success: false, 
       message: "Access denied. CEO privileges required." 
@@ -59,9 +61,34 @@ function authorizeCEO(req, res, next) {
 }
 
 /**
+ * Middleware to reject CEO tokens on regular user routes
+ * CEO should only access CEO-specific endpoints
+ */
+function rejectCEO(req, res, next) {
+  if (req.user && req.user.role === "ceo") {
+    console.error("[SECURITY] CEO token used on non-CEO route:", req.path);
+    return res.status(403).json({
+      success: false,
+      message: "CEO account cannot access this resource. Use CEO-specific endpoints."
+    });
+  }
+  next();
+}
+
+/**
  * Middleware to check student registration status (MongoDB version)
+ * Also rejects CEO tokens on student/regular user routes
  */
 async function checkStudentRegistrationStatus(req, res, next) {
+  // Reject CEO tokens - CEO should not access these routes
+  if (req.user && req.user.role === "ceo") {
+    console.error("[SECURITY] CEO token rejected on student/user route:", req.path);
+    return res.status(403).json({
+      success: false,
+      message: "CEO account cannot access this resource. Use CEO-specific endpoints."
+    });
+  }
+  
   if (req.user && req.user.role === "student") {
     try {
       const db = req.db;
@@ -87,7 +114,7 @@ async function checkStudentRegistrationStatus(req, res, next) {
       }
       next();
     } catch (error) {
-      console.error("Registration status check error:", error);
+      console.error("[Auth] Registration status check error:", error.message);
       return res.status(500).json({ success: false, message: "Unable to verify registration status" });
     }
   } else {
@@ -95,4 +122,4 @@ async function checkStudentRegistrationStatus(req, res, next) {
   }
 }
 
-module.exports = { authenticateToken, authorizeRoles, authorizeCEO, checkStudentRegistrationStatus, getSecret };
+module.exports = { authenticateToken, authorizeRoles, authorizeCEO, rejectCEO, checkStudentRegistrationStatus, getSecret };

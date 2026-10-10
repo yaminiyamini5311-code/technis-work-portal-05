@@ -11,49 +11,122 @@ const router = express.Router();
 
 function toId(id) { try { return new ObjectId(id); } catch { return id; } }
 
+/**
+ * Timing-safe string comparison to prevent timing attacks
+ * Compares strings character-by-character with constant time
+ */
+function timingSafeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length !== b.length) return false;
+  
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
 /* ─── LOGIN ─────────────────────────────────────────────────────────────── */
 router.post("/login", async (req, res) => {
   try {
-    const email = String(req.body?.email || "").trim().toLowerCase();
+    const emailRaw = String(req.body?.email || "");
+    const email = emailRaw.trim().toLowerCase();
     const password = String(req.body?.password || "");
-    console.log("LOGIN REQUEST:", { email, passwordReceived: Boolean(password) });
 
     if (!email || !password) {
       return res.status(400).json({ success: false, message: "Email and password are required" });
     }
 
-    const db = req.db;
-    if (!db) return res.status(500).json({ success: false, message: "Database connection unavailable" });
+    // ═══════════════════════════════════════════════════════════════════════
+    // CEO AUTHENTICATION - CHECKED FIRST, NO DATABASE LOOKUP
+    // ═══════════════════════════════════════════════════════════════════════
+    // The CEO account is authenticated ONLY via environment variables.
+    // CEO credentials never touch the users collection.
+    
+    // Read and normalize CEO configuration
+    const CEO_EMAIL_RAW = process.env.CEO_EMAIL || null;
+    const CEO_EMAIL = CEO_EMAIL_RAW ? CEO_EMAIL_RAW.trim().toLowerCase() : null;
+    const CEO_PASSWORD_HASH = process.env.CEO_PASSWORD_HASH ? process.env.CEO_PASSWORD_HASH.trim() : null;
+    const CEO_NAME = process.env.CEO_NAME ? process.env.CEO_NAME.trim() : "TECHINS CEO";
+    
+    // Log CEO configuration status (never log actual values)
+    console.log("[CEO AUTH] CEO_EMAIL defined:", Boolean(CEO_EMAIL_RAW));
+    console.log("[CEO AUTH] CEO_PASSWORD_HASH defined:", Boolean(CEO_PASSWORD_HASH));
+    console.log("[CEO AUTH] Submitted email matches CEO_EMAIL:", Boolean(CEO_EMAIL && timingSafeEqual(email, CEO_EMAIL)));
+    
+    // Check if this is a CEO login attempt (timing-safe email comparison)
+    if (CEO_EMAIL && timingSafeEqual(email, CEO_EMAIL)) {
+      console.log("[CEO AUTH] CEO login attempt detected");
+      
+      // Validate CEO configuration
+      if (!CEO_PASSWORD_HASH) {
+        console.error("[CEO AUTH] Missing CEO_PASSWORD_HASH environment variable");
+        return res.status(500).json({ 
+          success: false, 
+          message: "Server configuration error. Contact administrator." 
+        });
+      }
+      
+      if (!process.env.JWT_SECRET) {
+        console.error("[CEO AUTH] Missing JWT_SECRET environment variable");
+        return res.status(500).json({ 
+          success: false, 
+          message: "Server configuration error. Contact administrator." 
+        });
+      }
+      
+      // Verify CEO password with bcrypt
+      const passwordMatch = await bcrypt.compare(password, CEO_PASSWORD_HASH);
+      
+      if (!passwordMatch) {
+        console.log("[CEO AUTH] Failed login attempt - incorrect password");
+        return res.status(401).json({ success: false, message: "Invalid email or password" });
+      }
+      
+      // Generate CEO JWT token (8 hour expiry, no user ID needed)
+      const token = jwt.sign(
+        { role: "ceo", email: CEO_EMAIL },
+        getSecret(),
+        { expiresIn: "8h" }
+      );
+      
+      console.log("[CEO AUTH] ✓ CEO login successful");
+      
+      return res.status(200).json({
+        success: true,
+        message: "CEO login successful",
+        token,
+        user: {
+          id: "ceo",
+          name: CEO_NAME,
+          email: CEO_EMAIL,
+          role: "ceo",
+          department: "Executive",
+          registration_status: "approved",
+        },
+      });
+    }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // CEO ACCOUNT SECURITY CHECK
+    // REGULAR USER AUTHENTICATION (NON-CEO)
     // ═══════════════════════════════════════════════════════════════════════
-    // The CEO email (from env var) can ONLY log in as CEO role.
-    // No other account can use the CEO email or access CEO portal.
-    const CEO_EMAIL = (process.env.CEO_EMAIL || "ceo@techins.com").trim().toLowerCase();
-    
+    const db = req.db;
+    if (!db) {
+      return res.status(500).json({ success: false, message: "Database connection unavailable" });
+    }
+
     const user = await db.collection("users").findOne({ email });
-    console.log("LOGIN USER FOUND:", Boolean(user));
 
     if (!user) {
       return res.status(401).json({ success: false, message: "Invalid email or password" });
     }
 
-    // CEO Email Protection: Only the CEO account can use the designated CEO email
-    if (email === CEO_EMAIL && user.role !== "ceo") {
-      console.error("SECURITY VIOLATION: Non-CEO account attempted to use CEO email:", email);
-      return res.status(401).json({ success: false, message: "Invalid email or password" });
-    }
-    
-    // Reverse Check: CEO role can only be accessed via the designated CEO email
-    if (user.role === "ceo" && email !== CEO_EMAIL) {
-      console.error("SECURITY VIOLATION: CEO role accessed with non-CEO email:", email);
-      return res.status(401).json({ success: false, message: "Invalid email or password" });
-    }
-
     // Account status checks
     if (Number(user.active) !== 1) {
-      return res.status(401).json({ success: false, message: "Account is pending approval or has been deactivated" });
+      return res.status(401).json({ 
+        success: false, 
+        message: "Account is pending approval or has been deactivated" 
+      });
     }
 
     if (!user.password) {
@@ -62,7 +135,6 @@ router.post("/login", async (req, res) => {
 
     // Password verification
     const passwordMatch = await bcrypt.compare(password, String(user.password));
-    console.log("LOGIN PASSWORD MATCH:", passwordMatch);
 
     if (!passwordMatch) {
       return res.status(401).json({ success: false, message: "Invalid email or password" });
@@ -71,15 +143,10 @@ router.post("/login", async (req, res) => {
     const role = String(user.role || "").trim().toLowerCase();
     const userId = String(user._id);
 
-    // Generate JWT token with user ID and role
+    // Generate JWT token with user ID and role (1 day expiry for regular users)
     const token = jwt.sign({ id: userId, role }, getSecret(), { expiresIn: "1d" });
 
-    console.log("LOGIN SUCCESS:", email, role);
-    
-    // Special log for CEO login
-    if (role === "ceo") {
-      console.log("🔐 CEO LOGIN SUCCESSFUL - Direct access granted to:", email);
-    }
+    console.log("[AUTH] Login successful:", role);
     
     return res.status(200).json({
       success: true,
@@ -95,7 +162,7 @@ router.post("/login", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("LOGIN ERROR:", error);
+    console.error("[AUTH] Login error:", error.message);
     return res.status(500).json({ success: false, message: "Login failed" });
   }
 });
@@ -103,6 +170,26 @@ router.post("/login", async (req, res) => {
 /* ─── GET CURRENT USER ──────────────────────────────────────────────────── */
 router.get("/me", authenticateToken, async (req, res) => {
   try {
+    // CEO tokens don't have database records - return from token data
+    if (req.user.role === "ceo") {
+      const CEO_EMAIL = process.env.CEO_EMAIL ? process.env.CEO_EMAIL.trim().toLowerCase() : "ceo@techins.com";
+      const CEO_NAME = process.env.CEO_NAME ? process.env.CEO_NAME.trim() : "TECHINS CEO";
+      
+      return res.json({
+        success: true,
+        user: {
+          id: "ceo",
+          name: CEO_NAME,
+          email: CEO_EMAIL,
+          role: "ceo",
+          department: "Executive",
+          active: 1,
+          registration_status: "approved",
+        }
+      });
+    }
+    
+    // Regular user - lookup in database
     const db = req.db;
     const user = await db.collection("users").findOne(
       { _id: toId(req.user.id) },
@@ -124,7 +211,7 @@ router.get("/me", authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("GET ME ERROR:", error);
+    console.error("[AUTH] Get user error:", error.message);
     return res.status(500).json({ success: false, message: "Unable to fetch user data" });
   }
 });
@@ -194,18 +281,18 @@ router.post("/signup", async (req, res) => {
     // CEO ACCOUNT PROTECTION
     // ═══════════════════════════════════════════════════════════════════════
     // NO ONE can register as CEO or use the CEO email via public signup
-    const CEO_EMAIL = (process.env.CEO_EMAIL || "ceo@techins.com").trim().toLowerCase();
+    const CEO_EMAIL = process.env.CEO_EMAIL ? process.env.CEO_EMAIL.trim().toLowerCase() : null;
     
     if (role === "ceo") {
-      console.error("SECURITY VIOLATION: Attempt to register as CEO via signup:", email);
+      console.error("[SECURITY] Attempt to register as CEO via signup");
       return res.status(403).json({ 
         success: false, 
         message: "CEO accounts cannot be created through registration. Contact system administrator." 
       });
     }
     
-    if (email === CEO_EMAIL) {
-      console.error("SECURITY VIOLATION: Attempt to register with CEO email:", email);
+    if (CEO_EMAIL && email === CEO_EMAIL) {
+      console.error("[SECURITY] Attempt to register with CEO email");
       return res.status(403).json({ 
         success: false, 
         message: "This email address is reserved and cannot be used for registration." 
@@ -240,7 +327,6 @@ router.post("/signup", async (req, res) => {
 
     const result = await db.collection("users").insertOne({
       name, email, password: passwordHash, role, phone, active, registration_status: registrationStatus,
-      is_ceo: false,  // Mark as NOT CEO
       created_at: new Date().toISOString()
     });
     const insertedId = String(result.insertedId);

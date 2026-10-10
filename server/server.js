@@ -160,24 +160,33 @@ app.use((req, res, next) => {
 // Returns 503 if connection fails, allowing retry on next request
 
 let _initialized = false;
+let _initializationPromise = null;
 
 app.use(async (req, res, next) => {
   try {
     // Connect to database (reuses cached connection if available)
     req.db = await connect();
     
-    // Ensure default accounts on first successful connection
-    if (!_initialized) {
-      _initialized = true;
-      setImmediate(async () => {
+    // Ensure default accounts and CEO cleanup on first successful connection
+    // This must complete BEFORE serving any login requests
+    if (!_initialized && !_initializationPromise) {
+      _initializationPromise = (async () => {
         try {
+          console.log("[TECHINS] Running startup initialization...");
           await ensureDefaultAccounts(req.db);
+          _initialized = true;
           console.log("[TECHINS] Initialization complete");
         } catch (initErr) {
-          _initialized = false; // allow retry
+          _initialized = false;
+          _initializationPromise = null; // allow retry
           console.error("[TECHINS] Initialization error (non-fatal):", initErr.message);
         }
-      });
+      })();
+    }
+    
+    // Wait for initialization to complete before serving requests
+    if (_initializationPromise) {
+      await _initializationPromise;
     }
     
     next();
@@ -234,38 +243,62 @@ app.use((error, req, res, next) => {
 });
 
 // ─── DEFAULT ACCOUNTS ──────────────────────────────────────────────────────
-// Idempotent admin/manager/CEO account seeding using upsert.
-// Reads from env vars (ADMIN_EMAIL, ADMIN_PASSWORD, CEO_EMAIL, CEO_PASSWORD, etc.) or falls back to defaults.
+// Idempotent admin/manager account seeding using upsert.
+// Reads from env vars or falls back to defaults.
 // Never overwrites existing users — only creates on first run.
+// 
+// CEO ACCOUNT HANDLING:
+// CEO is authenticated via env vars only (CEO_EMAIL, CEO_PASSWORD_HASH).
+// Any documents in users collection with CEO email are removed for security.
 async function ensureDefaultAccounts(db) {
   try {
-    // Build accounts list from environment variables with secure defaults
+    // ═══════════════════════════════════════════════════════════════════════
+    // CEO EMAIL CLEANUP - RUNS FIRST, BEFORE ANY LOGIN REQUESTS
+    // ═══════════════════════════════════════════════════════════════════════
+    // Remove any users collection documents with the CEO email (case-insensitive)
+    // CEO authentication is handled ONLY via environment variables, not database
+    const CEO_EMAIL_RAW = process.env.CEO_EMAIL || null;
+    const CEO_EMAIL = CEO_EMAIL_RAW ? CEO_EMAIL_RAW.trim().toLowerCase() : null;
+    
+    console.log("[Accounts] CEO_EMAIL configured:", Boolean(CEO_EMAIL_RAW));
+    
+    if (CEO_EMAIL) {
+      try {
+        console.log("[Accounts] Starting CEO email cleanup from users collection");
+        
+        // Delete all documents matching CEO email (case-insensitive)
+        // Use regex with escaped email to prevent injection
+        const escapedEmail = CEO_EMAIL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const deleteResult = await db.collection("users").deleteMany({
+          email: { $regex: new RegExp(`^${escapedEmail}$`, 'i') }
+        });
+        
+        if (deleteResult.deletedCount > 0) {
+          console.log(`[Accounts] ✓ Removed ${deleteResult.deletedCount} document(s) with CEO email from users collection`);
+          console.log("[Accounts] CEO authentication is env-var only (no database)");
+        } else {
+          console.log("[Accounts] No documents with CEO email found in users collection");
+        }
+      } catch (cleanupError) {
+        console.error("[Accounts] CEO email cleanup error:", cleanupError.message);
+        // Don't fail initialization on cleanup error
+      }
+    } else {
+      console.warn("[Accounts] CEO_EMAIL not configured - skipping CEO cleanup");
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // ADMIN & MANAGER ACCOUNTS
+    // ═══════════════════════════════════════════════════════════════════════
     const accounts = [];
     
-    // ═══════════════════════════════════════════════════════════════════════
-    // CEO ACCOUNT - SPECIAL TREATMENT
-    // ═══════════════════════════════════════════════════════════════════════
-    // The CEO account has direct login access without registration/approval.
-    // Only ONE email can be CEO. This is set via environment variables.
-    const ceoEmail = process.env.CEO_EMAIL || "ceo@techins.com";
-    const ceoPassword = process.env.CEO_PASSWORD || "ceo@2006";
-    const ceoName = process.env.CEO_NAME || "TECHINS CEO";
-    accounts.push({
-      name: ceoName,
-      email: ceoEmail,
-      password: ceoPassword,
-      role: "ceo",
-      department: "Executive",
-      isCEO: true  // Special flag to identify CEO account
-    });
-    
-    // Admin account (for backward compatibility)
-    const adminEmail = process.env.ADMIN_EMAIL || "admin@techins.com";
+    // Admin account
+    const adminEmail = process.env.ADMIN_EMAIL ? process.env.ADMIN_EMAIL.trim().toLowerCase() : "admin@techins.com";
     const adminPassword = process.env.ADMIN_PASSWORD || "Admin@123";
-    const adminName = process.env.ADMIN_NAME || "TECHINS Admin";
+    const adminName = process.env.ADMIN_NAME ? process.env.ADMIN_NAME.trim() : "TECHINS Admin";
     
     // Only create admin if it's different from CEO email
-    if (adminEmail !== ceoEmail) {
+    if (!CEO_EMAIL || adminEmail !== CEO_EMAIL) {
       accounts.push({
         name: adminName,
         email: adminEmail,
@@ -273,15 +306,17 @@ async function ensureDefaultAccounts(db) {
         role: "admin",
         department: "Administration"
       });
+    } else {
+      console.log("[Accounts] Admin email same as CEO email - skipping admin account creation");
     }
     
     // Manager account
-    const managerEmail = process.env.MANAGER_EMAIL || "manager@techins.com";
+    const managerEmail = process.env.MANAGER_EMAIL ? process.env.MANAGER_EMAIL.trim().toLowerCase() : "manager@techins.com";
     const managerPassword = process.env.MANAGER_PASSWORD || "Manager@123";
-    const managerName = process.env.MANAGER_NAME || "TECHINS Manager";
+    const managerName = process.env.MANAGER_NAME ? process.env.MANAGER_NAME.trim() : "TECHINS Manager";
     
     // Only create manager if it's different from CEO/admin
-    if (managerEmail !== ceoEmail && managerEmail !== adminEmail) {
+    if ((!CEO_EMAIL || managerEmail !== CEO_EMAIL) && managerEmail !== adminEmail) {
       accounts.push({
         name: managerName,
         email: managerEmail,
@@ -289,6 +324,8 @@ async function ensureDefaultAccounts(db) {
         role: "manager",
         department: process.env.MANAGER_DEPARTMENT || "Techins"
       });
+    } else {
+      console.log("[Accounts] Manager email same as CEO/admin - skipping manager account creation");
     }
 
     for (const account of accounts) {
@@ -309,7 +346,6 @@ async function ensureDefaultAccounts(db) {
               department: account.department,
               active: 1,
               registration_status: "approved",
-              is_ceo: account.isCEO || false,  // Mark CEO account
               created_at: new Date().toISOString()
             }
           },
@@ -318,9 +354,6 @@ async function ensureDefaultAccounts(db) {
         
         if (result.upsertedCount > 0) {
           console.log(`[Accounts] ${account.role.toUpperCase()} created: ${account.email}`);
-          if (account.isCEO) {
-            console.log(`[Accounts] ⚠️  CEO ACCOUNT - Direct login enabled for: ${account.email}`);
-          }
         } else {
           console.log(`[Accounts] ${account.role.toUpperCase()} already exists: ${account.email}`);
         }
@@ -338,9 +371,9 @@ async function ensureDefaultAccounts(db) {
     console.log("[Accounts] Default accounts ensured successfully");
   } catch (error) {
     // Log seeding errors but don't fail initialization
-    console.error("[Accounts] Error during account seeding (non-fatal):", error.message);
-    console.error("[Accounts] Stack trace:", error.stack);
+    console.error("[Accounts] Error during account seeding:", error.message);
     console.warn("[Accounts] Continuing initialization despite seeding error");
+    throw error; // Re-throw so initialization can retry
   }
 }
 

@@ -1,0 +1,156 @@
+═══════════════════════════════════════════════════════════════════════════
+VERCEL ENVIRONMENT VARIABLES - REQUIRED CONFIGURATION
+═══════════════════════════════════════════════════════════════════════════
+
+Follow these steps to configure your backend on Vercel:
+
+1. Go to Vercel Dashboard → Your Backend Project → Settings → Environment Variables
+
+2. Add the following REQUIRED variables:
+
+   ┌─────────────────────────────────────────────────────────────────────┐
+   │ JWT_SECRET                                                          │
+   ├─────────────────────────────────────────────────────────────────────┤
+   │ Generate a random secret with this command:                         │
+   │ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+   │                                                                     │
+   │ Example value:                                                      │
+   │ a02d246d7689c4af4cbd0746145a26cfa5197b2689337203bc61d2b88a07cafb... │
+   └─────────────────────────────────────────────────────────────────────┘
+
+   ┌─────────────────────────────────────────────────────────────────────┐
+   │ MONGODB_URI                                                         │
+   ├─────────────────────────────────────────────────────────────────────┤
+   │ Your MongoDB Atlas connection string with URL-encoded password      │
+   │                                                                     │
+   │ IMPORTANT: Special characters in password must be URL-encoded:      │
+   │   @ = %40   : = %3A   / = %2F   ? = %3F   # = %23                 │
+   │   [ = %5B   ] = %5D   % = %25                                      │
+   │                                                                     │
+   │ Format:                                                             │
+   │ mongodb+srv://username:URL_ENCODED_PASSWORD@cluster.mongodb.net/?... │
+   │                                                                     │
+   │ Example (if password is "P@ss:w0rd#123"):                           │
+   │ mongodb+srv://user:P%40ss%3Aw0rd%23123@cluster0.mongodb.net/?...   │
+   └─────────────────────────────────────────────────────────────────────┘
+
+   ┌─────────────────────────────────────────────────────────────────────┐
+   │ CORS_ORIGINS                                                        │
+   ├─────────────────────────────────────────────────────────────────────┤
+   │ Your frontend URL (comma-separated if multiple, no trailing slash) │
+   │                                                                     │
+   │ Example:                                                            │
+   │ https://technis-work-portal-05-35bp.vercel.app                     │
+   └─────────────────────────────────────────────────────────────────────┘
+
+   ┌─────────────────────────────────────────────────────────────────────┐
+   │ CEO_EMAIL                                                           │
+   ├─────────────────────────────────────────────────────────────────────┤
+   │ The email address that can log in as CEO                           │
+   │                                                                     │
+   │ Example:                                                            │
+   │ ceo@techins.com                                                    │
+   └─────────────────────────────────────────────────────────────────────┘
+
+   ┌─────────────────────────────────────────────────────────────────────┐
+   │ CEO_PASSWORD_HASH                                                   │
+   ├─────────────────────────────────────────────────────────────────────┤
+   │ Bcrypt hash of the CEO password (NOT the plain password!)          │
+   │                                                                     │
+   │ Generate with:                                                      │
+   │ node server/scripts/generate-ceo-hash.js "your-password-here"      │
+   │                                                                     │
+   │ Example (for password "ceo@2006"):                                  │
+   │ $2b$12$pmGtpwFQruBUwvdM5TdfdOsZ1WCuUkuMD7EovjBq7woUSa4bR26pK       │
+   └─────────────────────────────────────────────────────────────────────┘
+
+3. OPTIONAL variables (will use defaults if not set):
+
+   CEO_NAME=TECHINS CEO
+   MONGODB_DB_NAME=techins
+   ADMIN_EMAIL=admin@techins.com
+   ADMIN_PASSWORD=Admin@123
+   ADMIN_NAME=TECHINS Admin
+   MANAGER_EMAIL=manager@techins.com
+   MANAGER_PASSWORD=Manager@123
+   MANAGER_NAME=TECHINS Manager
+
+4. After adding all variables, click "Redeploy" in Vercel Deployments tab
+
+═══════════════════════════════════════════════════════════════════════════
+GENERATING CEO PASSWORD HASH
+═══════════════════════════════════════════════════════════════════════════
+
+Run this command locally to generate a hash for your CEO password:
+
+  cd server
+  node scripts/generate-ceo-hash.js "your-actual-password-here"
+
+Example:
+  node scripts/generate-ceo-hash.js "ceo@2006"
+
+Output:
+  $2b$12$pmGtpwFQruBUwvdM5TdfdOsZ1WCuUkuMD7EovjBq7woUSa4bR26pK
+
+Copy this hash to CEO_PASSWORD_HASH in Vercel environment variables.
+
+NEVER commit the plaintext password to Git!
+NEVER log the plaintext password in production!
+
+═══════════════════════════════════════════════════════════════════════════
+URL-ENCODING YOUR MONGODB PASSWORD
+═══════════════════════════════════════════════════════════════════════════
+
+If your MongoDB password contains special characters, encode them:
+
+Special Character → URL Encoded
+─────────────────────────────
+@                 → %40
+:                 → %3A
+/                 → %2F
+?                 → %3F
+#                 → %23
+[                 → %5B
+]                 → %5D
+%                 → %25
+
+Example:
+  Original password: P@ss:w0rd#123
+  URL-encoded:       P%40ss%3Aw0rd%23123
+
+  Original URI: mongodb+srv://user:P@ss:w0rd#123@cluster0.mongodb.net/...
+  Encoded URI:  mongodb+srv://user:P%40ss%3Aw0rd%23123@cluster0.mongodb.net/...
+
+═══════════════════════════════════════════════════════════════════════════
+CEO AUTHENTICATION FLOW
+═══════════════════════════════════════════════════════════════════════════
+
+1. CEO logs in with CEO_EMAIL and password
+2. Backend checks CEO_EMAIL and CEO_PASSWORD_HASH from environment (no DB)
+3. If credentials match, returns JWT with role="ceo" (8 hour expiry)
+4. CEO token works ONLY on CEO-specific routes (/api/admin with ceo role)
+5. CEO token is REJECTED on student/regular user routes
+6. Regular user tokens are REJECTED on CEO-only routes
+
+Security Features:
+- CEO credentials never stored in database
+- CEO email cannot be used for registration
+- No one can register as CEO via signup
+- Timing-safe email comparison prevents timing attacks
+- Any database documents with CEO email are removed on startup
+
+═══════════════════════════════════════════════════════════════════════════
+TESTING CHECKLIST
+═══════════════════════════════════════════════════════════════════════════
+
+✓ CEO login with correct credentials → 200 OK + JWT token
+✓ CEO login with wrong password → 401 Unauthorized
+✓ Attempt to register as CEO → 403 Forbidden
+✓ Attempt to register with CEO email → 403 Forbidden
+✓ CEO token on CEO routes (/api/admin/*) → Works
+✓ CEO token on student routes (/api/student/*) → 403 Forbidden
+✓ Student token on CEO routes → 403 Forbidden
+✓ Missing CEO_PASSWORD_HASH → 500 Server configuration error
+✓ Missing JWT_SECRET → 500 Server configuration error
+
+═══════════════════════════════════════════════════════════════════════════
