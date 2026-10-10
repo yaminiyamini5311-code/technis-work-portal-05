@@ -5,12 +5,11 @@ const { authenticateToken, authorizeRoles } = require("../middleware/authMiddlew
 const router = express.Router();
 function toId(id) { try { return new ObjectId(id); } catch { return id; } }
 
-router.get("/", authenticateToken, async (req, res) => {
+router.get("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), async (req, res) => {
   try {
     const db = req.db;
-    let query = {};
-    if (["student", "member"].includes(req.user.role)) query = { assigned_to: req.user.id };
-    const missions = await db.collection("missions").find(query).sort({ created_at: -1 }).toArray();
+    // CEO, admin, and manager can see all missions
+    const missions = await db.collection("missions").find({}).sort({ created_at: -1 }).toArray();
     const result = await Promise.all(missions.map(async m => {
       const student = await db.collection("users").findOne({ _id: toId(m.assigned_to) }, { projection: { name: 1 } });
       const assigner = await db.collection("users").findOne({ _id: toId(m.assigned_by) }, { projection: { name: 1 } });

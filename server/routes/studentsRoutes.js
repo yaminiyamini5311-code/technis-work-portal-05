@@ -3,7 +3,7 @@ const { authenticateToken } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-router.get("/", authenticateToken, async (req, res) => {
+router.get("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), async (req, res) => {
   try {
     const db = req.db;
     const students = await db.collection("users").find(

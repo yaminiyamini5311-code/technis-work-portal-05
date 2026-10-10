@@ -29,6 +29,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "axios": "^1.20.0",
     "nodemon": "^3.1.14"
   },
   "engines": {

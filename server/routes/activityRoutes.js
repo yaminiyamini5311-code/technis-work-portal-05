@@ -18,16 +18,11 @@ router.get("/my", authenticateToken, authorizeRoles("student", "member"), async 
   res.json({ success: true, activities: activities.map(a => ({ ...a, id: String(a._id) })) });
 });
 
-router.get("/", authenticateToken, async (req, res) => {
+router.get("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), async (req, res) => {
   try {
     const db = req.db;
-    let query = {};
-    if (["student", "member"].includes(req.user.role)) {
-      query = { user_id: req.user.id };
-    } else if (!["admin", "manager"].includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: "Access denied" });
-    }
-    const activities = await db.collection("daily_activities").find(query).sort({ date: -1 }).toArray();
+    // CEO, admin, and manager can see all activities
+    const activities = await db.collection("daily_activities").find({}).sort({ date: -1 }).toArray();
     const result = await Promise.all(activities.map(async a => {
       const u = await db.collection("users").findOne({ _id: toId(a.user_id) }, { projection: { name: 1, email: 1 } });
       return { ...a, id: String(a._id), student_name: u?.name, student_email: u?.email };
