@@ -18,85 +18,105 @@ These variables MUST be configured in Vercel Dashboard → Settings → Environm
 - **How to get**: From MongoDB Atlas → Connect → Drivers → Connection String
 - **Note**: Include username, password, and cluster address
 
+### 3. `CEO_EMAIL`
+- **Purpose**: Email address for the CEO account (direct login access)
+- **Example**: `ceo@techins.com`
+- **Default**: `ceo@techins.com` (if not set)
+- **Security**: Only this email can log in as CEO. No registration required.
+- **IMPORTANT**: Set this in production to your actual CEO email
+
+### 4. `CEO_PASSWORD`
+- **Purpose**: Password for the CEO account
+- **Example**: Use a strong password (min 12 characters)
+- **Default**: `ceo@2006` (if not set)
+- **Security**: **MUST be changed in production!** This is hashed with bcrypt (12 rounds)
+- **CRITICAL**: Change this immediately in Vercel environment variables
+
 ## Optional Variables
 
-### 3. `MONGODB_DB_NAME`
+### 5. `MONGODB_DB_NAME`
 - **Purpose**: Name of the MongoDB database to use
 - **Default**: `techins` (if not set)
 - **Example**: `techins_production`
 
-### 4. `NODE_ENV`
+### 6. `CEO_NAME`
+- **Purpose**: Display name for the CEO account
+- **Default**: `TECHINS CEO` (if not set)
+- **Example**: `John Doe`
+- **Optional**: For customization
+
+### 7. `NODE_ENV`
 - **Purpose**: Environment mode (automatically set by Vercel to `production`)
 - **Vercel default**: `production`
 - **Local dev**: Not set or `development`
 
-### 5. `FRONTEND_URL`
+### 8. `FRONTEND_URL`
 - **Purpose**: Additional allowed CORS origins (comma-separated)
 - **Example**: `https://my-custom-domain.com,https://another-domain.com`
 - **Default**: Pre-configured list in server.js includes common Vercel domains
 
-### 6. `PORT`
+### 9. `PORT`
 - **Purpose**: Port number for local development server
 - **Default**: `5000` (only used in local development, ignored on Vercel)
 
-### 7. `APP_URL`
+### 10. `APP_URL`
 - **Purpose**: Base URL for email links in task assignment notifications
 - **Example**: `https://technis-work-portal-05.vercel.app`
 - **Default**: `http://localhost:5173` (if not set)
 
-### 8. `RESEND_API_KEY`
+### 11. `RESEND_API_KEY`
 - **Purpose**: API key for Resend email service (task notifications)
 - **Default**: Email notifications are skipped if not set
 - **Optional**: Only needed if you want email notifications
 
-### 9. `EMAIL_FROM`
+### 12. `EMAIL_FROM`
 - **Purpose**: Sender email address for task notifications
 - **Example**: `notifications@techins.com`
 - **Default**: Email notifications are skipped if not set
 - **Optional**: Required only if RESEND_API_KEY is set
 
-### 10. `ALLOWED_STUDENT_EMAILS`
+### 13. `ALLOWED_STUDENT_EMAILS`
 - **Purpose**: Comma-separated list of approved student emails
 - **Example**: `student1@example.com,student2@example.com`
 - **Optional**: For student registration allowlist feature
 
-### 11. `ADMIN_EMAIL`
+### 14. `ADMIN_EMAIL`
 - **Purpose**: Email address for the default admin account
-- **Default**: `ceo@techins.com` (if not set)
+- **Default**: `admin@techins.com` (if not set)
 - **Example**: `admin@yourdomain.com`
-- **Optional**: Recommended to set for production
+- **Optional**: Only create separate admin if needed (not same as CEO)
 
-### 12. `ADMIN_PASSWORD`
+### 15. `ADMIN_PASSWORD`
 - **Purpose**: Password for the default admin account
-- **Default**: `ceo@2006` (if not set)
+- **Default**: `Admin@123` (if not set)
 - **Example**: Use a strong password (min 12 characters)
-- **Optional**: **Strongly recommended** to set for production security
+- **Optional**: **Recommended** to set for production if using admin account
 
-### 13. `ADMIN_NAME`
+### 16. `ADMIN_NAME`
 - **Purpose**: Display name for the default admin account
 - **Default**: `TECHINS Admin` (if not set)
 - **Example**: `System Administrator`
 - **Optional**: For customization
 
-### 14. `MANAGER_EMAIL`
+### 17. `MANAGER_EMAIL`
 - **Purpose**: Email address for the default manager account
 - **Default**: `manager@techins.com` (if not set)
 - **Example**: `manager@yourdomain.com`
 - **Optional**: Recommended to set for production
 
-### 15. `MANAGER_PASSWORD`
+### 18. `MANAGER_PASSWORD`
 - **Purpose**: Password for the default manager account
 - **Default**: `Manager@123` (if not set)
 - **Example**: Use a strong password (min 12 characters)
 - **Optional**: **Strongly recommended** to set for production security
 
-### 16. `MANAGER_NAME`
+### 19. `MANAGER_NAME`
 - **Purpose**: Display name for the default manager account
 - **Default**: `TECHINS Manager` (if not set)
 - **Example**: `Project Manager`
 - **Optional**: For customization
 
-### 17. `MANAGER_DEPARTMENT`
+### 20. `MANAGER_DEPARTMENT`
 - **Purpose**: Department for the default manager account
 - **Default**: `Techins` (if not set)
 - **Example**: `Management`
@@ -111,14 +131,17 @@ Before deploying, ensure these are set in Vercel:
 ```
 ✅ JWT_SECRET          (REQUIRED)
 ✅ MONGODB_URI         (REQUIRED)
+✅ CEO_EMAIL           (REQUIRED - set to your CEO email)
+✅ CEO_PASSWORD        (REQUIRED - MUST change in production!)
+□  CEO_NAME            (optional, for customization)
 □  MONGODB_DB_NAME     (optional, defaults to "techins")
 □  FRONTEND_URL        (optional, for custom domains)
 □  APP_URL             (optional, for email links)
 □  RESEND_API_KEY      (optional, for emails)
 □  EMAIL_FROM          (optional, for emails)
 □  ALLOWED_STUDENT_EMAILS (optional)
-□  ADMIN_EMAIL         (optional, but RECOMMENDED for production)
-□  ADMIN_PASSWORD      (optional, but STRONGLY RECOMMENDED for production)
+□  ADMIN_EMAIL         (optional, if separate admin needed)
+□  ADMIN_PASSWORD      (optional, but RECOMMENDED if using admin)
 □  ADMIN_NAME          (optional, for customization)
 □  MANAGER_EMAIL       (optional, but RECOMMENDED for production)
 □  MANAGER_PASSWORD    (optional, but STRONGLY RECOMMENDED for production)

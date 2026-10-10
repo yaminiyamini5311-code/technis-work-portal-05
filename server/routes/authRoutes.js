@@ -25,6 +25,13 @@ router.post("/login", async (req, res) => {
     const db = req.db;
     if (!db) return res.status(500).json({ success: false, message: "Database connection unavailable" });
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // CEO ACCOUNT SECURITY CHECK
+    // ═══════════════════════════════════════════════════════════════════════
+    // The CEO email (from env var) can ONLY log in as CEO role.
+    // No other account can use the CEO email or access CEO portal.
+    const CEO_EMAIL = (process.env.CEO_EMAIL || "ceo@techins.com").trim().toLowerCase();
+    
     const user = await db.collection("users").findOne({ email });
     console.log("LOGIN USER FOUND:", Boolean(user));
 
@@ -32,14 +39,28 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ success: false, message: "Invalid email or password" });
     }
 
+    // CEO Email Protection: Only the CEO account can use the designated CEO email
+    if (email === CEO_EMAIL && user.role !== "ceo") {
+      console.error("SECURITY VIOLATION: Non-CEO account attempted to use CEO email:", email);
+      return res.status(401).json({ success: false, message: "Invalid email or password" });
+    }
+    
+    // Reverse Check: CEO role can only be accessed via the designated CEO email
+    if (user.role === "ceo" && email !== CEO_EMAIL) {
+      console.error("SECURITY VIOLATION: CEO role accessed with non-CEO email:", email);
+      return res.status(401).json({ success: false, message: "Invalid email or password" });
+    }
+
+    // Account status checks
     if (Number(user.active) !== 1) {
-      return res.status(401).json({ success: false, message: "Account is pending CEO approval or has been deactivated" });
+      return res.status(401).json({ success: false, message: "Account is pending approval or has been deactivated" });
     }
 
     if (!user.password) {
       return res.status(401).json({ success: false, message: "Invalid email or password" });
     }
 
+    // Password verification
     const passwordMatch = await bcrypt.compare(password, String(user.password));
     console.log("LOGIN PASSWORD MATCH:", passwordMatch);
 
@@ -50,9 +71,16 @@ router.post("/login", async (req, res) => {
     const role = String(user.role || "").trim().toLowerCase();
     const userId = String(user._id);
 
+    // Generate JWT token with user ID and role
     const token = jwt.sign({ id: userId, role }, getSecret(), { expiresIn: "1d" });
 
     console.log("LOGIN SUCCESS:", email, role);
+    
+    // Special log for CEO login
+    if (role === "ceo") {
+      console.log("🔐 CEO LOGIN SUCCESSFUL - Direct access granted to:", email);
+    }
+    
     return res.status(200).json({
       success: true,
       message: "Login successful",
@@ -161,9 +189,33 @@ router.post("/signup", async (req, res) => {
     if (password.length < 8) {
       return res.status(400).json({ success: false, message: "Password must be at least 8 characters" });
     }
-    if (!["student", "manager", "ceo"].includes(role)) {
-      return res.status(400).json({ success: false, message: "Invalid role. Allowed: student, manager, ceo" });
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // CEO ACCOUNT PROTECTION
+    // ═══════════════════════════════════════════════════════════════════════
+    // NO ONE can register as CEO or use the CEO email via public signup
+    const CEO_EMAIL = (process.env.CEO_EMAIL || "ceo@techins.com").trim().toLowerCase();
+    
+    if (role === "ceo") {
+      console.error("SECURITY VIOLATION: Attempt to register as CEO via signup:", email);
+      return res.status(403).json({ 
+        success: false, 
+        message: "CEO accounts cannot be created through registration. Contact system administrator." 
+      });
     }
+    
+    if (email === CEO_EMAIL) {
+      console.error("SECURITY VIOLATION: Attempt to register with CEO email:", email);
+      return res.status(403).json({ 
+        success: false, 
+        message: "This email address is reserved and cannot be used for registration." 
+      });
+    }
+    
+    if (!["student", "manager"].includes(role)) {
+      return res.status(400).json({ success: false, message: "Invalid role. Allowed: student, manager" });
+    }
+    
     if (role === "student" && !isStudentEmailAllowed(email)) {
       return res.status(403).json({ success: false, message: "This email is not authorized to register" });
     }
@@ -182,12 +234,13 @@ router.post("/signup", async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const requiresApproval = role === "manager" || role === "ceo";
+    const requiresApproval = role === "manager";  // Managers need approval, students don't
     const active = requiresApproval ? 0 : 1;
     const registrationStatus = role === "student" ? "pending" : "approved";
 
     const result = await db.collection("users").insertOne({
       name, email, password: passwordHash, role, phone, active, registration_status: registrationStatus,
+      is_ceo: false,  // Mark as NOT CEO
       created_at: new Date().toISOString()
     });
     const insertedId = String(result.insertedId);

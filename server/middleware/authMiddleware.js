@@ -39,6 +39,26 @@ function authorizeRoles(...allowedRoles) {
 }
 
 /**
+ * CEO-only authorization middleware
+ * Enforces that ONLY the CEO account can access CEO-specific resources
+ */
+function authorizeCEO(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: "Authentication required" });
+  }
+  
+  if (req.user.role !== "ceo") {
+    console.error("SECURITY VIOLATION: Non-CEO attempted to access CEO resource:", req.user.email);
+    return res.status(403).json({ 
+      success: false, 
+      message: "Access denied. CEO privileges required." 
+    });
+  }
+  
+  next();
+}
+
+/**
  * Middleware to check student registration status (MongoDB version)
  */
 async function checkStudentRegistrationStatus(req, res, next) {
@@ -75,4 +95,4 @@ async function checkStudentRegistrationStatus(req, res, next) {
   }
 }
 
-module.exports = { authenticateToken, authorizeRoles, checkStudentRegistrationStatus, getSecret };
+module.exports = { authenticateToken, authorizeRoles, authorizeCEO, checkStudentRegistrationStatus, getSecret };

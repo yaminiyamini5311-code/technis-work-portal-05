@@ -17,10 +17,13 @@ console.log();
 const REQUIRED = [
   { name: "JWT_SECRET", minLength: 32 },
   { name: "MONGODB_URI", pattern: /^mongodb(\+srv)?:\/\// },
+  { name: "CEO_EMAIL", pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ },
+  { name: "CEO_PASSWORD", minLength: 6 },
 ];
 
 const OPTIONAL = [
   "MONGODB_DB_NAME",
+  "CEO_NAME",
   "NODE_ENV",
   "FRONTEND_URL",
   "PORT",
