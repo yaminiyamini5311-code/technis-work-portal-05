@@ -27,36 +27,74 @@ const { authenticateToken, checkStudentRegistrationStatus } = require("./middlew
 
 const app = express();
 
-// ─── CORS ──────────────────────────────────────────────────────────────────
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:5174",
-  "http://localhost:5175",
-  "http://localhost:5176",
-  "https://technis-work-portal-05.vercel.app",
-  "https://technis-work-portal-05-ep1h6tgcr.vercel.app",
-  "https://technis-portal-server.vercel.app",
-];
+// ─── CORS CONFIGURATION ────────────────────────────────────────────────────
+// Allowlist-based CORS from CORS_ORIGINS environment variable.
+// Format: comma-separated list of origins (trailing slashes automatically stripped)
+// Example: https://frontend.vercel.app,https://app.example.com
 
-if (process.env.FRONTEND_URL) {
-  process.env.FRONTEND_URL
-    .split(",")
-    .map(u => u.trim())
-    .filter(Boolean)
-    .forEach(u => allowedOrigins.push(u));
+function buildCorsOriginsList() {
+  const origins = new Set();
+  
+  // Add localhost origins for local development
+  origins.add("http://localhost:5173");
+  origins.add("http://localhost:5174");
+  origins.add("http://localhost:5175");
+  origins.add("http://localhost:5176");
+  
+  // Add from CORS_ORIGINS environment variable (primary config)
+  if (process.env.CORS_ORIGINS) {
+    process.env.CORS_ORIGINS
+      .split(",")
+      .map(url => url.trim().replace(/\/$/, ""))  // Strip trailing slashes
+      .filter(Boolean)
+      .forEach(url => origins.add(url));
+  }
+  
+  // Backward compatibility: also check FRONTEND_URL
+  if (process.env.FRONTEND_URL) {
+    process.env.FRONTEND_URL
+      .split(",")
+      .map(url => url.trim().replace(/\/$/, ""))  // Strip trailing slashes
+      .filter(Boolean)
+      .forEach(url => origins.add(url));
+  }
+  
+  return Array.from(origins);
 }
 
-app.use(cors({
+const allowedOrigins = buildCorsOriginsList();
+console.log("[CORS] Allowed origins:", allowedOrigins);
+
+const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    console.warn("[CORS] Blocked origin:", origin);
-    return callback(new Error("Not allowed by CORS"));
+    // Allow requests with no origin (mobile apps, Postman, curl, etc.)
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    // Check if origin is in allowlist
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Log blocked origin for debugging
+    console.warn("[CORS] ❌ Blocked origin:", origin);
+    console.warn("[CORS] Allowed origins:", allowedOrigins.join(", "));
+    
+    // Return false instead of throwing error (prevents 500, returns 403)
+    return callback(null, false);
   },
-  credentials: true,
+  credentials: true,  // Allow cookies and authorization headers
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-}));
+  optionsSuccessStatus: 200  // For legacy browser support
+};
+
+// Apply CORS middleware BEFORE all routes and auth
+app.use(cors(corsOptions));
+
+// Handle preflight requests for all routes
+app.options("*", cors(corsOptions));
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));

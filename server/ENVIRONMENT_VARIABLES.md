@@ -32,30 +32,44 @@ These variables MUST be configured in Vercel Dashboard → Settings → Environm
 - **Security**: **MUST be changed in production!** This is hashed with bcrypt (12 rounds)
 - **CRITICAL**: Change this immediately in Vercel environment variables
 
+### 5. `CORS_ORIGINS`
+- **Purpose**: Comma-separated list of allowed frontend origins for CORS
+- **Example**: `https://technis-work-portal-05-35bp.vercel.app,https://your-custom-domain.com`
+- **Format**: No trailing slashes, comma-separated
+- **REQUIRED**: Set this to your actual frontend URL(s) in Vercel
+- **Note**: Prevents CORS errors when frontend calls backend APIs
+
 ## Optional Variables
 
-### 5. `MONGODB_DB_NAME`
+### 5. `CORS_ORIGINS`
+- **Purpose**: Comma-separated list of allowed frontend origins for CORS
+- **Example**: `https://technis-work-portal-05-35bp.vercel.app,https://your-custom-domain.com`
+- **Format**: No trailing slashes, comma-separated
+- **REQUIRED for production**: Set this to your actual frontend URL(s) in Vercel
+- **Note**: Prevents CORS errors when frontend calls backend APIs
+
+### 6. `MONGODB_DB_NAME`
 - **Purpose**: Name of the MongoDB database to use
 - **Default**: `techins` (if not set)
 - **Example**: `techins_production`
 
-### 6. `CEO_NAME`
+### 7. `CEO_NAME`
 - **Purpose**: Display name for the CEO account
 - **Default**: `TECHINS CEO` (if not set)
 - **Example**: `John Doe`
 - **Optional**: For customization
 
-### 7. `NODE_ENV`
+### 8. `NODE_ENV`
 - **Purpose**: Environment mode (automatically set by Vercel to `production`)
 - **Vercel default**: `production`
 - **Local dev**: Not set or `development`
 
-### 8. `FRONTEND_URL`
-- **Purpose**: Additional allowed CORS origins (comma-separated)
+### 9. `FRONTEND_URL`
+- **Purpose**: Additional allowed CORS origins (comma-separated) - **DEPRECATED**
 - **Example**: `https://my-custom-domain.com,https://another-domain.com`
-- **Default**: Pre-configured list in server.js includes common Vercel domains
+- **Note**: Use `CORS_ORIGINS` instead (this is kept for backward compatibility)
 
-### 9. `PORT`
+### 10. `PORT`
 - **Purpose**: Port number for local development server
 - **Default**: `5000` (only used in local development, ignored on Vercel)
 
@@ -133,9 +147,10 @@ Before deploying, ensure these are set in Vercel:
 ✅ MONGODB_URI         (REQUIRED)
 ✅ CEO_EMAIL           (REQUIRED - set to your CEO email)
 ✅ CEO_PASSWORD        (REQUIRED - MUST change in production!)
+✅ CORS_ORIGINS        (REQUIRED for production - your frontend URL)
 □  CEO_NAME            (optional, for customization)
 □  MONGODB_DB_NAME     (optional, defaults to "techins")
-□  FRONTEND_URL        (optional, for custom domains)
+□  FRONTEND_URL        (optional, deprecated - use CORS_ORIGINS)
 □  APP_URL             (optional, for email links)
 □  RESEND_API_KEY      (optional, for emails)
 □  EMAIL_FROM          (optional, for emails)

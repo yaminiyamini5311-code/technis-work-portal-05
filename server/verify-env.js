@@ -19,6 +19,7 @@ const REQUIRED = [
   { name: "MONGODB_URI", pattern: /^mongodb(\+srv)?:\/\// },
   { name: "CEO_EMAIL", pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ },
   { name: "CEO_PASSWORD", minLength: 6 },
+  { name: "CORS_ORIGINS", pattern: /^https?:\/\// },  // At least one URL
 ];
 
 const OPTIONAL = [
