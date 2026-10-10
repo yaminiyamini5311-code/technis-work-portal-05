@@ -14,6 +14,7 @@ import StudentPerformance from "./pages/student/Performance";
 import StudentFeedback from "./pages/student/Feedback";
 import Profile from "./pages/student/Profile";
 import ActivityMonitor from "./pages/manager/ActivityMonitor";
+import ManagerDashboard from "./pages/manager/ManagerDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import Students from "./pages/admin/Students";
 import AdminTasks from "./pages/admin/Tasks";
@@ -59,7 +60,8 @@ export default function App() {
     </Route>
 
     <Route element={<Protected role="manager"><RoleLayout role="manager" /></Protected>}>
-      <Route path="/manager" element={<ActivityMonitor />} />
+      <Route path="/manager" element={<ManagerDashboard />} />
+      <Route path="/manager/monitor" element={<ActivityMonitor />} />
       <Route path="/manager/students" element={<Students />} />
       <Route path="/manager/tasks" element={<AdminTasks />} />
       <Route path="/manager/missions" element={<AdminMissions />} />

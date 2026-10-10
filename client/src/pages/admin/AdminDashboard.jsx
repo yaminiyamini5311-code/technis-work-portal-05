@@ -183,7 +183,7 @@ export default function AdminDashboard() {
       {[['Students',data?.students||0,'01'],['Tasks',data?.tasks||0,'02'],['Completed',data?.completedTasks||0,'03'],['Pending',data?.pendingTasks||0,'04'],['Missions',data?.missions||0,'05'],["Today's activity",data?.activitiesToday||0,'06']].map(([label,value,no])=><div className="admin-stat" key={label}><small>{no}</small><span>{label}</span><strong>{value}</strong></div>)}
     </div>
     <section className="panel admin-chart-panel">
-      <div className="panel-head chart-head"><div><span className="section-kicker">LIVE PROGRESS</span><h3>Student completion activity</h3><p>Real completed-task data from the SQLite database.</p></div><div className="chart-tabs">{['week','month','year'].map(item=><button key={item} className={period===item?'active':''} onClick={()=>setPeriod(item)}>{item}</button>)}</div></div>
+      <div className="panel-head chart-head"><div><span className="section-kicker">LIVE PROGRESS</span><h3>Student completion activity</h3><p>Real completed-task data tracked across your team.</p></div><div className="chart-tabs">{['week','month','year'].map(item=><button key={item} className={period===item?'active':''} onClick={()=>setPeriod(item)}>{item}</button>)}</div></div>
       {chart?.values?.length ? <MiniLineChart labels={chart.labels} values={chart.values}/> : <div className="empty-state">No completion activity has been recorded yet.</div>}
     </section>
     <div className="admin-quick">

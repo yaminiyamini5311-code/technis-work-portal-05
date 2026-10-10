@@ -24,6 +24,10 @@ proof/
 NUL
 **/NUL
 
+# Database backups
+*.db.backup-*
+techins.db.backup-*
+
 # Credentials and sensitive data
 TECHINS_60_Master_Credentials.*
 server/verify-students.js
@@ -34,3 +38,8 @@ server/check-*.js
 server/allowed-students.txt
 server/students-seed-data.csv
 server/*-seed-data.csv
+
+sqlite_backup.json
+techins.db
+server/.env
+client/.env

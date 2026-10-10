@@ -1,33 +1,16 @@
 const express = require("express");
-const { authenticateToken, authorizeRoles } = require("../middleware/authMiddleware");
+const { authenticateToken } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-/* =========================================================
-   GET STUDENTS LIST
-   GET /api/students
-   
-   For admin/manager: returns all students
-   For students: returns all students (for peer reference)
-========================================================= */
-router.get("/", authenticateToken, (req, res) => {
+router.get("/", authenticateToken, async (req, res) => {
   try {
-    const db = req.app.locals.db;
-    
-    const students = db.prepare(`
-      SELECT 
-        id,
-        name,
-        email,
-        department,
-        program,
-        created_at
-      FROM users
-      WHERE LOWER(role) = 'student' AND active = 1
-      ORDER BY name ASC
-    `).all();
-
-    res.json({ success: true, students });
+    const db = req.db;
+    const students = await db.collection("users").find(
+      { role: "student", active: 1 },
+      { projection: { password: 0 } }
+    ).sort({ name: 1 }).toArray();
+    res.json({ success: true, students: students.map(s => ({ ...s, id: String(s._id) })) });
   } catch (error) {
     console.error("Students list error:", error);
     res.status(500).json({ success: false, message: "Unable to fetch students" });

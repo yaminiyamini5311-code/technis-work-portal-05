@@ -1,42 +1,21 @@
 const express = require("express");
+const { ObjectId } = require("mongodb");
 const { authenticateToken } = require("../middleware/authMiddleware");
 
 const router = express.Router();
+function toId(id) { try { return new ObjectId(id); } catch { return id; } }
 
-/* =========================================================
-   GET NOTIFICATIONS
-   GET /api/notifications
-========================================================= */
-router.get("/", authenticateToken, (req, res) => {
+router.get("/", authenticateToken, async (req, res) => {
   try {
-    const db = req.app.locals.db;
-    
-    const notifications = db.prepare(`
-      SELECT 
-        id,
-        type,
-        title,
-        message,
-        CASE WHEN read_at IS NOT NULL THEN 1 ELSE 0 END AS read,
-        related_task_id,
-        created_at
-      FROM notifications
-      WHERE user_id = ?
-      ORDER BY created_at DESC
-      LIMIT 50
-    `).all(req.user.id);
-
-    const unread = db.prepare(`
-      SELECT COUNT(*) AS count
-      FROM notifications
-      WHERE user_id = ?
-        AND read_at IS NULL
-    `).get(req.user.id);
-
+    const db = req.db;
+    const notifications = await db.collection("notifications").find(
+      { user_id: req.user.id },
+    ).sort({ created_at: -1 }).limit(50).toArray();
+    const unread = await db.collection("notifications").countDocuments({ user_id: req.user.id, read_at: null });
     res.json({
       success: true,
-      notifications,
-      unread: unread?.count || 0
+      notifications: notifications.map(n => ({ ...n, id: String(n._id), read: n.read_at ? 1 : 0 })),
+      unread
     });
   } catch (error) {
     console.error("Notifications error:", error);
@@ -44,21 +23,13 @@ router.get("/", authenticateToken, (req, res) => {
   }
 });
 
-/* =========================================================
-   MARK NOTIFICATION AS READ
-   PATCH /api/notifications/:id/read
-========================================================= */
-router.patch("/:id/read", authenticateToken, (req, res) => {
+router.patch("/:id/read", authenticateToken, async (req, res) => {
   try {
-    const db = req.app.locals.db;
-    
-    db.prepare(`
-      UPDATE notifications
-      SET read_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-        AND user_id = ?
-    `).run(Number(req.params.id), req.user.id);
-
+    const db = req.db;
+    await db.collection("notifications").updateOne(
+      { _id: toId(req.params.id), user_id: req.user.id },
+      { $set: { read_at: new Date().toISOString() } }
+    );
     res.json({ success: true, message: "Notification marked as read" });
   } catch (error) {
     console.error("Mark read error:", error);
@@ -66,21 +37,13 @@ router.patch("/:id/read", authenticateToken, (req, res) => {
   }
 });
 
-/* =========================================================
-   MARK ALL NOTIFICATIONS AS READ
-   POST /api/notifications/read-all
-========================================================= */
-router.post("/read-all", authenticateToken, (req, res) => {
+router.post("/read-all", authenticateToken, async (req, res) => {
   try {
-    const db = req.app.locals.db;
-    
-    db.prepare(`
-      UPDATE notifications
-      SET read_at = CURRENT_TIMESTAMP
-      WHERE user_id = ?
-        AND read_at IS NULL
-    `).run(req.user.id);
-
+    const db = req.db;
+    await db.collection("notifications").updateMany(
+      { user_id: req.user.id, read_at: null },
+      { $set: { read_at: new Date().toISOString() } }
+    );
     res.json({ success: true, message: "All notifications marked as read" });
   } catch (error) {
     console.error("Mark all read error:", error);

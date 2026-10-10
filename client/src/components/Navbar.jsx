@@ -33,7 +33,8 @@ export default function Navbar({ role }) {
         ];
       case "manager":
         return [
-          { path: "/manager", icon: "grid", label: "Team Activity", end: true },
+          { path: "/manager", icon: "home", label: "Dashboard", end: true },
+          { path: "/manager/monitor", icon: "grid", label: "Activity Monitor" },
           { path: "/manager/students", icon: "user", label: "Students" },
           { path: "/manager/tasks", icon: "clipboard", label: "Tasks" },
           { path: "/manager/missions", icon: "target", label: "Missions" },

@@ -3,113 +3,26 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const bcrypt = require("bcryptjs");
 const path = require("path");
-const { authenticateToken, checkStudentRegistrationStatus } = require("./middleware/authMiddleware");
 
 dotenv.config();
 
-/* =========================================================
-   JWT SECRET CHECK
-   ========================================================= */
-
 if (!process.env.JWT_SECRET) {
-  console.error(
-    "JWT_SECRET is missing. Add it to Render Environment Variables."
-  );
+  console.error("JWT_SECRET is missing. Add it to environment variables.");
   process.exit(1);
 }
 
-/* =========================================================
-   DATABASE
-   ========================================================= */
-
-const db = require("./database");
-
-/* =========================================================
-   AUTH ROUTES
-   ========================================================= */
-
-const authRoutes = require("./routes/authRoutes");
-
-/* =========================================================
-   OPTIONAL ROUTES
-   ========================================================= */
-
-let taskRoutes;
-let missionRoutes;
-let activityRoutes;
-let performanceRoutes;
-let adminRoutes;
-let studentRoutes;
-let notificationRoutes;
-let auditRoutes;
-let studentsRoutes;
-
-try {
-  taskRoutes = require("./routes/taskRoutes");
-} catch (error) {
-  console.log("taskRoutes not loaded:", error.message);
+if (!process.env.MONGODB_URI) {
+  console.error("MONGODB_URI is missing. Add it to environment variables.");
+  process.exit(1);
 }
 
-try {
-  missionRoutes = require("./routes/missionRoutes");
-} catch (error) {
-  console.log("missionRoutes not loaded:", error.message);
-}
-
-try {
-  activityRoutes = require("./routes/activityRoutes");
-} catch (error) {
-  console.log("activityRoutes not loaded:", error.message);
-}
-
-try {
-  performanceRoutes = require("./routes/performanceRoutes");
-} catch (error) {
-  console.log("performanceRoutes not loaded:", error.message);
-}
-
-try {
-  adminRoutes = require("./routes/adminRoutes");
-} catch (error) {
-  console.log("adminRoutes not loaded:", error.message);
-}
-
-try {
-  studentRoutes = require("./routes/studentRoutes");
-} catch (error) {
-  console.log("studentRoutes not loaded:", error.message);
-}
-
-try {
-  notificationRoutes = require("./routes/notificationRoutes");
-} catch (error) {
-  console.log("notificationRoutes not loaded:", error.message);
-}
-
-try {
-  auditRoutes = require("./routes/auditRoutes");
-} catch (error) {
-  console.log("auditRoutes not loaded:", error.message);
-}
-
-try {
-  studentsRoutes = require("./routes/studentsRoutes");
-} catch (error) {
-  console.log("studentsRoutes not loaded:", error.message);
-}
-
-/* =========================================================
-   EXPRESS APP
-   ========================================================= */
+const { connect, healthCheck } = require("./mongodb");
+const { authenticateToken, checkStudentRegistrationStatus } = require("./middleware/authMiddleware");
 
 const app = express();
-
 const PORT = Number(process.env.PORT) || 5000;
 
-/* =========================================================
-   CORS
-   ========================================================= */
-
+// ─── CORS ──────────────────────────────────────────────────────────────────
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
@@ -119,602 +32,152 @@ const allowedOrigins = [
   "https://technis-work-portal-05-ep1h6tgcr.vercel.app",
 ];
 
-console.log("Allowed CORS origins:");
-console.log(allowedOrigins);
+if (process.env.FRONTEND_URL) {
+  const extraOrigins = process.env.FRONTEND_URL.split(",").map(u => u.trim()).filter(Boolean);
+  allowedOrigins.push(...extraOrigins);
+}
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      /*
-       * Allow requests without an Origin header.
-       * This is required for PowerShell/Postman testing.
-       */
-      if (!origin) {
-        return callback(null, true);
-      }
+console.log("Allowed CORS origins:", allowedOrigins);
 
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    console.log("Blocked CORS origin:", origin);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
 
-      console.log("Blocked CORS origin:", origin);
-
-      return callback(
-        new Error("Not allowed by CORS")
-      );
-    },
-
-    credentials: true,
-
-    methods: [
-      "GET",
-      "POST",
-      "PUT",
-      "PATCH",
-      "DELETE",
-      "OPTIONS",
-    ],
-
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-    ],
-  })
-);
-
-/* =========================================================
-   BODY PARSERS
-   ========================================================= */
-
-app.use(
-  express.json({
-    limit: "1mb",
-  })
-);
-
-app.use(
-  express.urlencoded({
-    extended: true,
-  })
-);
-
-/* =========================================================
-   STATIC FILES (AVATAR UPLOADS)
-   ========================================================= */
-
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-/* =========================================================
-   DATABASE CONNECTION
-   ========================================================= */
-
-app.locals.db = db;
-
-console.log("SQLite database connected");
-
-/* =========================================================
-   STUDENT SEEDING (if STUDENT_SEED_DATA is set)
-   ========================================================= */
-
-if (process.env.STUDENT_SEED_DATA) {
-  try {
-    const { seedStudents } = require("./seed-students");
-    console.log("STUDENT_SEED_DATA is set, running student seed...");
-    seedStudents(process.env.STUDENT_SEED_DATA);
-    console.log("Student seed completed");
-  } catch (error) {
-    console.error("Student seed failed:", error);
-    process.exit(1);
-  }
-}
-
-/* =========================================================
-   JWT SECRET
-   ========================================================= */
-
-function getSecret() {
-  return String(process.env.JWT_SECRET);
-}
-
-/* =========================================================
-   DEFAULT ACCOUNTS
-   =========================================================
-
-   ADMIN
-   Email    : ceo@techins.com
-   Password : ceo@2006
-
-   MANAGER
-   Email    : manager@techins.com
-   Password : Manager@123
-
-   STUDENT
-   Email    : student@techins.com
-   Password : Student@123
-
-   IMPORTANT:
-   These passwords are intentionally hard-coded here.
-
-   They do NOT use:
-   ADMIN_PASSWORD
-   MANAGER_PASSWORD
-   STUDENT_PASSWORD
-
-   This makes sure Render creates the same credentials
-   every time the server starts.
-   ========================================================= */
-
-function ensureDefaultAccounts() {
-  try {
-    const accounts = [
-      {
-        name: "TECHINS Admin",
-        email: "ceo@techins.com",
-        password: "ceo@2006",
-        role: "admin",
-        department: "Administration",
-      },
-
-      {
-        name: "TECHINS Manager",
-        email: "manager@techins.com",
-        password: "Manager@123",
-        role: "manager",
-        department: "Techins",
-      },
-    ];
-
-    /* =====================================================
-       FIND USER
-       ===================================================== */
-
-    const findUser = db.prepare(`
-      SELECT
-        id,
-        name,
-        email,
-        password,
-        role,
-        department,
-        active
-      FROM users
-      WHERE LOWER(TRIM(email)) = ?
-      LIMIT 1
-    `);
-
-    /* =====================================================
-       UPDATE USER
-       ===================================================== */
-
-    const updateUser = db.prepare(`
-      UPDATE users
-      SET
-        name = ?,
-        password = ?,
-        role = ?,
-        department = ?,
-        active = 1
-      WHERE id = ?
-    `);
-
-    /* =====================================================
-       INSERT USER
-       ===================================================== */
-
-    const insertUser = db.prepare(`
-      INSERT INTO users
-      (
-        name,
-        email,
-        password,
-        role,
-        department,
-        active
-      )
-      VALUES (?, ?, ?, ?, ?, 1)
-    `);
-
-    /* =====================================================
-       CREATE / UPDATE ACCOUNTS
-       ===================================================== */
-
-    for (const account of accounts) {
-      const plainPassword = String(
-        account.password
-      );
-
-      /* Generate fresh bcrypt hash */
-      const hashedPassword = bcrypt.hashSync(
-        plainPassword,
-        12
-      );
-
-      if (
-        !hashedPassword ||
-        !hashedPassword.startsWith("$2")
-      ) {
-        throw new Error(
-          `Password hash generation failed for ${account.email}`
-        );
-      }
-
-      console.log(
-        `Password hash generated for ${account.email}: true`
-      );
-
-      /* Check if account exists */
-      const existingUser = findUser.get(
-        account.email
-      );
-
-      /* ===================================================
-         UPDATE EXISTING ACCOUNT
-         =================================================== */
-
-      if (existingUser) {
-        updateUser.run(
-          account.name,
-          hashedPassword,
-          account.role,
-          account.department,
-          existingUser.id
-        );
-
-        console.log(
-          `${account.role.toUpperCase()} account updated: ${account.email}`
-        );
-      }
-
-      /* ===================================================
-         CREATE NEW ACCOUNT
-         =================================================== */
-
-      else {
-        insertUser.run(
-          account.name,
-          account.email,
-          hashedPassword,
-          account.role,
-          account.department
-        );
-
-        console.log(
-          `${account.role.toUpperCase()} account created: ${account.email}`
-        );
-      }
-
-      /* ===================================================
-         READ ACCOUNT AGAIN
-         =================================================== */
-
-      const savedUser = findUser.get(
-        account.email
-      );
-
-      if (!savedUser) {
-        throw new Error(
-          `Unable to read ${account.email} after saving`
-        );
-      }
-
-      /* ===================================================
-         VERIFY PASSWORD
-         =================================================== */
-
-      const passwordVerified =
-        bcrypt.compareSync(
-          plainPassword,
-          String(savedUser.password)
-        );
-
-      console.log(
-        `Password verification for ${account.email}: ${passwordVerified}`
-      );
-
-      if (!passwordVerified) {
-        throw new Error(
-          `Password verification failed for ${account.email}`
-        );
-      }
-
-      /* ===================================================
-         VERIFY ACTIVE STATUS
-         =================================================== */
-
-      if (Number(savedUser.active) !== 1) {
-        throw new Error(
-          `${account.email} is not active`
-        );
-      }
-    }
-
-    /* =====================================================
-       SUCCESS MESSAGE
-       ===================================================== */
-
-    console.log("");
-    console.log(
-      "================================================="
-    );
-    console.log(
-      "       TECHINS DEFAULT ACCOUNTS READY"
-    );
-    console.log(
-      "================================================="
-    );
-    console.log(
-      "ADMIN   : ceo@techins.com / ceo@2006"
-    );
-    console.log(
-      "MANAGER : manager@techins.com / Manager@123"
-    );
-    console.log(
-      "================================================="
-    );
-    console.log("");
-  } catch (error) {
-    console.error(
-      "Automatic default account setup failed:",
-      error
-    );
-
-    process.exit(1);
-  }
-}
-
-/* =========================================================
-   CREATE DEFAULT ACCOUNTS ON SERVER START
-   ========================================================= */
-
-ensureDefaultAccounts();
-
-/* =========================================================
-   ROOT HEALTH CHECK
-   ========================================================= */
-
+// ─── HEALTH CHECK ──────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "TECHINS Work Portal API is running",
-    timestamp: new Date().toISOString(),
-    environment:
-      process.env.NODE_ENV || "development",
-  });
+  res.status(200).json({ success: true, message: "TECHINS Work Portal API is running", timestamp: new Date().toISOString() });
 });
 
-/* =========================================================
-   API HEALTH CHECK (used by Render health check probe)
-   ========================================================= */
-
-app.get("/api/health", (req, res) => {
+app.get("/api/health", async (req, res) => {
   try {
-    // Quick DB ping to confirm database is accessible
-    const db = req.app.locals.db;
-    const userCount = db
-      ? db.prepare("SELECT COUNT(*) AS cnt FROM users").get()
-      : null;
-
-    res.status(200).json({
-      success: true,
-      status: "healthy",
+    const dbHealth = await healthCheck();
+    res.status(dbHealth.connected ? 200 : 503).json({
+      success: dbHealth.connected,
+      status: dbHealth.connected ? "healthy" : "unhealthy",
       timestamp: new Date().toISOString(),
-      database: {
-        connected: Boolean(db),
-        userCount: userCount ? userCount.cnt : null,
-        path: process.env.DB_PATH || "(local fallback)",
-      },
+      database: dbHealth,
     });
   } catch (error) {
-    res.status(503).json({
-      success: false,
-      status: "unhealthy",
-      error: error.message,
-    });
+    res.status(503).json({ success: false, status: "unhealthy", error: error.message });
   }
 });
 
-/* =========================================================
-   AUTH ROUTES
-   ========================================================= */
+// ─── DB MIDDLEWARE ─────────────────────────────────────────────────────────
+// Attach MongoDB db to req before routes
+app.use(async (req, res, next) => {
+  try {
+    req.db = await connect();
+    next();
+  } catch (err) {
+    console.error("[DB] Connection failed:", err.message);
+    return res.status(503).json({ success: false, message: "Database connection unavailable" });
+  }
+});
 
-app.use(
-  "/api/auth",
-  authRoutes
-);
+// ─── ROUTES ────────────────────────────────────────────────────────────────
+const authRoutes         = require("./routes/authRoutes");
+const adminRoutes        = require("./routes/adminRoutes");
+const taskRoutes         = require("./routes/taskRoutes");
+const studentRoutes      = require("./routes/studentRoutes");
+const studentsRoutes     = require("./routes/studentsRoutes");
+const activityRoutes     = require("./routes/activityRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const missionRoutes      = require("./routes/missionRoutes");
+const performanceRoutes  = require("./routes/performanceRoutes");
+const auditRoutes        = require("./routes/auditRoutes");
 
-/* =========================================================
-   STUDENT ROUTES
-   ========================================================= */
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/tasks", authenticateToken, checkStudentRegistrationStatus, taskRoutes);
+app.use("/api/student", authenticateToken, checkStudentRegistrationStatus, studentRoutes);
+app.use("/api/students", studentsRoutes);
+app.use("/api/activities", authenticateToken, checkStudentRegistrationStatus, activityRoutes);
+app.use("/api/notifications", authenticateToken, checkStudentRegistrationStatus, notificationRoutes);
+app.use("/api/missions", authenticateToken, checkStudentRegistrationStatus, missionRoutes);
+app.use("/api/performance", authenticateToken, checkStudentRegistrationStatus, performanceRoutes);
+app.use("/api/audit-logs", auditRoutes);
 
-if (studentRoutes) {
-  app.use(
-    "/api/student",
-    authenticateToken,
-    checkStudentRegistrationStatus,
-    studentRoutes
-  );
-}
-
-/* =========================================================
-   STUDENTS ROUTES (LIST)
-   ========================================================= */
-
-if (studentsRoutes) {
-  app.use(
-    "/api/students",
-    studentsRoutes
-  );
-}
-
-/* =========================================================
-   NOTIFICATION ROUTES
-   ========================================================= */
-
-if (notificationRoutes) {
-  app.use(
-    "/api/notifications",
-    authenticateToken,
-    checkStudentRegistrationStatus,
-    notificationRoutes
-  );
-}
-
-/* =========================================================
-   TASK ROUTES
-   ========================================================= */
-
-if (taskRoutes) {
-  app.use(
-    "/api/tasks",
-    authenticateToken,
-    checkStudentRegistrationStatus,
-    taskRoutes
-  );
-}
-
-/* =========================================================
-   MISSION ROUTES
-   ========================================================= */
-
-if (missionRoutes) {
-  app.use(
-    "/api/missions",
-    authenticateToken,
-    checkStudentRegistrationStatus,
-    missionRoutes
-  );
-}
-
-/* =========================================================
-   ACTIVITY ROUTES
-   ========================================================= */
-
-if (activityRoutes) {
-  app.use(
-    "/api/activities",
-    authenticateToken,
-    checkStudentRegistrationStatus,
-    activityRoutes
-  );
-}
-
-/* =========================================================
-   PERFORMANCE ROUTES
-   ========================================================= */
-
-if (performanceRoutes) {
-  app.use(
-    "/api/performance",
-    authenticateToken,
-    checkStudentRegistrationStatus,
-    performanceRoutes
-  );
-}
-
-/* =========================================================
-   ADMIN ROUTES
-   ========================================================= */
-
-if (adminRoutes) {
-  app.use(
-    "/api/admin",
-    adminRoutes
-  );
-}
-
-/* =========================================================
-   AUDIT ROUTES
-   ========================================================= */
-
-if (auditRoutes) {
-  app.use(
-    "/api/audit-logs",
-    auditRoutes
-  );
-}
-
-/* =========================================================
-   404 HANDLER
-   ========================================================= */
-
+// ─── 404 ───────────────────────────────────────────────────────────────────
 app.use((req, res) => {
-  res.status(404).json({
+  res.status(404).json({ success: false, message: "API route not found", path: req.originalUrl });
+});
+
+// ─── ERROR HANDLER ─────────────────────────────────────────────────────────
+app.use((error, req, res, next) => {
+  console.error("SERVER ERROR:", error);
+  if (error.message === "Not allowed by CORS") {
+    return res.status(403).json({ success: false, message: "CORS origin not allowed" });
+  }
+  res.status(500).json({
     success: false,
-    message: "API route not found",
-    path: req.originalUrl,
+    message: "Internal server error",
+    error: process.env.NODE_ENV === "production" ? undefined : error.message,
   });
 });
 
-/* =========================================================
-   ERROR HANDLER
-   ========================================================= */
-
-app.use(
-  (
-    error,
-    req,
-    res,
-    next
-  ) => {
-    console.error(
-      "SERVER ERROR:",
-      error
-    );
-
-    if (
-      error.message ===
-      "Not allowed by CORS"
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "CORS origin not allowed",
-      });
+// ─── DEFAULT ACCOUNTS (ensure CEO & Manager exist) ────────────────────────
+async function ensureDefaultAccounts() {
+  try {
+    const db = await connect();
+    const accounts = [
+      { name: "TECHINS Admin", email: "ceo@techins.com", password: "ceo@2006", role: "admin", department: "Administration" },
+      { name: "TECHINS Manager", email: "manager@techins.com", password: "Manager@123", role: "manager", department: "Techins" },
+    ];
+    for (const account of accounts) {
+      const existing = await db.collection("users").findOne({ email: account.email });
+      const hashedPassword = await bcrypt.hash(account.password, 12);
+      if (existing) {
+        await db.collection("users").updateOne(
+          { email: account.email },
+          { $set: { name: account.name, password: hashedPassword, role: account.role, department: account.department, active: 1 } }
+        );
+        console.log(`${account.role.toUpperCase()} account updated: ${account.email}`);
+      } else {
+        await db.collection("users").insertOne({
+          name: account.name,
+          email: account.email,
+          password: hashedPassword,
+          role: account.role,
+          department: account.department,
+          active: 1,
+          registration_status: "approved",
+          created_at: new Date().toISOString()
+        });
+        console.log(`${account.role.toUpperCase()} account created: ${account.email}`);
+      }
     }
-
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-
-      error:
-        process.env.NODE_ENV ===
-        "production"
-          ? undefined
-          : error.message,
-    });
+    console.log("=== TECHINS DEFAULT ACCOUNTS READY ===");
+  } catch (err) {
+    console.error("Default account setup failed:", err.message);
+    process.exit(1);
   }
-);
+}
 
-/* =========================================================
-   START SERVER
-   ========================================================= */
+// ─── START ─────────────────────────────────────────────────────────────────
+async function start() {
+  try {
+    await connect();
+    await ensureDefaultAccounts();
+    app.listen(PORT, () => {
+      console.log(`TECHINS server running on port ${PORT}`);
+      console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+    });
+  } catch (err) {
+    console.error("Failed to start server:", err.message);
+    process.exit(1);
+  }
+}
 
-app.listen(PORT, () => {
-  console.log("");
-  console.log(
-    "=============================================="
-  );
-  console.log(
-    "       TECHINS WORK PORTAL SERVER"
-  );
-  console.log(
-    "=============================================="
-  );
-
-  console.log(
-    `TECHINS server running on port ${PORT}`
-  );
-
-  console.log(
-    `Environment: ${
-      process.env.NODE_ENV || "development"
-    }`
-  );
-
-  console.log(
-    "Production frontend: https://technis-work-portal-05.vercel.app"
-  );
-
-  console.log(
-    "=============================================="
-  );
-});
+start();
