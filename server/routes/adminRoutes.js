@@ -16,7 +16,7 @@ function fmt(doc) {
 }
 
 /* ─── STATS ─────────────────────────────────────────────────────────────── */
-router.get("/stats", authenticateToken, authorizeRoles("admin", "manager"), async (req, res) => {
+router.get("/stats", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
   try {
     const db = req.db;
     const today = new Date().toISOString().slice(0, 10);
@@ -43,7 +43,7 @@ router.get("/stats", authenticateToken, authorizeRoles("admin", "manager"), asyn
 });
 
 /* ─── PROGRESS ──────────────────────────────────────────────────────────── */
-router.get("/progress", authenticateToken, authorizeRoles("admin", "manager"), async (req, res) => {
+router.get("/progress", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
   try {
     const db = req.db;
     const period = String(req.query?.period || "week").toLowerCase();
@@ -72,7 +72,7 @@ router.get("/progress", authenticateToken, authorizeRoles("admin", "manager"), a
 });
 
 /* ─── GET STUDENTS ──────────────────────────────────────────────────────── */
-router.get("/students", authenticateToken, authorizeRoles("admin", "manager"), async (req, res) => {
+router.get("/students", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
   try {
     const db = req.db;
     const students = await db.collection("users").find(
@@ -172,7 +172,7 @@ router.post("/approve-user/:id", authenticateToken, authorizeRoles("admin", "ceo
 });
 
 /* ─── FEEDBACK ──────────────────────────────────────────────────────────── */
-router.get("/feedback", authenticateToken, authorizeRoles("admin", "manager"), async (req, res) => {
+router.get("/feedback", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
   try {
     const db = req.db;
     const tasks = await db.collection("tasks").find(

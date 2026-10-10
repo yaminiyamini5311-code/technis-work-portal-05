@@ -215,11 +215,11 @@ const auditRoutes        = require("./routes/auditRoutes");
 
 app.use("/api/auth",         authRoutes);
 app.use("/api/admin",        adminRoutes);
-app.use("/api/tasks",        authenticateToken, checkStudentRegistrationStatus, taskRoutes);
+app.use("/api/tasks",        authenticateToken, taskRoutes);
 app.use("/api/student",      authenticateToken, checkStudentRegistrationStatus, studentRoutes);
 app.use("/api/students",     studentsRoutes);
 app.use("/api/activities",   authenticateToken, checkStudentRegistrationStatus, activityRoutes);
-app.use("/api/notifications",authenticateToken, checkStudentRegistrationStatus, notificationRoutes);
+app.use("/api/notifications",authenticateToken, notificationRoutes);
 app.use("/api/missions",     authenticateToken, checkStudentRegistrationStatus, missionRoutes);
 app.use("/api/performance",  authenticateToken, checkStudentRegistrationStatus, performanceRoutes);
 app.use("/api/audit-logs",   auditRoutes);

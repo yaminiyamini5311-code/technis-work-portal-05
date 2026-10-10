@@ -1,6 +1,6 @@
 const express = require("express");
 const { ObjectId } = require("mongodb");
-const { authenticateToken, authorizeRoles } = require("../middleware/authMiddleware");
+const { authenticateToken, authorizeRoles, checkStudentRegistrationStatus } = require("../middleware/authMiddleware");
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
@@ -94,7 +94,7 @@ async function buildTaskResponse(db, tasks) {
 }
 
 /* ─── GET MY TASKS (student) ────────────────────────────────────────────── */
-router.get("/my", authenticateToken, authorizeRoles("student", "member"), async (req, res) => {
+router.get("/my", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), async (req, res) => {
   try {
     const db = req.db;
     const tasks = await db.collection("tasks").find({ assigned_to: req.user.id }).sort({ created_at: -1 }).toArray();
@@ -113,7 +113,7 @@ router.get("/students", authenticateToken, authorizeRoles("admin", "manager"), a
 });
 
 /* ─── GET SUBMISSIONS ───────────────────────────────────────────────────── */
-router.get("/submissions", authenticateToken, authorizeRoles("admin", "manager"), async (req, res) => {
+router.get("/submissions", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
   try {
     const db = req.db;
     const subTaskIds = await db.collection("submissions").distinct("task_id");
@@ -138,8 +138,16 @@ router.get("/", authenticateToken, async (req, res) => {
     const db = req.db;
     let tasks;
     if (["student", "member"].includes(req.user.role)) {
+      // Students must have approved registration
+      if (req.user.role === "student") {
+        const user = await db.collection("users").findOne({ _id: toId(req.user.id) }, { projection: { registration_status: 1 } });
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+        const status = user.registration_status || "approved";
+        if (status === "pending") return res.status(403).json({ success: false, code: "REGISTRATION_PENDING", message: "Your registration is pending CEO approval" });
+        if (status === "rejected") return res.status(403).json({ success: false, code: "REGISTRATION_REJECTED", message: "Your registration has been rejected" });
+      }
       tasks = await db.collection("tasks").find({ assigned_to: req.user.id }).sort({ created_at: -1 }).toArray();
-    } else if (["admin", "manager"].includes(req.user.role)) {
+    } else if (["admin", "manager", "ceo"].includes(req.user.role)) {
       tasks = await db.collection("tasks").find({}).sort({ created_at: -1 }).toArray();
     } else {
       return res.status(403).json({ success: false, message: "Access denied" });
@@ -257,7 +265,7 @@ router.get("/:id", authenticateToken, async (req, res) => {
     const task = await db.collection("tasks").findOne({ _id: toId(req.params.id) });
     if (!task) return res.status(404).json({ success: false, message: "Task not found" });
 
-    const allowed = req.user.role === "admin" || req.user.role === "manager" || task.assigned_to === req.user.id;
+    const allowed = ["admin", "manager", "ceo"].includes(req.user.role) || task.assigned_to === req.user.id;
     if (!allowed) return res.status(403).json({ success: false, message: "Access denied" });
 
     const history = await db.collection("task_status_history").find({ task_id: String(task._id) }).sort({ created_at: 1 }).toArray();
@@ -290,7 +298,7 @@ router.patch("/:id/status", authenticateToken, async (req, res) => {
 
     const studentOwner = task.assigned_to === req.user.id && ["student", "member"].includes(req.user.role);
     const managerOwner = task.assigned_by === req.user.id && req.user.role === "manager";
-    const admin = req.user.role === "admin";
+    const admin = ["admin", "ceo"].includes(req.user.role);
 
     if (!studentOwner && !managerOwner && !admin) return res.status(403).json({ success: false, message: "Access denied" });
     if (studentOwner && !["Acknowledged", "In Progress"].includes(toStatus)) return res.status(403).json({ success: false, message: "Students cannot directly approve or review tasks" });
@@ -307,7 +315,7 @@ router.patch("/:id/status", authenticateToken, async (req, res) => {
 });
 
 /* ─── SUBMIT TASK ───────────────────────────────────────────────────────── */
-router.post("/:id/submit", authenticateToken, authorizeRoles("student", "member"), upload.array("files", 5), async (req, res) => {
+router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), upload.array("files", 5), async (req, res) => {
   try {
     const db = req.db;
     const task = await db.collection("tasks").findOne({ _id: toId(req.params.id), assigned_to: req.user.id });
@@ -403,7 +411,7 @@ router.patch("/:id/feedback", authenticateToken, authorizeRoles("admin", "ceo", 
 });
 
 /* ─── TASK OUTCOME ──────────────────────────────────────────────────────── */
-router.patch("/:id/outcome", authenticateToken, authorizeRoles("student", "member"), async (req, res) => {
+router.patch("/:id/outcome", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), async (req, res) => {
   try {
     const db = req.db;
     const task = await db.collection("tasks").findOne({ _id: toId(req.params.id), assigned_to: req.user.id });
@@ -435,7 +443,9 @@ router.get("/:id/submissions", authenticateToken, async (req, res) => {
     const db = req.db;
     const task = await db.collection("tasks").findOne({ _id: toId(req.params.id) });
     if (!task) return res.status(404).json({ success: false, message: "Task not found" });
-    if (req.user.role !== "admin" && req.user.role !== "manager" && task.assigned_to !== req.user.id) return res.status(403).json({ success: false, message: "Access denied" });
+    if (!["admin", "manager", "ceo"].includes(req.user.role) && task.assigned_to !== req.user.id) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
 
     const submissions = await db.collection("submissions").find({ task_id: String(task._id) }).sort({ version: -1 }).toArray();
     const rows = await Promise.all(submissions.map(async s => {
