@@ -3,12 +3,25 @@ const { MongoClient } = require("mongodb");
 const MONGODB_URI = process.env.MONGODB_URI;
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || "techins";
 
+// Globally cached client and connection promise for serverless reuse
 let _client = null;
 let _db = null;
 let _connecting = null;
 
+/**
+ * Connect to MongoDB with global caching and automatic retry on failure.
+ * 
+ * Serverless-safe design:
+ * - Reuses connection across warm invocations
+ * - Resets _connecting promise on failure so next request can retry
+ * - Increased timeouts (20s) for slow Vercel cold starts
+ * - Never calls process.exit() - returns errors instead
+ */
 async function connect() {
+  // Return cached connection if available
   if (_db) return _db;
+  
+  // Wait for in-progress connection attempt
   if (_connecting) return _connecting;
 
   if (!MONGODB_URI) {
@@ -18,27 +31,49 @@ async function connect() {
   _connecting = (async () => {
     try {
       console.log("[MongoDB] Connecting...");
+      
+      // Create client with increased timeouts for Vercel serverless
       _client = new MongoClient(MONGODB_URI, {
         maxPoolSize: 10,
         minPoolSize: 1,
-        serverSelectionTimeoutMS: 10000,
-        connectTimeoutMS: 10000,
-        socketTimeoutMS: 45000,
+        serverSelectionTimeoutMS: 20000,  // 20s - increased for Vercel cold starts
+        connectTimeoutMS: 20000,           // 20s - increased for slow connections
+        socketTimeoutMS: 45000,            // 45s - keep-alive for long operations
       });
+      
       await _client.connect();
       _db = _client.db(MONGODB_DB_NAME);
+      
+      // Verify connection with ping
       await _db.command({ ping: 1 });
-      console.log("[MongoDB] Connected — db: " + MONGODB_DB_NAME);
+      console.log("[MongoDB] Connected successfully — db: " + MONGODB_DB_NAME);
+      
+      // Ensure indexes (non-fatal)
       await ensureIndexes(_db);
+      
       return _db;
     } catch (err) {
+      // Reset all connection state on failure so next request can retry
       _client = null;
       _db = null;
       _connecting = null;
+      
       console.error("[MongoDB] Connection failed:", err.message);
+      console.error("[MongoDB] Error code:", err.code);
       console.error("[MongoDB] Stack trace:", err.stack);
+      
+      // Provide helpful error messages for common issues
+      if (err.message.includes("timeout") || err.message.includes("ETIMEDOUT")) {
+        console.error("[MongoDB] TIMEOUT - Possible causes:");
+        console.error("  1. MongoDB Atlas IP allowlist doesn't include 0.0.0.0/0");
+        console.error("  2. Network connectivity issues from Vercel region");
+        console.error("  3. MongoDB Atlas cluster is paused or unavailable");
+        console.error("  4. Connection string is incorrect");
+      }
+      
       throw new Error(`MongoDB connection failed: ${err.message}`);
     } finally {
+      // Always clear _connecting flag so failures don't block future attempts
       _connecting = null;
     }
   })();
@@ -74,7 +109,7 @@ async function ensureIndexes(db) {
 
 async function healthCheck() {
   try {
-    if (!_db) return { connected: false };
+    if (!_db) return { connected: false, reason: "No active connection" };
     await _db.command({ ping: 1 });
     const userCount = await _db.collection("users").countDocuments();
     return { connected: true, userCount };
@@ -89,14 +124,12 @@ async function disconnect() {
       await _client.close();
       _client = null;
       _db = null;
-      console.log("[MongoDB] Connection closed.");
+      _connecting = null;
+      console.log("[MongoDB] Connection closed gracefully.");
     } catch (err) {
       console.error("[MongoDB] Shutdown error:", err.message);
     }
   }
 }
-
-// REMOVED process.exit() handlers — Vercel manages lifecycle
-// Local dev cleanup is optional; connection will close on process end anyway
 
 module.exports = { connect, disconnect, healthCheck };

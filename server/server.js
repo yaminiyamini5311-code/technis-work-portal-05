@@ -130,13 +130,39 @@ app.use((req, res, next) => {
 });
 
 // ─── DB MIDDLEWARE ─────────────────────────────────────────────────────────
+// Lazy connection on each request - connects on first request, reuses on warm requests
+// Returns 503 if connection fails, allowing retry on next request
+
+let _initialized = false;
+
 app.use(async (req, res, next) => {
   try {
+    // Connect to database (reuses cached connection if available)
     req.db = await connect();
+    
+    // Ensure default accounts on first successful connection
+    if (!_initialized) {
+      _initialized = true;
+      setImmediate(async () => {
+        try {
+          await ensureDefaultAccounts(req.db);
+          console.log("[TECHINS] Initialization complete");
+        } catch (initErr) {
+          _initialized = false; // allow retry
+          console.error("[TECHINS] Initialization error (non-fatal):", initErr.message);
+        }
+      });
+    }
+    
     next();
   } catch (err) {
-    console.error("[DB] Connection failed:", err.message);
-    return res.status(503).json({ success: false, message: "Database connection unavailable. Check MONGODB_URI in Vercel env vars." });
+    console.error("[DB] Connection failed for request:", req.method, req.url);
+    console.error("[DB] Error:", err.message);
+    return res.status(503).json({ 
+      success: false, 
+      message: "Database connection unavailable. Please try again in a moment.",
+      hint: "Check MONGODB_URI in Vercel environment variables and MongoDB Atlas IP allowlist (0.0.0.0/0)"
+    });
   }
 });
 
@@ -263,60 +289,19 @@ async function ensureDefaultAccounts(db) {
   }
 }
 
-// ─── VERCEL SERVERLESS ENTRY ────────────────────────────────────────────────
-// On Vercel: module.exports = app  (no app.listen — Vercel handles the HTTP layer)
-// Locally:   start() calls app.listen()
+// ─── LOCAL DEV ONLY ────────────────────────────────────────────────────────
+// On Vercel: VERCEL env var is set, skip app.listen() (Vercel handles HTTP)
+// Locally:   Start Express server with app.listen()
 
-let _initialized = false;
-
-// Lazy init — runs once on first warm request, then reuses the connection
-async function initOnce() {
-  if (_initialized) return;
-  _initialized = true;
-  try {
-    console.log("[TECHINS] Initializing serverless function...");
-    const db = await connect();
-    console.log("[TECHINS] Database connected");
-    await ensureDefaultAccounts(db);
-    console.log("[TECHINS] Server initialized successfully");
-  } catch (err) {
-    _initialized = false; // allow retry on next request
-    console.error("[TECHINS] Initialization failed");
-    console.error("[TECHINS] Error message:", err.message);
-    console.error("[TECHINS] Stack trace:", err.stack);
-    // Don't throw — let the request continue and get caught by middleware
-  }
-}
-
-// Wrap app to trigger lazy init before the first real request
-const handler = async (req, res) => {
-  await initOnce();
-  return app(req, res);
-};
-
-// ─── LOCAL DEV ─────────────────────────────────────────────────────────────
-if (process.env.NODE_ENV !== "production") {
+if (!process.env.VERCEL) {
   const PORT = Number(process.env.PORT) || 5000;
-  (async () => {
-    try {
-      console.log("[TECHINS] Starting local development server...");
-      const db = await connect();
-      console.log("[TECHINS] Database connected successfully");
-      await ensureDefaultAccounts(db);
-      console.log("[TECHINS] Default accounts ensured");
-      app.listen(PORT, () => {
-        console.log(`[TECHINS] Server running on http://localhost:${PORT}`);
-      });
-    } catch (err) {
-      console.error("[TECHINS] Failed to start server");
-      console.error("[TECHINS] Error message:", err.message);
-      console.error("[TECHINS] Stack trace:", err.stack);
-      console.error("[TECHINS] If this is a database error, check your MONGODB_URI in .env");
-      process.exit(1);
-    }
-  })();
+  app.listen(PORT, () => {
+    console.log(`[TECHINS] Server running on http://localhost:${PORT}`);
+    console.log(`[TECHINS] Database will connect on first request`);
+  });
 }
 
 // ─── EXPORT FOR VERCEL ─────────────────────────────────────────────────────
-// Vercel imports this file and calls the exported function as an HTTP handler.
-module.exports = handler;
+// Export Express app directly - Vercel wraps it as a serverless function
+// Connection happens lazily in the DB middleware on each request
+module.exports = app;
