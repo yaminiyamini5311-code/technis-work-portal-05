@@ -182,27 +182,84 @@ app.use((error, req, res, next) => {
 });
 
 // ─── DEFAULT ACCOUNTS ──────────────────────────────────────────────────────
+// Idempotent admin/manager account seeding using upsert.
+// Reads from env vars (ADMIN_EMAIL, ADMIN_PASSWORD, etc.) or falls back to defaults.
+// Never overwrites existing users — only creates on first run.
 async function ensureDefaultAccounts(db) {
-  const accounts = [
-    { name: "TECHINS Admin",   email: "ceo@techins.com",     password: "ceo@2006",    role: "admin",   department: "Administration" },
-    { name: "TECHINS Manager", email: "manager@techins.com", password: "Manager@123", role: "manager", department: "Techins" },
-  ];
-  for (const account of accounts) {
-    const existing = await db.collection("users").findOne({ email: account.email });
-    const hashedPassword = await bcrypt.hash(account.password, 12);
-    if (existing) {
-      await db.collection("users").updateOne(
-        { email: account.email },
-        { $set: { name: account.name, password: hashedPassword, role: account.role, department: account.department, active: 1 } }
-      );
-    } else {
-      await db.collection("users").insertOne({
-        name: account.name, email: account.email, password: hashedPassword,
-        role: account.role, department: account.department, active: 1,
-        registration_status: "approved", created_at: new Date().toISOString()
-      });
+  try {
+    // Build accounts list from environment variables with secure defaults
+    const accounts = [];
+    
+    // Admin account
+    const adminEmail = process.env.ADMIN_EMAIL || "ceo@techins.com";
+    const adminPassword = process.env.ADMIN_PASSWORD || "ceo@2006";
+    const adminName = process.env.ADMIN_NAME || "TECHINS Admin";
+    accounts.push({
+      name: adminName,
+      email: adminEmail,
+      password: adminPassword,
+      role: "admin",
+      department: "Administration"
+    });
+    
+    // Manager account
+    const managerEmail = process.env.MANAGER_EMAIL || "manager@techins.com";
+    const managerPassword = process.env.MANAGER_PASSWORD || "Manager@123";
+    const managerName = process.env.MANAGER_NAME || "TECHINS Manager";
+    accounts.push({
+      name: managerName,
+      email: managerEmail,
+      password: managerPassword,
+      role: "manager",
+      department: process.env.MANAGER_DEPARTMENT || "Techins"
+    });
+
+    for (const account of accounts) {
+      try {
+        // Hash password with bcrypt
+        const hashedPassword = await bcrypt.hash(account.password, 12);
+        
+        // Upsert: insert only if email doesn't exist, never overwrite
+        // $setOnInsert ensures data is only written on insert, not on match
+        const result = await db.collection("users").updateOne(
+          { email: account.email },
+          {
+            $setOnInsert: {
+              name: account.name,
+              email: account.email,
+              password: hashedPassword,
+              role: account.role,
+              department: account.department,
+              active: 1,
+              registration_status: "approved",
+              created_at: new Date().toISOString()
+            }
+          },
+          { upsert: true }
+        );
+        
+        if (result.upsertedCount > 0) {
+          console.log(`[Accounts] ${account.role.toUpperCase()} created: ${account.email}`);
+        } else {
+          console.log(`[Accounts] ${account.role.toUpperCase()} already exists: ${account.email}`);
+        }
+      } catch (accountError) {
+        // Catch duplicate key errors on individual accounts (race condition on parallel deploys)
+        if (accountError.code === 11000) {
+          console.log(`[Accounts] ${account.role.toUpperCase()} already exists (duplicate key): ${account.email}`);
+        } else {
+          console.error(`[Accounts] Failed to ensure ${account.role} account:`, accountError.message);
+        }
+        // Continue to next account even if one fails
+      }
     }
-    console.log(`[Accounts] ${account.role.toUpperCase()} ready: ${account.email}`);
+    
+    console.log("[Accounts] Default accounts ensured successfully");
+  } catch (error) {
+    // Log seeding errors but don't fail initialization
+    console.error("[Accounts] Error during account seeding (non-fatal):", error.message);
+    console.error("[Accounts] Stack trace:", error.stack);
+    console.warn("[Accounts] Continuing initialization despite seeding error");
   }
 }
 

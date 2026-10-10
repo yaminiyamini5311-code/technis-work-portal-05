@@ -60,6 +60,48 @@ These variables MUST be configured in Vercel Dashboard → Settings → Environm
 - **Example**: `student1@example.com,student2@example.com`
 - **Optional**: For student registration allowlist feature
 
+### 11. `ADMIN_EMAIL`
+- **Purpose**: Email address for the default admin account
+- **Default**: `ceo@techins.com` (if not set)
+- **Example**: `admin@yourdomain.com`
+- **Optional**: Recommended to set for production
+
+### 12. `ADMIN_PASSWORD`
+- **Purpose**: Password for the default admin account
+- **Default**: `ceo@2006` (if not set)
+- **Example**: Use a strong password (min 12 characters)
+- **Optional**: **Strongly recommended** to set for production security
+
+### 13. `ADMIN_NAME`
+- **Purpose**: Display name for the default admin account
+- **Default**: `TECHINS Admin` (if not set)
+- **Example**: `System Administrator`
+- **Optional**: For customization
+
+### 14. `MANAGER_EMAIL`
+- **Purpose**: Email address for the default manager account
+- **Default**: `manager@techins.com` (if not set)
+- **Example**: `manager@yourdomain.com`
+- **Optional**: Recommended to set for production
+
+### 15. `MANAGER_PASSWORD`
+- **Purpose**: Password for the default manager account
+- **Default**: `Manager@123` (if not set)
+- **Example**: Use a strong password (min 12 characters)
+- **Optional**: **Strongly recommended** to set for production security
+
+### 16. `MANAGER_NAME`
+- **Purpose**: Display name for the default manager account
+- **Default**: `TECHINS Manager` (if not set)
+- **Example**: `Project Manager`
+- **Optional**: For customization
+
+### 17. `MANAGER_DEPARTMENT`
+- **Purpose**: Department for the default manager account
+- **Default**: `Techins` (if not set)
+- **Example**: `Management`
+- **Optional**: For customization
+
 ---
 
 ## Vercel Configuration Checklist
@@ -75,6 +117,13 @@ Before deploying, ensure these are set in Vercel:
 □  RESEND_API_KEY      (optional, for emails)
 □  EMAIL_FROM          (optional, for emails)
 □  ALLOWED_STUDENT_EMAILS (optional)
+□  ADMIN_EMAIL         (optional, but RECOMMENDED for production)
+□  ADMIN_PASSWORD      (optional, but STRONGLY RECOMMENDED for production)
+□  ADMIN_NAME          (optional, for customization)
+□  MANAGER_EMAIL       (optional, but RECOMMENDED for production)
+□  MANAGER_PASSWORD    (optional, but STRONGLY RECOMMENDED for production)
+□  MANAGER_NAME        (optional, for customization)
+□  MANAGER_DEPARTMENT  (optional, for customization)
 ```
 
 ## How to Set Environment Variables in Vercel
@@ -103,6 +152,11 @@ Before deploying, ensure these are set in Vercel:
 ### Error: "JWT_SECRET is not configured"
 - **Solution**: Add JWT_SECRET in Vercel environment variables
 - **Must redeploy** after adding
+
+### Error: "E11000 duplicate key error" during account seeding
+- **Solution**: This is now handled automatically with upsert
+- **Result**: Existing accounts are preserved, new accounts are created only if missing
+- **Non-fatal**: Server will continue initialization even if seeding fails
 
 ## Testing Health Endpoints
 
