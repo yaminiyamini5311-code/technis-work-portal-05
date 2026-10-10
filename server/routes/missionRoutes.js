@@ -5,6 +5,20 @@ const { authenticateToken, authorizeRoles, checkStudentRegistrationStatus } = re
 const router = express.Router();
 function toId(id) { try { return new ObjectId(id); } catch { return id; } }
 
+/* GET /my - Student's own missions */
+router.get("/my", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), async (req, res) => {
+  try {
+    const db = req.db;
+    const missions = await db.collection("missions").find({ assigned_to: req.user.id }).sort({ created_at: -1 }).toArray();
+    const result = await Promise.all(missions.map(async m => {
+      const assigner = await db.collection("users").findOne({ _id: toId(m.assigned_by) }, { projection: { name: 1 } });
+      return { ...m, id: String(m._id), assigned_by_name: assigner?.name };
+    }));
+    res.json({ success: true, missions: result });
+  } catch (e) { res.status(500).json({ success: false, message: "Unable to fetch missions" }); }
+});
+
+/* GET / - All missions (admin/manager/CEO) */
 router.get("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), async (req, res) => {
   try {
     const db = req.db;

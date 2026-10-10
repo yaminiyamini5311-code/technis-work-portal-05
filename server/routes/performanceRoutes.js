@@ -1,10 +1,27 @@
 const express = require("express");
 const { ObjectId } = require("mongodb");
-const { authenticateToken, authorizeRoles } = require("../middleware/authMiddleware");
+const { authenticateToken, authorizeRoles, checkStudentRegistrationStatus } = require("../middleware/authMiddleware");
 const { writeAudit } = require("../utils/audit_mongo");
 const router = express.Router();
 function toId(id) { try { return new ObjectId(id); } catch { return id; } }
 
+/* GET /me - Student's own performance records */
+router.get("/me", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), async (req, res) => {
+  try {
+    const db = req.db;
+    const records = await db.collection("performance").find({ user_id: req.user.id }).sort({ created_at: -1 }).toArray();
+    const result = await Promise.all(records.map(async p => {
+      const r = p.reviewed_by ? await db.collection("users").findOne({ _id: toId(p.reviewed_by) }, { projection: { name: 1 } }) : null;
+      return { ...p, id: String(p._id), reviewer_name: r?.name };
+    }));
+    res.json({ success: true, records: result });
+  } catch (e) {
+    console.error("Performance GET /me:", e);
+    res.status(500).json({ success: false, message: "Unable to fetch performance records" });
+  }
+});
+
+/* GET / - All performance records (admin/manager/CEO) */
 router.get("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), async (req, res) => {
   try {
     const db = req.db;
