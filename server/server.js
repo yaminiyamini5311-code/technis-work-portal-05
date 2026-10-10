@@ -483,14 +483,34 @@ app.get("/", (req, res) => {
 });
 
 /* =========================================================
-   API HEALTH CHECK
+   API HEALTH CHECK (used by Render health check probe)
    ========================================================= */
 
-app.get("/api", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "TECHINS Work Portal API",
-  });
+app.get("/api/health", (req, res) => {
+  try {
+    // Quick DB ping to confirm database is accessible
+    const db = req.app.locals.db;
+    const userCount = db
+      ? db.prepare("SELECT COUNT(*) AS cnt FROM users").get()
+      : null;
+
+    res.status(200).json({
+      success: true,
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      database: {
+        connected: Boolean(db),
+        userCount: userCount ? userCount.cnt : null,
+        path: process.env.DB_PATH || "(local fallback)",
+      },
+    });
+  } catch (error) {
+    res.status(503).json({
+      success: false,
+      status: "unhealthy",
+      error: error.message,
+    });
+  }
 });
 
 /* =========================================================

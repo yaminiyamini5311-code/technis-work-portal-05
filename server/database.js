@@ -1,9 +1,104 @@
 const path = require("path");
+const fs   = require("fs");
 const { DatabaseSync } = require("node:sqlite");
 
-const dbPath = process.env.DB_PATH ? process.env.DB_PATH : path.join(__dirname, "techins.db");
+// ─────────────────────────────────────────────────────────────────────────────
+// DATABASE PATH — permanent, explicit, never silently re-created
+// ─────────────────────────────────────────────────────────────────────────────
+
+const IS_PRODUCTION = process.env.NODE_ENV === "production" ||
+                      Boolean(process.env.RENDER);
+
+// On Render the disk is mounted at /var/data.  DB_PATH must point there.
+// Locally (development) the DB lives beside this file.
+const DEFAULT_PATH = IS_PRODUCTION
+  ? "/var/data/techins.db"
+  : path.join(__dirname, "techins.db");
+
+const dbPath = process.env.DB_PATH
+  ? path.resolve(process.env.DB_PATH)
+  : DEFAULT_PATH;
+
+console.log(`[DB] Resolved database path : ${dbPath}`);
+console.log(`[DB] IS_PRODUCTION           : ${IS_PRODUCTION}`);
+console.log(`[DB] DB_PATH env var         : ${process.env.DB_PATH || "(not set, using default)"}`);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GUARD — ensure parent directory exists (persistent disk must be mounted)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const dbDir = path.dirname(dbPath);
+
+if (!fs.existsSync(dbDir)) {
+  // In production this means the persistent disk is NOT mounted.
+  // Crash loudly rather than silently create an ephemeral database.
+  if (IS_PRODUCTION) {
+    console.error(
+      `[DB] FATAL: Persistent disk directory "${dbDir}" does not exist. ` +
+      "Ensure the Render disk is mounted at /var/data before starting the server."
+    );
+    process.exit(1);
+  }
+  // In development create the directory so the app still starts.
+  fs.mkdirSync(dbDir, { recursive: true });
+  console.log(`[DB] Created database directory: ${dbDir}`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRE-OPEN INTEGRITY CHECK — never silently replace a populated DB
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DB_EXISTS_BEFORE_OPEN = fs.existsSync(dbPath);
+console.log(`[DB] Database file pre-existed: ${DB_EXISTS_BEFORE_OPEN}`);
+
+if (DB_EXISTS_BEFORE_OPEN) {
+  const stat = fs.statSync(dbPath);
+  console.log(`[DB] Existing DB size: ${stat.size} bytes, modified: ${stat.mtime.toISOString()}`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OPEN DATABASE
+// ─────────────────────────────────────────────────────────────────────────────
+
 const db = new DatabaseSync(dbPath);
-db.exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;");
+
+// WAL mode for better concurrent read/write and crash safety
+db.exec("PRAGMA journal_mode = WAL;");
+db.exec("PRAGMA foreign_keys = ON;");
+db.exec("PRAGMA synchronous = NORMAL;");  // Good balance of durability vs speed
+db.exec("PRAGMA wal_autocheckpoint = 1000;");
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST-OPEN SANITY CHECK — verify we opened the correct populated database
+// ─────────────────────────────────────────────────────────────────────────────
+
+// If the DB existed before we opened it, it must still have the users table
+// and at least one user row.  If it's empty something has gone wrong.
+if (DB_EXISTS_BEFORE_OPEN) {
+  try {
+    const tableExists = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+      .get();
+
+    if (tableExists) {
+      const userCount = db.prepare("SELECT COUNT(*) AS cnt FROM users").get();
+      console.log(`[DB] Post-open user count: ${userCount.cnt}`);
+
+      if (Number(userCount.cnt) === 0) {
+        console.error(
+          "[DB] WARNING: The database file existed but contains zero users. " +
+          "This may indicate a corrupted or reset database. Proceeding with caution."
+        );
+      }
+    }
+  } catch (e) {
+    console.error("[DB] Post-open sanity check error:", e.message);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCHEMA CREATION (idempotent — IF NOT EXISTS on all tables)
+// ─────────────────────────────────────────────────────────────────────────────
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS users (
@@ -168,49 +263,109 @@ CREATE TABLE IF NOT EXISTS task_status_history (
 );
 `);
 
-function columns(table) { return db.prepare(`PRAGMA table_info(${table})`).all().map(r => r.name); }
-function addColumnIfMissing(table, column, definition) {
-  if (!columns(table).includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+// ─────────────────────────────────────────────────────────────────────────────
+// SAFE INCREMENTAL MIGRATIONS — addColumnIfMissing only, never DROP/TRUNCATE
+// ─────────────────────────────────────────────────────────────────────────────
+
+function columns(table) {
+  return db.prepare(`PRAGMA table_info(${table})`).all().map(r => r.name);
 }
 
-addColumnIfMissing("users", "department", "TEXT DEFAULT 'Techins'");
-addColumnIfMissing("users", "program", "TEXT");
-addColumnIfMissing("users", "active", "INTEGER NOT NULL DEFAULT 1");
-addColumnIfMissing("users", "phone", "TEXT");
-addColumnIfMissing("users", "avatar", "TEXT");
-addColumnIfMissing("users", "registration_status", "TEXT NOT NULL DEFAULT 'approved'");
+function addColumnIfMissing(table, column, definition) {
+  if (!columns(table).includes(column)) {
+    console.log(`[DB] Adding missing column: ${table}.${column}`);
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+addColumnIfMissing("users", "department",           "TEXT DEFAULT 'Techins'");
+addColumnIfMissing("users", "program",              "TEXT");
+addColumnIfMissing("users", "active",               "INTEGER NOT NULL DEFAULT 1");
+addColumnIfMissing("users", "phone",                "TEXT");
+addColumnIfMissing("users", "avatar",               "TEXT");
+addColumnIfMissing("users", "registration_status",  "TEXT NOT NULL DEFAULT 'approved'");
 
 // Ensure role constraint allows 'ceo'
 const checkRoleConstraint = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get();
 if (checkRoleConstraint && !checkRoleConstraint.sql.includes('CHECK')) {
   // No check constraint exists, roles are free-form strings
-  console.log("Role constraint check: No CHECK constraint on users.role (free-form)");
+  console.log("[DB] Role constraint check: No CHECK constraint on users.role (free-form)");
 }
+
 for (const [c, d] of [
-  ["task_code", "TEXT"], ["category", "TEXT DEFAULT 'General'"], ["program", "TEXT DEFAULT 'TECHINS'"], ["department", "TEXT"], ["domain", "TEXT DEFAULT 'edutins'"], ["team", "TEXT DEFAULT 'General'"], ["task_type", "TEXT DEFAULT 'General'"],
-  ["what", "TEXT"], ["why", "TEXT"], ["how", "TEXT"], ["how_to_do", "TEXT"], ["expected_output", "TEXT"], ["submission_requirements", "TEXT"], ["resources", "TEXT"], ["notes", "TEXT"],
-  ["workflow_status", "TEXT DEFAULT 'Assigned'"], ["start_date", "TEXT"], ["updated_at", "TEXT"]
+  ["task_code",               "TEXT"],
+  ["category",                "TEXT DEFAULT 'General'"],
+  ["program",                 "TEXT DEFAULT 'TECHINS'"],
+  ["department",              "TEXT"],
+  ["domain",                  "TEXT DEFAULT 'edutins'"],
+  ["team",                    "TEXT DEFAULT 'General'"],
+  ["task_type",               "TEXT DEFAULT 'General'"],
+  ["what",                    "TEXT"],
+  ["why",                     "TEXT"],
+  ["how",                     "TEXT"],
+  ["how_to_do",               "TEXT"],
+  ["expected_output",         "TEXT"],
+  ["submission_requirements", "TEXT"],
+  ["resources",               "TEXT"],
+  ["notes",                   "TEXT"],
+  ["workflow_status",         "TEXT DEFAULT 'Assigned'"],
+  ["start_date",              "TEXT"],
+  ["updated_at",              "TEXT"],
 ]) addColumnIfMissing("tasks", c, d);
 
 // Backfill domain for existing tasks
 db.prepare("UPDATE tasks SET domain='edutins' WHERE domain IS NULL OR domain=''").run();
-for (const [c, d] of [["next_steps","TEXT"]]) addColumnIfMissing("daily_activities", c, d);
+
+for (const [c, d] of [["next_steps", "TEXT"]]) addColumnIfMissing("daily_activities", c, d);
 addColumnIfMissing("notifications", "related_task_id", "INTEGER");
 
 // Backfill identifiers for legacy tasks without changing existing records.
 const legacyTasks = db.prepare("SELECT id, task_code FROM tasks ORDER BY id").all();
-const updateCode = db.prepare("UPDATE tasks SET task_code=? WHERE id=?");
+const updateCode  = db.prepare("UPDATE tasks SET task_code=? WHERE id=?");
 for (const task of legacyTasks) {
   if (!task.task_code) updateCode.run(`TNS-${new Date().getFullYear()}-${String(task.id).padStart(4, "0")}`, task.id);
 }
+
 db.prepare("UPDATE tasks SET workflow_status=CASE LOWER(status) WHEN 'completed' THEN 'Approved' WHEN 'in_progress' THEN 'In Progress' WHEN 'pending' THEN 'Assigned' ELSE COALESCE(workflow_status,'Assigned') END WHERE workflow_status IS NULL OR workflow_status='' ").run();
 db.prepare("UPDATE tasks SET updated_at=COALESCE(updated_at,created_at)").run();
 
-for (const table of ["tasks","missions","daily_activities"]) {
-  if (columns(table).includes("status")) db.prepare(`UPDATE ${table} SET status=LOWER(status) WHERE status IS NOT NULL`).run();
+for (const table of ["tasks", "missions", "daily_activities"]) {
+  if (columns(table).includes("status")) {
+    db.prepare(`UPDATE ${table} SET status=LOWER(status) WHERE status IS NOT NULL`).run();
+  }
 }
 
-db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_task_code ON tasks(task_code); CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON tasks(assigned_to); CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date); CREATE INDEX IF NOT EXISTS idx_submissions_task ON submissions(task_id); CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id,read_at); CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at);`);
+// ─────────────────────────────────────────────────────────────────────────────
+// INDEXES
+// ─────────────────────────────────────────────────────────────────────────────
+
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_task_code   ON tasks(task_code);
+  CREATE INDEX        IF NOT EXISTS idx_tasks_assigned_to ON tasks(assigned_to);
+  CREATE INDEX        IF NOT EXISTS idx_tasks_due_date    ON tasks(due_date);
+  CREATE INDEX        IF NOT EXISTS idx_submissions_task  ON submissions(task_id);
+  CREATE INDEX        IF NOT EXISTS idx_notifications_user ON notifications(user_id, read_at);
+  CREATE INDEX        IF NOT EXISTS idx_audit_created     ON audit_logs(created_at);
+`);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RECORD COUNT REPORT — printed on every startup for operational visibility
+// ─────────────────────────────────────────────────────────────────────────────
+
+try {
+  const tables = ["users","tasks","missions","daily_activities","submissions","notifications","performance","audit_logs"];
+  const counts = tables.map(t => {
+    const r = db.prepare(`SELECT COUNT(*) AS cnt FROM ${t}`).get();
+    return `${t}=${r.cnt}`;
+  });
+  console.log(`[DB] Startup record counts: ${counts.join(", ")}`);
+} catch (e) {
+  console.error("[DB] Could not read startup record counts:", e.message);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TRANSACTION HELPER
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Standalone transaction helper — node:sqlite's DatabaseSync does NOT support
 // property assignment on the native object, so we export a plain function instead.
@@ -226,12 +381,13 @@ function runInTransaction(database, callback) {
   }
 }
 
-// ----------------------------------------------------------
-// GRACEFUL SHUTDOWN — checkpoint WAL so data is durably
-// written to the main .db file before the process exits.
-// Without this, a SIGTERM/SIGINT (nodemon restart, Render
-// redeploy, Ctrl-C) leaves data only in the WAL file.
-// ----------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// GRACEFUL SHUTDOWN — checkpoint WAL so data is durably written to the main
+// .db file before the process exits.
+// Without this, a SIGTERM/SIGINT (nodemon restart, Render redeploy, Ctrl-C)
+// may leave data only in the WAL file, causing apparent data loss on restart.
+// ─────────────────────────────────────────────────────────────────────────────
+
 let _dbClosed = false;
 function shutdownDb() {
   if (_dbClosed) return;
@@ -239,15 +395,16 @@ function shutdownDb() {
   try {
     db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
     db.close();
-    console.log("SQLite: WAL checkpointed and database closed cleanly.");
+    console.log("[DB] SQLite: WAL checkpointed and database closed cleanly.");
   } catch (e) {
-    console.error("SQLite shutdown error:", e.message);
+    console.error("[DB] SQLite shutdown error:", e.message);
   }
 }
-process.once("exit", shutdownDb);
+
+process.once("exit",   shutdownDb);
 process.once("SIGINT",  () => { shutdownDb(); process.exit(0); });
 process.once("SIGTERM", () => { shutdownDb(); process.exit(0); });
 
-console.log(`SQLite database connected: ${dbPath}`);
+console.log(`[DB] SQLite database connected: ${dbPath}`);
 module.exports = db;
 module.exports.runInTransaction = runInTransaction;
