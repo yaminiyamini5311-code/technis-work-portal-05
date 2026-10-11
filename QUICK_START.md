@@ -99,7 +99,6 @@ Vercel will auto-deploy.
 - `server/scripts/seedAuthorized.js` - Seed script (INSERT-ONLY)
 - `server/scripts/testAuthorization.js` - Test suite
 - `server/AUTHORIZATION_SYSTEM.md` - Full documentation
-- `VERIFICATION_REPORT.md` - Detailed verification report
 
 ### Modified Files
 - `server/routes/authRoutes.js` - Registration notifications now check authorization
@@ -187,8 +186,7 @@ db.authorized_users.countDocuments({ role: "manager", active: true })  // Should
 
 ## Documentation
 
-📖 **Full documentation:** `server/AUTHORIZATION_SYSTEM.md`  
-📋 **Verification report:** `VERIFICATION_REPORT.md`
+📖 **Full documentation:** `server/AUTHORIZATION_SYSTEM.md`
 
 ## Support Commands
 

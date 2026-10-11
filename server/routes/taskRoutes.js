@@ -205,6 +205,86 @@ router.get("/", authenticateToken, async (req, res) => {
   } catch (e) { console.error("GET ALL TASKS:", e); res.status(500).json({ success: false, message: "Unable to load tasks" }); }
 });
 
+/* ─── DELETE TASK ──────────────────────────────────────────────────────────
+ * Removes one task and the records that exist only because of it:
+ *   task_assignments  (one row per student)
+ *   submissions       (+ submission_files belonging to them)
+ *   notifications     (pointing at this task)
+ *
+ * Assignment logic for every OTHER task is untouched, so batch and
+ * multi-student relationships elsewhere are preserved.
+ * Authorized exactly like task creation (admin / ceo / manager).
+ */
+router.delete("/:id", authenticateToken, authorizeRoles("admin", "ceo", "manager"), async (req, res) => {
+  try {
+    const db = req.db;
+    // toId() is lenient (returns the raw string on failure), so validate
+    // explicitly here to give a clear 400 instead of a confusing 404.
+    let taskId;
+    try {
+      taskId = new ObjectId(String(req.params.id || "").trim());
+    } catch {
+      return res.status(400).json({ success: false, message: "Invalid task id" });
+    }
+
+    const task = await db.collection("tasks").findOne({ _id: taskId });
+    if (!task) return res.status(404).json({ success: false, message: "Task not found" });
+
+    const taskKey = String(task._id);
+
+    // Count the dependent rows before removing them (reported back to the UI).
+    const assignmentCount = await db.collection("task_assignments").countDocuments({ task_id: taskKey });
+    const submissionCount = await db.collection("submissions").countDocuments({ task_id: taskKey });
+    const notificationCount = await db.collection("notifications").countDocuments({ task_id: taskKey });
+
+    await db.collection("task_assignments").deleteMany({ task_id: taskKey });
+
+    // Remove submission files first: they reference submissions by id.
+    const subIds = (await db.collection("submissions").distinct("_id", { task_id: taskKey })).map(String);
+    if (subIds.length) {
+      await db.collection("submission_files").deleteMany({ submission_id: { $in: subIds } });
+    }
+    await db.collection("submissions").deleteMany({ task_id: taskKey });
+
+    if (notificationCount > 0) {
+      await db.collection("notifications").deleteMany({ task_id: taskKey });
+    }
+
+    const result = await db.collection("tasks").deleteOne({ _id: taskId });
+    if (result.deletedCount !== 1) {
+      return res.status(409).json({ success: false, message: "Task could not be removed. Please refresh and try again." });
+    }
+
+    await writeAudit(db, {
+      actorId: req.user.id,
+      action: "task_deleted",
+      entityType: "task",
+      entityId: taskKey,
+      previousValue: {
+        task_code: task.task_code || null,
+        title: task.title,
+        target_type: task.target_type || null,
+        batch_id: task.batch_id || null,
+      },
+      metadata: { assignments: assignmentCount, submissions: submissionCount, notifications: notificationCount },
+    });
+
+    res.json({
+      success: true,
+      message: "Task removed successfully",
+      taskId: taskKey,
+      removed: {
+        assignments: assignmentCount,
+        submissions: submissionCount,
+        notifications: notificationCount,
+      },
+    });
+  } catch (e) {
+    console.error("DELETE TASK:", e);
+    res.status(500).json({ success: false, message: "Unable to remove task" });
+  }
+});
+
 /* ─── CREATE TASK ─────────────────────────────────────────────────────────
  * Payload options (all IDs are ObjectId STRINGS — never Numbers):
  *   target_type: "batch"   + batch_id            → whole batch

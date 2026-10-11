@@ -43,6 +43,10 @@ export default function Tasks() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Task removal: `confirmDelete` holds the task awaiting confirmation,
+  // `deleting` keeps the confirm button disabled while the request is in flight.
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     try {
@@ -139,6 +143,51 @@ export default function Tasks() {
     const res = await fetch(`${API_URL}/api/tasks/${task.id}/submissions`, { headers: auth() });
     const data = await res.json();
     setSubmissions(data.submissions || []);
+  };
+
+  // Opens the confirmation popup. Nothing is deleted until confirmDeleteTask runs.
+  const askDelete = (task) => {
+    setMessage("");
+    setError("");
+    setConfirmDelete(task);
+  };
+
+  // Deletes only after the CEO confirms. The success message is set solely
+  // from a confirmed backend response, then the list is refreshed.
+  const confirmDeleteTask = async () => {
+    const task = confirmDelete;
+    if (!task || deleting) return;
+    setDeleting(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_URL}/api/tasks/${task.id}`, {
+        method: "DELETE",
+        headers: auth()
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.success) {
+        setError(data.message || "Task could not be removed. Please try again.");
+        setConfirmDelete(null);
+        return;
+      }
+
+      const removed = data.removed || {};
+      const parts = [`Task ${task.task_code || task.title} removed successfully`];
+      const extra = [];
+      if (removed.assignments) extra.push(`${removed.assignments} student assignment${removed.assignments === 1 ? "" : "s"}`);
+      if (removed.submissions) extra.push(`${removed.submissions} submission${removed.submissions === 1 ? "" : "s"}`);
+      if (extra.length) parts.push(`with ${extra.join(" and ")}`);
+
+      setMessage(parts.join(" ") + ".");
+      setConfirmDelete(null);
+      await load();
+    } catch (e) {
+      setError("Task could not be removed. Please try again.");
+      setConfirmDelete(null);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const submitReview = async (decision = review.decision) => {
@@ -423,7 +472,17 @@ export default function Tasks() {
                 <td>{t.due_date || "—"}</td>
                 <td>{t.submission_count || 0}</td>
                 <td>
-                  <button onClick={() => openReview(t)}>Review</button>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button onClick={() => openReview(t)}>Review</button>
+                    <button
+                      onClick={() => askDelete(t)}
+                      disabled={deleting}
+                      aria-label={`Remove task ${t.task_code || t.title}`}
+                      style={{ color: '#B42318', borderColor: '#F0C7C2', background: '#FEF3F2' }}
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -432,6 +491,45 @@ export default function Tasks() {
 
         {!tasks.filter(t => !domainFilter || t.domain === domainFilter).length && <div className="empty-state">No tasks yet.</div>}
       </div>
+
+      {confirmDelete && (
+        <div className="review-modal">
+          <div className="panel" role="dialog" aria-modal="true" aria-labelledby="confirm-delete-title">
+            <div className="panel-head">
+              <div>
+                <span className="section-kicker">REMOVE TASK</span>
+                <h3 id="confirm-delete-title">
+                  {confirmDelete.task_code || "Task"} · {confirmDelete.title}
+                </h3>
+                <p>
+                  {confirmDelete.target_type === "batch"
+                    ? `This task is assigned to batch "${confirmDelete.batch_name || "—"}" (${confirmDelete.assignee_count || 0} assignees).`
+                    : confirmDelete.student_name
+                      ? `Assigned to ${confirmDelete.student_name}.`
+                      : "This task has student assignments."}
+                </p>
+              </div>
+              <button onClick={() => setConfirmDelete(null)} disabled={deleting}>Close</button>
+            </div>
+
+            <p style={{ marginTop: '16px' }}>
+              This permanently removes the task and its student assignments and submissions. This cannot be undone.
+            </p>
+
+            <div className="quick-actions">
+              <button onClick={() => setConfirmDelete(null)} disabled={deleting}>Cancel</button>
+              <button
+                className="gold-btn"
+                onClick={confirmDeleteTask}
+                disabled={deleting}
+                style={deleting ? { opacity: 0.6, cursor: 'not-allowed' } : { background: '#B42318', color: '#fff', borderColor: '#B42318' }}
+              >
+                {deleting ? "Removing…" : "Yes, remove task"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selected && (
         <div className="review-modal">
