@@ -5,14 +5,7 @@ import "../../styles/admin.css";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 
-const PROGRAMS = [
-  { value: "techins 60", label: "Techins 60" },
-  { value: "ai ally", label: "AI Ally" },
-  { value: "life wise", label: "Life Wise" },
-  { value: "foundation x", label: "Foundation X" },
-  { value: "concept to carrier", label: "Concept to Carrier" },
-  { value: "unlock", label: "Unlock" }
-];
+// REMOVED: PROGRAMS array now loaded from batches collection (same source as signup dropdown)
 
 const DOMAINS = [
   { value: "edutins", label: "EduTins" },
@@ -44,6 +37,7 @@ export default function Tasks() {
   });
 
   const { student, program, setStudent, setProgram, reset, isStudentDisabled, isProgramDisabled } = useExclusiveSelect();
+  const [programBatches, setProgramBatches] = useState([]); // Batches for legacy "program" dropdown
   const [selected, setSelected] = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [review, setReview] = useState({ decision: "revision", comment: "" });
@@ -63,7 +57,9 @@ export default function Tasks() {
       if (!tasksRes.ok) throw new Error(taskData.message || "Unable to load tasks");
       setTasks(taskData.tasks || []);
       setStudents(studentData.students || []);
-      setBatches(batchData.batches || []);
+      const fetchedBatches = batchData.batches || [];
+      setBatches(fetchedBatches);
+      setProgramBatches(fetchedBatches); // Use same source for legacy program dropdown
       setBatchesError("");
       setError("");
     } catch (e) {
@@ -325,15 +321,15 @@ export default function Tasks() {
             name="task-program"
             value={program}
             onChange={e => setProgram(e.target.value)}
-            disabled={isProgramDisabled || targetType !== "program"}
+            disabled={isProgramDisabled || targetType !== "program" || batchesLoading}
             autoComplete="off"
-            style={isProgramDisabled || targetType !== "program" ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#F3F4F6' } : {}}
-            title={isProgramDisabled ? "Disabled because a student is selected" : targetType !== "program" ? "Select 'Program (legacy)' above" : ""}
-            aria-disabled={isProgramDisabled || targetType !== "program"}
+            style={isProgramDisabled || targetType !== "program" || batchesLoading ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#F3F4F6' } : {}}
+            title={isProgramDisabled ? "Disabled because a student is selected" : targetType !== "program" ? "Select 'Program (legacy)' above" : batchesLoading ? "Loading programs..." : ""}
+            aria-disabled={isProgramDisabled || targetType !== "program" || batchesLoading}
           >
-            <option value="">Select program</option>
-            {PROGRAMS.map(prog => (
-              <option key={prog.value} value={prog.value}>{prog.label}</option>
+            <option value="">{batchesLoading ? "Loading programs..." : "Select program"}</option>
+            {programBatches.map(batch => (
+              <option key={batch.id} value={batch.name.toLowerCase()}>{batch.name}</option>
             ))}
           </select>
           {targetType !== "program" && (
