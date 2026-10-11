@@ -11,6 +11,13 @@
  * 
  * Removes any other batches that shouldn't exist.
  * Safe and idempotent.
+ *
+ * DESTRUCTIVE SAFETY:
+ *  - Refuses to run unless MONGODB_URI points at localhost. This script
+ *    DELETES batches, so it must never be pointed at a shared/production
+ *    cluster by accident. Production data must be managed through the
+ *    authenticated API (POST/PATCH /api/batches) instead.
+ *  - Run with --dry-run to preview every action before any write.
  */
 
 const { MongoClient, ObjectId } = require("mongodb");
@@ -22,6 +29,7 @@ if (!process.env.VERCEL) {
 
 const MONGODB_URI = (process.env.MONGODB_URI || "").trim();
 const MONGODB_DB_NAME = (process.env.MONGODB_DB_NAME || "techins").trim();
+const DRY_RUN = process.argv.includes("--dry-run");
 
 // EXACT 6 REQUIRED PROGRAMS (case-sensitive as specified)
 const REQUIRED_PROGRAMS = [
@@ -40,6 +48,15 @@ function normalizeName(name) {
 async function main() {
   if (!MONGODB_URI) {
     console.error("[FIX] ERROR: MONGODB_URI environment variable is required");
+    process.exit(1);
+  }
+
+  // ── Production guard: this script deletes batches, so local-only ──────
+  if (!/^mongodb:\/\/(127\.0\.0\.1|localhost)/.test(MONGODB_URI)) {
+    console.error("[FIX] REFUSING TO RUN: MONGODB_URI is not a local MongoDB.");
+    console.error("[FIX]   This script DELETES batches and is authorized for the");
+    console.error("[FIX]   LOCAL database only. Manage production batches through");
+    console.error("[FIX]   the authenticated API (POST/PATCH /api/batches) instead.");
     process.exit(1);
   }
 
@@ -111,6 +128,8 @@ async function main() {
         if (studentCount > 0) {
           console.log(`[FIX] ⚠ SKIP: "${batch.name}" (${studentCount} student(s) assigned)`);
           console.log(`[FIX]         Manual intervention required to reassign students`);
+        } else if (DRY_RUN) {
+          console.log(`[FIX] [dry-run] WOULD REMOVE: "${batch.name}" (${batch._id})`);
         } else {
           await db.collection("batches").deleteOne({ _id: batch._id });
           console.log(`[FIX] ✓ REMOVED: "${batch.name}" (${batch._id})`);
@@ -133,6 +152,9 @@ async function main() {
       if (existingNormalized.has(normalized)) {
         const existing = batchesToKeep.find(b => normalizeName(b.name) === normalized);
         console.log(`[FIX] ⊘ EXISTS: "${programName}" (as "${existing.name}")`);
+      } else if (DRY_RUN) {
+        console.log(`[FIX] [dry-run] WOULD INSERT: "${programName}"`);
+        inserted++;
       } else {
         const result = await db.collection("batches").insertOne({
           name: programName,
