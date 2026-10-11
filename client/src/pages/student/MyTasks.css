@@ -257,6 +257,165 @@
     box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   Task card layout.
+
+   These rules target the class names the component actually renders
+   (.task-card-top / .task-label / .task-meta-grid / .upload-box).
+   The stylesheet previously only defined .task-top / .task-details /
+   .task-detail, which the component never emits, so the header row, the
+   metadata and the submission block fell back to block+inline rendering
+   (labels colliding with their values).
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Header: ID + title/description on the left, status badge on the right. */
+.task-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+.task-card-top > div {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.task-card-top h2 {
+    margin: 6px 0 0;
+    font-size: 19px;
+    line-height: 1.35;
+    font-weight: 700;
+    color: var(--text-primary-dark, #F5F8FF);
+    /* Long titles wrap instead of overflowing the card. */
+    overflow-wrap: anywhere;
+}
+
+.task-card-top p {
+    margin: 10px 0 0;
+    font-size: 14px;
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+}
+
+/* Task ID chip. */
+.task-label {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--accent, #FFA51A);
+    background: rgba(250, 154, 2, 0.12);
+    border: 1px solid rgba(250, 154, 2, 0.28);
+    border-radius: 6px;
+    padding: 4px 9px;
+    line-height: 1.2;
+}
+
+/* Metadata: label above value, evenly spaced, no crowding. */
+.task-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px 22px;
+    margin-top: 22px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.task-meta-grid > div {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+
+.task-meta-grid span {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--text-muted-on-dark, #D1D1D1);
+}
+
+.task-meta-grid strong {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary-dark, #F5F8FF);
+    overflow-wrap: anywhere;
+}
+
+/* Submission block: header, comment field, file control, submit button. */
+.upload-box {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+        "head   head"
+        "note   note"
+        "files  submit";
+    gap: 14px;
+    align-items: center;
+    margin-top: 20px;
+    padding: 18px;
+    border: 1px solid var(--space-border, rgba(250, 154, 2, 0.25));
+    border-radius: 14px;
+}
+
+.upload-box > div {
+    grid-area: head;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.upload-box > div strong {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary-dark, #F5F8FF);
+}
+
+.upload-box > div small {
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--text-muted-on-dark, #D1D1D1);
+}
+
+/* Layout/typography only — colours intentionally left to the shared theme
+   (styles/theme.css), which styles every student-portal input the same way.
+   Restyling this field alone would make the task card inconsistent with
+   Daily Activity, Profile and Feedback. */
+.upload-box textarea {
+    grid-area: note;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 84px;
+    padding: 12px 14px;
+    font-size: 14px;
+    line-height: 1.55;
+    font-family: inherit;
+    border-radius: 10px;
+    resize: vertical;
+}
+
+.upload-box textarea:focus-visible {
+    outline: 2px solid var(--accent, #FFA51A);
+    outline-offset: 1px;
+}
+
+.upload-box .upload-button {
+    grid-area: files;
+    justify-self: start;
+}
+
+.upload-box .gold-btn {
+    grid-area: submit;
+    justify-self: end;
+    white-space: nowrap;
+}
+
 .task-top {
     display: flex;
     justify-content: space-between;
@@ -350,27 +509,57 @@
     cursor: pointer;
 }
 
-.action-progress {
-    background: #EEEEEE;
-    color: #175cd3;
-}
-
 .action-complete {
     background: #0C120C;
     color: white;
-}
-
-.action-progress:hover {
-    background: #dce9ff;
 }
 
 .action-complete:hover {
     background: #0C120C;
 }
 
+/* ── "Start Task" button ────────────────────────────────────────────────
+   buttons.css groups .student-layout .action-progress with the LIGHT-theme
+   secondary buttons and forces background:var(--surface) / color:var(--text-on-light)
+   with !important. Under the space theme those tokens are the DARK palette
+   (--surface: rgba(10,18,40,.72), --text-on-light: #0C120C), which rendered
+   near-black text on a dark surface - measured contrast 1.02:1.
+
+   These rules are scoped to .action-progress (used only by the Start Task
+   button) and keep the existing size/padding/border-radius. Amber fill with
+   the near-black token gives 9.6:1 while staying on-theme. */
+.student-layout .task-actions .action-progress {
+    background: var(--accent, #FFA51A) !important;
+    color: #0C120C !important;
+    border: 1px solid var(--accent, #FFA51A) !important;
+    font-weight: 700 !important;
+    opacity: 1 !important;
+}
+
+.student-layout .task-actions .action-progress:hover:not(:disabled) {
+    background: #FFC24D !important;
+    color: #0C120C !important;
+    border-color: #FFC24D !important;
+}
+
+/* Focus ring is intentionally NOT overridden here: index.css sets
+   `button:focus-visible { outline: 3px solid rgba(250,154,2,.4) !important;
+   outline-offset: 2px !important }`. That amber ring sits 2px outside the
+   button on the dark card, so it stays clearly visible without needing
+   to fight a global !important rule that affects every button. */
+/* Disabled stays readable: muted surface + muted light text (9.2:1),
+   no opacity fade that would wash the label out. */
+.student-layout .task-actions .action-progress:disabled {
+    background: rgba(255, 255, 255, 0.10) !important;
+    color: var(--text-muted-on-dark, #D1D1D1) !important;
+    border-color: rgba(255, 255, 255, 0.18) !important;
+    opacity: 1 !important;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
 .action-progress:disabled,
 .action-complete:disabled {
-    opacity: 0.6;
     cursor: not-allowed;
 }
 
@@ -406,6 +595,25 @@
     .task-details {
         grid-template-columns: 1fr;
     }
+
+    .task-meta-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .upload-box {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "head"
+            "note"
+            "files"
+            "submit";
+    }
+
+    .upload-box .upload-button,
+    .upload-box .gold-btn {
+        justify-self: stretch;
+        text-align: center;
+    }
 }
 
 @media (max-width: 600px) {
@@ -425,6 +633,20 @@
 
     .task-top {
         flex-direction: column;
+    }
+
+    /* Stack the status badge under the title on small screens. */
+    .task-card-top {
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .task-meta-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .task-card {
+        padding: 18px;
     }
 }
 
