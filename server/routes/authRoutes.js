@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { ObjectId } = require("mongodb");
 const { authenticateToken, authorizeRoles, getSecret } = require("../middleware/authMiddleware");
+const { rateLimit } = require("../middleware/rateLimit");
 const { MAX_STUDENT_ACCOUNTS, ALLOWED_DEPARTMENTS, ALLOWED_PROGRAMS } = require("../config");
 const { writeAudit } = require("../utils/audit_mongo");
 const { createCeoNotification } = require("../utils/ceoNotification");
@@ -27,7 +28,8 @@ function timingSafeEqual(a, b) {
 }
 
 /* ─── LOGIN ─────────────────────────────────────────────────────────────── */
-router.post("/login", async (req, res) => {
+// Generic rate limit: 20 attempts per 15 minutes per client
+router.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }), async (req, res) => {
   try {
     const emailRaw = String(req.body?.email || "");
     const email = emailRaw.trim().toLowerCase();
@@ -198,6 +200,17 @@ router.get("/me", authenticateToken, async (req, res) => {
     if (!user || Number(user.active) !== 1) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
+
+    // Resolve batch membership (id + name) for the auth payload
+    let batch = null;
+    if (user.batch_id) {
+      const batchDoc = await db.collection("batches").findOne(
+        { _id: toId(user.batch_id) },
+        { projection: { name: 1, active: 1 } }
+      );
+      if (batchDoc) batch = { id: String(batchDoc._id), name: batchDoc.name, active: batchDoc.active !== false };
+    }
+
     return res.json({
       success: true,
       user: {
@@ -208,6 +221,7 @@ router.get("/me", authenticateToken, async (req, res) => {
         department: user.department,
         active: user.active,
         registration_status: user.registration_status || "approved",
+        batch,
       }
     });
   } catch (error) {
@@ -269,6 +283,7 @@ router.post("/signup", async (req, res) => {
     const password = String(req.body?.password || "");
     const role = String(req.body?.role || "student").trim().toLowerCase();
     const phone = req.body?.phone ? String(req.body.phone).trim() : null;
+    const batchId = req.body?.batchId ? String(req.body.batchId).trim() : null;
 
     if (!name || !email || !password) {
       return res.status(400).json({ success: false, message: "Name, email and password are required" });
@@ -302,7 +317,30 @@ router.post("/signup", async (req, res) => {
     if (!["student", "manager"].includes(role)) {
       return res.status(400).json({ success: false, message: "Invalid role. Allowed: student, manager" });
     }
-    
+
+    // ── BATCH VALIDATION (students must join an active batch) ──
+    // Never trust the client: the batch must exist and be active.
+    let batchRecord = null;
+    if (role === "student") {
+      if (!batchId) {
+        return res.status(400).json({ success: false, message: "Batch selection is required" });
+      }
+      const dbPre = req.db;
+      const { ObjectId: Oid } = require("mongodb");
+      let batchOid;
+      try { batchOid = new Oid(batchId); } catch { batchOid = null; }
+      if (!batchOid) {
+        return res.status(400).json({ success: false, message: "Invalid batch selected" });
+      }
+      batchRecord = await dbPre.collection("batches").findOne({ _id: batchOid });
+      if (!batchRecord) {
+        return res.status(400).json({ success: false, message: "Selected batch does not exist" });
+      }
+      if (batchRecord.active === false) {
+        return res.status(400).json({ success: false, message: "Selected batch is no longer accepting students" });
+      }
+    }
+
     // NOTE: Signup is open to all emails. Authorization is enforced only for CEO Portal notifications.
     // Only emails in the authorized_users collection will trigger CEO notifications.
     // See utils/ceoNotification.js for authorization logic.
@@ -327,9 +365,17 @@ router.post("/signup", async (req, res) => {
 
     const result = await db.collection("users").insertOne({
       name, email, password: passwordHash, role, phone, active, registration_status: registrationStatus,
+      batch_id: batchRecord ? String(batchRecord._id) : null,
+      program: batchRecord ? String(batchRecord.name) : null,
       created_at: new Date().toISOString()
     });
     const insertedId = String(result.insertedId);
+
+    // Student joined a batch: materialize assignments for that batch's active tasks
+    if (batchRecord) {
+      const { createAssignmentsForStudent } = require("../models/TaskAssignment");
+      await createAssignmentsForStudent(db, insertedId, String(batchRecord._id));
+    }
 
     // Notify CEO/Admin users about new student registration (with authorization check)
     if (role === "student") {

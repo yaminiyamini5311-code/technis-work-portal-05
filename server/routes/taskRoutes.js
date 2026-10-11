@@ -76,11 +76,23 @@ async function transition(db, task, toStatus, actorId, comment = null) {
 
 async function buildTaskResponse(db, tasks) {
   return Promise.all(tasks.map(async t => {
-    const assigned = await db.collection("users").findOne({ _id: toId(t.assigned_to) }, { projection: { name: 1, email: 1 } });
+    const assigned = t.assigned_to
+      ? await db.collection("users").findOne({ _id: toId(t.assigned_to) }, { projection: { name: 1, email: 1 } })
+      : null;
     const creator = await db.collection("users").findOne({ _id: toId(t.assigned_by) }, { projection: { name: 1 } });
     const fileCount = await db.collection("task_files").countDocuments({ task_id: String(t._id) });
     const subCount = await db.collection("submissions").countDocuments({ task_id: String(t._id) });
     const lastSub = await db.collection("submissions").find({ task_id: String(t._id) }, { projection: { version: 1 } }).sort({ version: -1 }).limit(1).toArray();
+    // Per-student assignment summary for this task
+    const assignments = await db.collection("task_assignments")
+      .find({ task_id: String(t._id) }, { projection: { student_id: 1, status: 1, progress: 1 } })
+      .toArray();
+    const assigneeIds = [...new Set(assignments.map(a => a.student_id))];
+    let batchName = null;
+    if (t.batch_id) {
+      const batch = await db.collection("batches").findOne({ _id: toId(t.batch_id) }, { projection: { name: 1 } });
+      batchName = batch?.name || null;
+    }
     return {
       ...t,
       id: String(t._id),
@@ -89,27 +101,53 @@ async function buildTaskResponse(db, tasks) {
       assigned_by_name: creator?.name,
       file_count: fileCount,
       submission_count: subCount,
-      latest_version: lastSub[0]?.version || null
+      latest_version: lastSub[0]?.version || null,
+      assignee_count: assigneeIds.length,
+      assignee_ids: assigneeIds,
+      batch_name: batchName,
     };
   }));
 }
 
-/* ─── GET MY TASKS (student) ────────────────────────────────────────────── */
+/* ─── GET MY TASKS (student) ──────────────────────────────────────
+ * A student's tasks = every task with a TaskAssignment for
+ * them (batch tasks included). Legacy tasks assigned directly
+ * via assigned_to are also included.
+ */
 router.get("/my", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), async (req, res) => {
   try {
     const db = req.db;
-    const tasks = await db.collection("tasks").find({ assigned_to: req.user.id }).sort({ created_at: -1 }).toArray();
+    const { getStudentTaskIds } = require("../models/TaskAssignment");
+    const assignedTaskIds = await getStudentTaskIds(db, req.user.id);
+    const tasks = await db.collection("tasks").find({
+      $or: [
+        { _id: { $in: assignedTaskIds.map(id => { try { return toId(id); } catch { return id; } }) } },
+        { assigned_to: req.user.id },
+      ]
+    }).sort({ created_at: -1 }).toArray();
     const result = await buildTaskResponse(db, tasks);
     res.json({ success: true, tasks: result });
   } catch (e) { console.error("GET MY TASKS:", e); res.status(500).json({ success: false, message: "Unable to load tasks" }); }
 });
 
 /* ─── GET STUDENTS LIST (for task assignment) ───────────────────────────── */
-router.get("/students", authenticateToken, authorizeRoles("admin", "manager"), async (req, res) => {
+router.get("/students", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
   try {
     const db = req.db;
-    const students = await db.collection("users").find({ role: "student", active: 1 }, { projection: { name: 1, email: 1, department: 1, created_at: 1 } }).sort({ name: 1 }).toArray();
-    res.json({ success: true, students: students.map(s => ({ ...s, id: String(s._id) })) });
+    const students = await db.collection("users").find({ role: "student", active: 1 }, { projection: { name: 1, email: 1, department: 1, program: 1, batch_id: 1, created_at: 1 } }).sort({ name: 1 }).toArray();
+    const batchIds = [...new Set(students.map(s => s.batch_id).filter(Boolean))];
+    const batches = batchIds.length
+      ? await db.collection("batches").find({ _id: { $in: batchIds.map(id => { try { return toId(id); } catch { return id; } }) } }, { projection: { name: 1 } }).toArray()
+      : [];
+    const batchNameById = new Map(batches.map(b => [String(b._id), b.name]));
+    res.json({
+      success: true,
+      students: students.map(s => ({
+        ...s,
+        id: String(s._id),
+        batch_name: s.batch_id ? (batchNameById.get(String(s.batch_id)) || null) : null,
+      })),
+    });
   } catch (e) { res.status(500).json({ success: false, message: "Unable to fetch students" }); }
 });
 
@@ -148,6 +186,15 @@ router.get("/", authenticateToken, async (req, res) => {
         if (status === "rejected") return res.status(403).json({ success: false, code: "REGISTRATION_REJECTED", message: "Your registration has been rejected" });
       }
       tasks = await db.collection("tasks").find({ assigned_to: req.user.id }).sort({ created_at: -1 }).toArray();
+      // Tasks assigned through TaskAssignment (batch or multi-student)
+      const { getStudentTaskIds } = require("../models/TaskAssignment");
+      const assignedTaskIds = await getStudentTaskIds(db, req.user.id);
+      const extra = await db.collection("tasks").find({
+        _id: { $in: assignedTaskIds.map(id => { try { return toId(id); } catch { return id; } }) },
+        assigned_to: { $ne: req.user.id },
+      }).sort({ created_at: -1 }).toArray();
+      const seen = new Set(tasks.map(t => String(t._id)));
+      tasks = tasks.concat(extra.filter(t => !seen.has(String(t._id))));
     } else if (["admin", "manager", "ceo"].includes(req.user.role)) {
       tasks = await db.collection("tasks").find({}).sort({ created_at: -1 }).toArray();
     } else {
@@ -158,14 +205,23 @@ router.get("/", authenticateToken, async (req, res) => {
   } catch (e) { console.error("GET ALL TASKS:", e); res.status(500).json({ success: false, message: "Unable to load tasks" }); }
 });
 
-/* ─── CREATE TASK ───────────────────────────────────────────────────────── */
+/* ─── CREATE TASK ─────────────────────────────────────────────────────────
+ * Payload options (all IDs are ObjectId STRINGS — never Numbers):
+ *   target_type: "batch"   + batch_id            → whole batch
+ *   target_type: "student" + student_ids: [...]  → one or more students
+ *   legacy: assigned_to (single student string)
+ *   legacy: program / group (program grouping)
+ */
 router.post("/", authenticateToken, authorizeRoles("admin", "ceo", "manager"), async (req, res) => {
   try {
     const b = req.body || {};
     const title = String(b.title || "").trim();
     if (!title) return res.status(400).json({ success: false, message: "Task title is required" });
 
-    const assignedTo = b.assigned_to ? String(b.assigned_to) : null;
+    const targetType = b.target_type ? String(b.target_type).trim().toLowerCase() : null;
+    const batchId = b.batch_id ? String(b.batch_id).trim() : null;
+    const studentIdsRaw = Array.isArray(b.student_ids) ? b.student_ids.map(String).map(s => s.trim()).filter(Boolean) : [];
+    const assignedTo = b.assigned_to ? String(b.assigned_to).trim() : null;
     const program = b.program ? String(b.program).trim().toLowerCase() : null;
     const domain = b.domain ? String(b.domain).trim().toLowerCase() : null;
     const group = b.group ? String(b.group).trim().toLowerCase() : null;
@@ -175,24 +231,69 @@ router.post("/", authenticateToken, authorizeRoles("admin", "ceo", "manager"), a
     }
 
     const db = req.db;
-    let studentsToNotify = [];
+    let targetStudents = [];   // resolved student docs
+    let taskBatchId = null;    // set for batch-targeted tasks
+    let taskTargetType = "student";
 
-    if (assignedTo && !program && !group) {
-      const student = await db.collection("users").findOne({ _id: toId(assignedTo), role: "student", active: 1 });
+    if (targetType === "batch" || (targetType === null && batchId)) {
+      // ── BATCH ASSIGNMENT ──────────────────────────────────────────
+      if (!batchId) {
+        return res.status(400).json({ success: false, message: "Batch is required for batch assignment" });
+      }
+      const { ObjectId: Oid } = require("mongodb");
+      let batchOid;
+      try { batchOid = new Oid(batchId); } catch { batchOid = null; }
+      if (!batchOid) {
+        return res.status(400).json({ success: false, message: "Invalid batch id" });
+      }
+      const batch = await db.collection("batches").findOne({ _id: batchOid });
+      if (!batch) {
+        return res.status(404).json({ success: false, message: "Batch not found" });
+      }
+      if (batch.active === false) {
+        return res.status(400).json({ success: false, message: "Batch is deactivated. Reactivate it before assigning tasks." });
+      }
+      taskBatchId = String(batch._id);
+      taskTargetType = "batch";
+      targetStudents = await db.collection("users")
+        .find({ batch_id: taskBatchId, role: "student", active: 1 })
+        .toArray();
+      if (targetStudents.length === 0) {
+        return res.status(404).json({ success: false, message: "No active students in this batch" });
+      }
+    } else if (studentIdsRaw.length > 0) {
+      // ── MULTI-STUDENT ASSIGNMENT ────────────────────────────────
+      taskTargetType = "student";
+      for (const sid of studentIdsRaw) {
+        const { ObjectId: Oid } = require("mongodb");
+        let sOid;
+        try { sOid = new Oid(sid); } catch { sOid = null; }
+        if (!sOid) return res.status(400).json({ success: false, message: `Invalid student id: ${sid}` });
+        const student = await db.collection("users").findOne({ _id: sOid, role: "student", active: 1 });
+        if (!student) return res.status(404).json({ success: false, message: `Student not found: ${sid}` });
+        targetStudents.push(student);
+      }
+    } else if (assignedTo && !program && !group) {
+      // ── LEGACY SINGLE-STUDENT ASSIGNMENT ────────────────────────
+      taskTargetType = "student";
+      const { ObjectId: Oid } = require("mongodb");
+      let sOid;
+      try { sOid = new Oid(assignedTo); } catch { sOid = null; }
+      if (!sOid) return res.status(400).json({ success: false, message: "Invalid student id" });
+      const student = await db.collection("users").findOne({ _id: sOid, role: "student", active: 1 });
       if (!student) return res.status(404).json({ success: false, message: "Student not found" });
-      studentsToNotify.push(student);
+      targetStudents.push(student);
     } else if (program) {
       if (!ALLOWED_PROGRAMS.includes(program)) {
         return res.status(400).json({ success: false, message: "Invalid program. Choose from: " + ALLOWED_PROGRAMS.join(", ") });
       }
-      studentsToNotify = await db.collection("users").find({ program, role: "student", active: 1 }).toArray();
-      if (studentsToNotify.length === 0) return res.status(404).json({ success: false, message: "No active students found in this program" });
+      targetStudents = await db.collection("users").find({ program, role: "student", active: 1 }).toArray();
+      if (targetStudents.length === 0) return res.status(404).json({ success: false, message: "No active students found in this program" });
     } else if (group) {
-      // Group-based assignment: group is stored in users.program field
-      studentsToNotify = await db.collection("users").find({ program: group, role: "student", active: 1 }).toArray();
-      if (studentsToNotify.length === 0) return res.status(404).json({ success: false, message: "No active students found in this group" });
+      targetStudents = await db.collection("users").find({ program: group, role: "student", active: 1 }).toArray();
+      if (targetStudents.length === 0) return res.status(404).json({ success: false, message: "No active students found in this group" });
     } else {
-      return res.status(400).json({ success: false, message: "Select a student, program, or group" });
+      return res.status(400).json({ success: false, message: "Select a student, a batch, a program, or a group" });
     }
 
     const priority = String(b.priority || "medium").toLowerCase();
@@ -206,56 +307,77 @@ router.post("/", authenticateToken, authorizeRoles("admin", "ceo", "manager"), a
     }
 
     const taskCode = await nextTaskCode(db);
-    const taskIds = [];
+    const now = new Date().toISOString();
 
-    for (const student of studentsToNotify) {
+    // One shared Task document. Per-student state lives in task_assignments.
+    const result = await db.collection("tasks").insertOne({
+      task_code: taskCode,
+      title,
+      category: String(b.category || "").trim() || null,
+      program: program || null,
+      group: group || null,
+      department: null,
+      domain,
+      team: String(b.team || "").trim() || null,
+      task_type: String(b.task_type || "General"),
+      description: String(b.description || "").trim(),
+      what: String(b.what || "").trim(),
+      why: String(b.why || "").trim(),
+      how: String(b.how || "").trim(),
+      how_to_do: b.how_to_do ? String(b.how_to_do).trim().substring(0, 5000) : null,
+      expected_output: String(b.expected_output || "").trim(),
+      submission_requirements: String(b.submission_requirements || "").trim(),
+      resources: String(b.resources || "").trim(),
+      notes: String(b.notes || "").trim(),
+      target_type: taskTargetType,
+      batch_id: taskBatchId,
+      assigned_to: targetStudents[0] ? String(targetStudents[0]._id) : null,
+      assigned_by: req.user.id,
+      status: legacyStatus(workflow),
+      workflow_status: workflow,
+      priority,
+      start_date: b.start_date || null,
+      due_date: b.due_date || null,
+      completed_at: null,
+      feedback: null,
+      outcome: null,
+      outcome_submitted_at: null,
+      created_at: now,
+      updated_at: now
+    });
+    const taskId = String(result.insertedId);
+
+    // One TaskAssignment per student (idempotent upsert, unique on
+    // (task_id, student_id) — duplicate attempts cannot create rows).
+    const { createAssignmentsForStudents } = require("../models/TaskAssignment");
+    const assignmentResult = await createAssignmentsForStudents(
+      db,
+      taskId,
+      targetStudents.map(s => String(s._id)),
+      { status: "assigned", progress: 0 }
+    );
+
+    for (const student of targetStudents) {
       const studentId = String(student._id);
-      const now = new Date().toISOString();
-      const result = await db.collection("tasks").insertOne({
-        task_code: taskCode,
-        title,
-        category: String(b.category || "").trim() || null,
-        program: program || null,
-        group: group || null,
-        department: null,
-        domain,
-        team: String(b.team || "").trim() || null,
-        task_type: String(b.task_type || "General"),
-        description: String(b.description || "").trim(),
-        what: String(b.what || "").trim(),
-        why: String(b.why || "").trim(),
-        how: String(b.how || "").trim(),
-        how_to_do: b.how_to_do ? String(b.how_to_do).trim().substring(0, 5000) : null,
-        expected_output: String(b.expected_output || "").trim(),
-        submission_requirements: String(b.submission_requirements || "").trim(),
-        resources: String(b.resources || "").trim(),
-        notes: String(b.notes || "").trim(),
-        assigned_to: studentId,
-        assigned_by: req.user.id,
-        status: legacyStatus(workflow),
-        workflow_status: workflow,
-        priority,
-        start_date: b.start_date || null,
-        due_date: b.due_date || null,
-        completed_at: null,
-        feedback: null,
-        outcome: null,
-        outcome_submitted_at: null,
-        created_at: now,
-        updated_at: now
-      });
-      const taskId = String(result.insertedId);
-      taskIds.push(taskId);
-
       await notify(db, studentId, "task_assigned", "New task assigned", `${title} (${taskCode}) has been assigned to you.`, taskId);
-      await writeAudit(db, { actorId: req.user.id, action: "task_created", entityType: "task", entityId: taskId, newValue: { task_code: taskCode, title, assigned_to: studentId, workflow_status: workflow } });
-
       try {
         await sendTaskAssignmentEmail({ to: student.email, studentName: student.name, taskTitle: title, description: String(b.description || ""), dueDate: b.due_date, appUrl: process.env.APP_URL });
       } catch (e) { console.error("Task email notification failed:", e.message); }
     }
 
-    res.status(201).json({ success: true, message: "Task assigned successfully", taskId: taskIds[0], taskCode });
+    await writeAudit(db, { actorId: req.user.id, action: "task_created", entityType: "task", entityId: taskId, newValue: { task_code: taskCode, title, target_type: taskTargetType, batch_id: taskBatchId, assigned_count: targetStudents.length, workflow_status: workflow } });
+
+    res.status(201).json({
+      success: true,
+      message: "Task assigned successfully",
+      taskId,
+      taskCode,
+      target_type: taskTargetType,
+      batch_id: taskBatchId,
+      assigned_count: targetStudents.length,
+      assignments_created: assignmentResult.created,
+      assignments_existing: assignmentResult.existing,
+    });
   } catch (e) { console.error("Create task error:", e); res.status(500).json({ success: false, message: "Unable to create task" }); }
 });
 
@@ -266,7 +388,15 @@ router.get("/:id", authenticateToken, async (req, res) => {
     const task = await db.collection("tasks").findOne({ _id: toId(req.params.id) });
     if (!task) return res.status(404).json({ success: false, message: "Task not found" });
 
-    const allowed = ["admin", "manager", "ceo"].includes(req.user.role) || task.assigned_to === req.user.id;
+    // Authorization: CEO/admin/manager see everything.
+    // A student may read a task only if they have an assignment
+    // for it (batch or individual) or it is legacy-assigned to them.
+    let allowed = ["admin", "manager", "ceo"].includes(req.user.role) || task.assigned_to === req.user.id;
+    if (!allowed && ["student", "member"].includes(req.user.role)) {
+      const { getAssignment } = require("../models/TaskAssignment");
+      const assignment = await getAssignment(db, String(task._id), req.user.id);
+      allowed = Boolean(assignment);
+    }
     if (!allowed) return res.status(403).json({ success: false, message: "Access denied" });
 
     const history = await db.collection("task_status_history").find({ task_id: String(task._id) }).sort({ created_at: 1 }).toArray();
@@ -281,8 +411,45 @@ router.get("/:id", authenticateToken, async (req, res) => {
       return { ...s, id: String(s._id), reviewer_name: u?.name };
     }));
 
-    res.json({ success: true, task: { ...task, id: String(task._id) }, history: historyWithNames, submissions: subsWithNames });
+    // Per-student assignments (CEO/admin/manager only — students see only their own)
+    let assignments = [];
+    if (["admin", "manager", "ceo"].includes(req.user.role)) {
+      const { listAssignmentsForTask } = require("../models/TaskAssignment");
+      assignments = await listAssignmentsForTask(db, String(task._id));
+    } else {
+      const { getAssignment } = require("../models/TaskAssignment");
+      const own = await getAssignment(db, String(task._id), req.user.id);
+      if (own) assignments = [{
+        id: String(own._id),
+        task_id: own.task_id,
+        student_id: own.student_id,
+        status: own.status,
+        progress: own.progress,
+        submission_version: own.submission_version || null,
+        submission_comment: own.submission_comment || null,
+        submitted_at: own.submitted_at || null,
+        created_at: own.created_at || null,
+        updated_at: own.updated_at || null,
+      }];
+    }
+
+    res.json({ success: true, task: { ...task, id: String(task._id) }, history: historyWithNames, submissions: subsWithNames, assignments });
   } catch (e) { res.status(500).json({ success: false, message: "Unable to fetch task" }); }
+});
+
+/* ─── LIST ASSIGNMENTS FOR A TASK (admin/manager/ceo) ─────────── */
+router.get("/:id/assignments", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+    const task = await db.collection("tasks").findOne({ _id: toId(req.params.id) }, { projection: { title: 1, task_code: 1 } });
+    if (!task) return res.status(404).json({ success: false, message: "Task not found" });
+    const { listAssignmentsForTask } = require("../models/TaskAssignment");
+    const assignments = await listAssignmentsForTask(db, String(task._id));
+    res.json({ success: true, task: { id: String(task._id), title: task.title, task_code: task.task_code }, assignments });
+  } catch (e) {
+    console.error("GET ASSIGNMENTS:", e);
+    res.status(500).json({ success: false, message: "Unable to fetch assignments" });
+  }
 });
 
 /* ─── UPDATE TASK STATUS ────────────────────────────────────────────────── */
@@ -297,7 +464,11 @@ router.patch("/:id/status", authenticateToken, async (req, res) => {
     const toStatus = map[requested.toLowerCase()] || requested;
     if (!STATUS.includes(toStatus)) return res.status(400).json({ success: false, message: "Invalid task status" });
 
-    const studentOwner = task.assigned_to === req.user.id && ["student", "member"].includes(req.user.role);
+    const { getAssignment, updateAssignment } = require("../models/TaskAssignment");
+    const studentAssignment = ["student", "member"].includes(req.user.role)
+      ? await getAssignment(db, String(task._id), req.user.id)
+      : null;
+    const studentOwner = (task.assigned_to === req.user.id || studentAssignment) && ["student", "member"].includes(req.user.role);
     const managerOwner = task.assigned_by === req.user.id && req.user.role === "manager";
     const admin = ["admin", "ceo"].includes(req.user.role);
 
@@ -308,8 +479,24 @@ router.patch("/:id/status", authenticateToken, async (req, res) => {
     }
 
     await transition(db, task, toStatus, req.user.id, req.body?.comment || null);
+    // Mirror the transition into the acting student's assignment
+    if (studentOwner && studentAssignment) {
+      await updateAssignment(db, String(task._id), req.user.id, { status: "in_progress" });
+    }
     if (toStatus === "In Progress") await notify(db, task.assigned_by, "task_started", "Task started", `${task.title} was marked in progress.`, String(task._id));
-    if (toStatus === "Approved") await notify(db, task.assigned_to, "task_approved", "Task approved", `${task.title} has been approved.`, String(task._id));
+    if (toStatus === "Approved") {
+      // Notify every student assigned to this task (batch tasks have many)
+      const { listAssignmentsForTask } = require("../models/TaskAssignment");
+      const assignees = await listAssignmentsForTask(db, String(task._id));
+      for (const a of assignees) {
+        await notify(db, a.student_id, "task_approved", "Task approved", `${task.title} has been approved.`, String(task._id));
+      }
+      // Mark every student assignment on this task as approved
+      await db.collection("task_assignments").updateMany(
+        { task_id: String(task._id) },
+        { $set: { status: "approved", progress: 100, updated_at: new Date().toISOString() } }
+      );
+    }
 
     res.json({ success: true, message: "Task status updated", workflow_status: toStatus });
   } catch (e) { console.error("Update status:", e); res.status(500).json({ success: false, message: "Unable to update status" }); }
@@ -319,8 +506,14 @@ router.patch("/:id/status", authenticateToken, async (req, res) => {
 router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), upload.array("files", 5), async (req, res) => {
   try {
     const db = req.db;
-    const task = await db.collection("tasks").findOne({ _id: toId(req.params.id), assigned_to: req.user.id });
+    const task = await db.collection("tasks").findOne({ _id: toId(req.params.id) });
     if (!task) return res.status(404).json({ success: false, message: "Task not found" });
+
+    // Students may only submit tasks they have an assignment for
+    const { getAssignment, updateAssignment } = require("../models/TaskAssignment");
+    const assignment = await getAssignment(db, String(task._id), req.user.id);
+    const legacyOwner = task.assigned_to === req.user.id;
+    if (!assignment && !legacyOwner) return res.status(403).json({ success: false, message: "Access denied" });
     if (["Approved", "Cancelled", "Archived"].includes(task.workflow_status)) return res.status(409).json({ success: false, message: "This task cannot accept a submission" });
 
     const lastSub = await db.collection("submissions").find({ task_id: String(task._id) }).sort({ version: -1 }).limit(1).toArray();
@@ -355,6 +548,13 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
     }
 
     await transition(db, task, version > 1 ? "Resubmitted" : "Submitted", req.user.id, "Submission received");
+    // Record the submission snapshot on the student's own assignment
+    await updateAssignment(db, String(task._id), req.user.id, {
+      status: "submitted",
+      submission_version: version,
+      submission_comment: String(req.body?.comment || "").trim() || null,
+      submitted_at: submittedAt,
+    });
     await notify(db, task.assigned_by, "submission_received", "Submission received", `${submissionCode} was submitted for ${task.title}.`, String(task._id));
     await writeAudit(db, { actorId: req.user.id, action: "submission_uploaded", entityType: "submission", entityId: sid, newValue: { submission_code: submissionCode, task_id: String(task._id), version, submitted_at: submittedAt } });
 
@@ -384,6 +584,12 @@ router.post("/review", authenticateToken, authorizeRoles("admin", "ceo", "manage
 
     await db.collection("submissions").updateOne({ _id: sub._id }, { $set: { status: next, reviewer_id: req.user.id, reviewed_at: now, review_comments: comment } });
     await transition(db, task, next, req.user.id, comment);
+    // Mirror the decision onto the submitting student's assignment
+    const { updateAssignment } = require("../models/TaskAssignment");
+    await updateAssignment(db, String(task._id), sub.student_id, {
+      status: decision === "approve" ? "approved" : "revision_required",
+      progress: decision === "approve" ? 100 : undefined,
+    });
     await notify(db, sub.student_id, decision === "approve" ? "task_approved" : "revision_required", decision === "approve" ? "Task approved" : "Revision required", `${task.title}: ${comment}`, sub.task_id);
     await writeAudit(db, { actorId: req.user.id, action: decision === "approve" ? "submission_approved" : "revision_requested", entityType: "submission", entityId: String(sub._id), previousValue: { status: sub.status }, newValue: { status: next, review_comments: comment } });
 

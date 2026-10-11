@@ -1,237 +1,355 @@
-import { useEffect, useState } from "react";
-import { useExclusiveSelect } from "../../hooks/useExclusiveSelect";
+import { useEffect, useState, useCallback } from "react";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-const DEPARTMENTS = [
-  { value: "edutins", label: "Edutins" },
-  { value: "resins", label: "Resins" },
-  { value: "innovins", label: "Innovins" },
-  { value: "systins", label: "Systins" },
-  { value: "program", label: "Program" }
-];
-
-const PROGRAMS = [
-  { value: "techins 60", label: "Techins 60" },
-  { value: "ai ally", label: "AI Ally" },
-  { value: "life wise", label: "Life Wise" },
-  { value: "foundation x", label: "Foundation X" },
-  { value: "concept to carrier", label: "Concept to Carrier" },
-  { value: "unlock", label: "Unlock" }
-];
+const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 
 export default function Students() {
   const [students, setStudents] = useState([]);
   const [total, setTotal] = useState(0);
   const [maxStudents, setMaxStudents] = useState(100);
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
-  const { department, program, setDepartment, setProgram, reset, isDepartmentDisabled, isProgramDisabled } = useExclusiveSelect();
-  const [msg, setMsg] = useState("");
+  const [search, setSearch] = useState("");
+  const [batchFilter, setBatchFilter] = useState("");
+  const [batches, setBatches] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
+  const [batchTarget, setBatchTarget] = useState(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
-      const studentsRes = await fetch(`${API_URL}/api/admin/students`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
-
-      const studentsData = await studentsRes.json();
-
-      if (!studentsRes.ok) throw new Error(studentsData.message || "Unable to load students");
-      
-      setStudents(studentsData.students || []);
-      // Use server-provided total and limit for accurate count
-      if (typeof studentsData.total === "number") setTotal(studentsData.total);
-      if (typeof studentsData.limit === "number") setMaxStudents(studentsData.limit);
+      setLoading(true);
+      const params = new URLSearchParams({ page, limit: 10 });
+      if (search.trim()) params.set("search", search.trim());
+      if (batchFilter) params.set("batch", batchFilter);
+      const res = await fetch(`${API_URL}/api/admin/students?${params}`, { headers: auth() });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Unable to load students");
+      setStudents(data.students || []);
+      setTotal(data.total || 0);
+      setMaxStudents(data.limit || 100);
+      setTotalPages(data.total_pages || 1);
+      setError("");
     } catch (e) {
       setError(e.message);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [page, search, batchFilter]);
 
-  useEffect(() => {
-    load();
+  const loadBatches = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/batches`, { headers: auth() });
+      const data = await res.json();
+      setBatches(data.batches || []);
+    } catch { /* non-fatal */ }
   }, []);
+
+  useEffect(() => { loadBatches(); }, [loadBatches]);
+  useEffect(() => { load(); }, [load]);
 
   const create = async (e) => {
     e.preventDefault();
     setMsg("");
     setError("");
-    setLoading(true);
-
+    setSubmitting(true);
+    const form = e.target;
+    const name = form.studentName.value.trim();
+    const email = form.studentEmail.value.trim();
+    const password = form.studentPassword.value;
+    const batchId = form.studentBatch.value;
+    if (!name || !email || !password) {
+      setError("Name, email and password are required.");
+      setSubmitting(false);
+      return;
+    }
     try {
-      const r = await fetch(`${API_URL}/api/admin/students`, {
+      const res = await fetch(`${API_URL}/api/admin/students`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`
-        },
-        body: JSON.stringify({ ...form, department, program })
+        headers: { ...auth(), "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password, batchId: batchId || undefined })
       });
-
-      const d = await r.json();
-
-      if (!r.ok) {
-        setError(d.message || "Unable to create ID");
-        return;
-      }
-
-      setMsg("ID created successfully.");
-      setForm({ name: "", email: "", password: "" });
-      reset();
-      load();
+      const data = await res.json();
+      if (!res.ok) return setError(data.message || "Unable to create ID");
+      setMsg("Student added successfully.");
+      form.reset();
+      await load();
     } catch (err) {
       setError(err.message || "An error occurred");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
+    }
+  };
+
+  const saveEdit = async (e) => {
+    e.preventDefault();
+    if (!editTarget) return;
+    setSubmitting(true);
+    setError("");
+    setMsg("");
+    const form = e.target;
+    try {
+      const res = await fetch(`${API_URL}/api/admin/students/${editTarget.id}`, {
+        method: "PUT",
+        headers: { ...auth(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.editName.value.trim(),
+          email: form.editEmail.value.trim(),
+          phone: form.editPhone.value.trim() || null,
+          department: form.editDepartment.value || null
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) return setError(data.message || "Unable to update student");
+      setMsg("Student updated successfully.");
+      setEditTarget(null);
+      await load();
+    } catch (err) {
+      setError(err.message || "An error occurred");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const changeBatch = async (e) => {
+    e.preventDefault();
+    if (!batchTarget) return;
+    const newBatchId = e.target.newBatch.value;
+    if (!newBatchId) return setError("Select a batch.");
+    setSubmitting(true);
+    setError("");
+    setMsg("");
+    try {
+      const res = await fetch(`${API_URL}/api/admin/students/${batchTarget.id}/batch`, {
+        method: "PATCH",
+        headers: { ...auth(), "Content-Type": "application/json" },
+        body: JSON.stringify({ batchId: newBatchId })
+      });
+      const data = await res.json();
+      if (!res.ok) return setError(data.message || "Unable to change batch");
+      setMsg("Batch changed successfully.");
+      setBatchTarget(null);
+      await load();
+    } catch (err) {
+      setError(err.message || "An error occurred");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const toggleActive = async (student) => {
+    const action = student.active === 1 ? "deactivate" : "reactivate";
+    if (!window.confirm(`Are you sure you want to ${action} ${student.name}?`)) return;
+    setError("");
+    setMsg("");
+    try {
+      const res = await fetch(`${API_URL}/api/admin/students/${student.id}/${action}`, {
+        method: "PATCH",
+        headers: auth()
+      });
+      const data = await res.json();
+      if (!res.ok) return setError(data.message || `Unable to ${action} student`);
+      setMsg(`${student.name} ${action}d.`);
+      await load();
+    } catch (err) {
+      setError(err.message || "An error occurred");
+    }
+  };
+
+  const removeFromBatch = async (student) => {
+    if (!window.confirm(`Remove ${student.name} from their batch? Their task history and submissions are preserved.`)) return;
+    setError("");
+    setMsg("");
+    try {
+      const res = await fetch(`${API_URL}/api/admin/students/${student.id}/remove-batch`, {
+        method: "PATCH",
+        headers: auth()
+      });
+      const data = await res.json();
+      if (!res.ok) return setError(data.message || "Unable to remove from batch");
+      setMsg(`${student.name} removed from batch.`);
+      await load();
+    } catch (err) {
+      setError(err.message || "An error occurred");
     }
   };
 
   const isLimitReached = total >= maxStudents;
 
   return (
-    <div className="admin-simple">
+    <div className="admin-simple page-enter">
       <div className="simple-head">
         <span>TEAM MANAGEMENT</span>
         <h2>Students</h2>
         <p>{total} / {maxStudents} student accounts.</p>
       </div>
 
+      {error && <div className="error-msg">{error}</div>}
+      {msg && <div className="success-msg">{msg}</div>}
+
       <div className="admin-two">
         <form className="panel" onSubmit={create} autoComplete="off">
-          <h3>Create ID</h3>
-
-          <label htmlFor="student-name">
-            Full name
-            <input
-              id="student-name"
-              name="student-name"
-              placeholder="Full name"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              required
-              autoComplete="off"
-            />
+          <h3>Add Student</h3>
+          <label>Full name
+            <input name="studentName" placeholder="Full name" required autoComplete="off" />
           </label>
-
-          <label htmlFor="student-email">
-            Email
-            <input
-              id="student-email"
-              name="student-email"
-              type="email"
-              placeholder="Email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              required
-              autoComplete="off"
-            />
+          <label>Email
+            <input name="studentEmail" type="email" placeholder="Email" required autoComplete="off" />
           </label>
-
-          <label htmlFor="student-password">
-            Temporary password
-            <input
-              id="student-password"
-              name="student-password"
-              type="password"
-              placeholder="Temporary password"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              required
-              autoComplete="new-password"
-            />
+          <label>Temporary password
+            <input name="studentPassword" type="password" placeholder="Temporary password" required autoComplete="new-password" />
           </label>
-
-          <label htmlFor="student-department">
-            Department
-            <select
-              id="student-department"
-              name="student-department"
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              disabled={isProgramDisabled}
-              style={isProgramDisabled ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: 'rgba(0,0,0,0.05)' } : {}}
-              title={isProgramDisabled ? "Disabled because a Program is selected" : ""}
-              aria-disabled={isProgramDisabled}
-            >
-              <option value="">Select department</option>
-              {DEPARTMENTS.map((dept) => (
-                <option key={dept.value} value={dept.value}>
-                  {dept.label}
-                </option>
-              ))}
+          <label>Batch
+            <select name="studentBatch">
+              <option value="">No batch</option>
+              {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
-            {isProgramDisabled && (
-              <small style={{ fontSize: '10px', color: 'var(--text-muted-on-light)', marginTop: '2px' }}>Disabled because a Program is selected</small>
-            )}
           </label>
-
-          <label htmlFor="student-program">
-            Program
-            <select
-              id="student-program"
-              name="student-program"
-              value={program}
-              onChange={(e) => setProgram(e.target.value)}
-              disabled={isDepartmentDisabled}
-              style={isDepartmentDisabled ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: 'rgba(0,0,0,0.05)' } : {}}
-              title={isDepartmentDisabled ? "Disabled because a Department is selected" : ""}
-              aria-disabled={isDepartmentDisabled}
-            >
-              <option value="">Select program</option>
-              {PROGRAMS.map((prog) => (
-                <option key={prog.value} value={prog.value}>
-                  {prog.label}
-                </option>
-              ))}
-            </select>
-            {isDepartmentDisabled && (
-              <small style={{ fontSize: '10px', color: 'var(--text-muted-on-light)', marginTop: '2px' }}>Disabled because a Department is selected</small>
-            )}
-          </label>
-
-          <button 
-            className="gold-btn" 
-            type="submit"
-            disabled={loading || isLimitReached}
-          >
-            {loading ? "Creating ID…" : "Create ID"}
+          <button className="gold-btn" type="submit" disabled={submitting || isLimitReached}>
+            {submitting ? "Adding…" : "Add Student"}
           </button>
-
           {isLimitReached && (
-            <div className="error-msg">
-              Student limit of {maxStudents} has been reached. Cannot create more student accounts.
-            </div>
+            <div className="error-msg">Student limit of {maxStudents} reached.</div>
           )}
-
-          {msg && <div className="success-msg">{msg}</div>}
-          {error && <div className="error-msg">{error}</div>}
         </form>
 
         <div className="panel">
           <div className="panel-head">
             <h3>Registered Students</h3>
-            <button onClick={() => load()}>Refresh</button>
+            <button onClick={load} disabled={loading}>{loading ? "Loading…" : "Refresh"}</button>
           </div>
 
-          {students.length ? (
-            students.map((s) => (
-              <div className="list-row" key={s.id}>
-                <div className="avatar">{s.name.charAt(0).toUpperCase()}</div>
-                <div>
-                  <strong>{s.name}</strong>
-                  <small>
-                    {s.email}
-                    {s.department && ` · ${s.department.charAt(0).toUpperCase() + s.department.slice(1)}`}
-                    {s.program && ` · ${s.program.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}`}
-                  </small>
-                </div>
-              </div>
-            ))
+          <div style={{ display: "flex", gap: "10px", marginBottom: "14px", flexWrap: "wrap" }}>
+            <input
+              type="search"
+              placeholder="Search name or email…"
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
+              style={{ flex: 1, minWidth: 180, padding: "8px 12px", borderRadius: 8, border: "1px solid #D0D0D0", fontSize: 13 }}
+            />
+            <select
+              value={batchFilter}
+              onChange={e => { setBatchFilter(e.target.value); setPage(1); }}
+              style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #D0D0D0", fontSize: 13 }}
+            >
+              <option value="">All batches</option>
+              {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </div>
+
+          {loading ? (
+            <div className="empty-state">Loading students…</div>
+          ) : students.length === 0 ? (
+            <div className="empty-state">No students found.</div>
           ) : (
-            <div className="empty-state">No students yet.</div>
+            <>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ textAlign: "left", borderBottom: "2px solid #E5E5E5" }}>
+                      <th style={{ padding: "8px" }}>Name</th>
+                      <th style={{ padding: "8px" }}>Email</th>
+                      <th style={{ padding: "8px" }}>Batch</th>
+                      <th style={{ padding: "8px" }}>Status</th>
+                      <th style={{ padding: "8px" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {students.map(s => (
+                      <tr key={s.id} style={{ borderBottom: "1px solid #F0F0F0" }}>
+                        <td style={{ padding: "8px" }}><strong>{s.name}</strong></td>
+                        <td style={{ padding: "8px" }}>{s.email}</td>
+                        <td style={{ padding: "8px" }}>{s.batch?.name || "—"}</td>
+                        <td style={{ padding: "8px" }}>
+                          <span className={`pill ${s.active === 1 ? "approved" : "pending"}`}>
+                            {s.active === 1 ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td style={{ padding: "8px" }}>
+                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                            <button onClick={() => setEditTarget(s)}>Edit</button>
+                            <button onClick={() => setBatchTarget(s)}>Change Batch</button>
+                            {s.batch_id && <button onClick={() => removeFromBatch(s)}>Remove</button>}
+                            <button onClick={() => toggleActive(s)}>
+                              {s.active === 1 ? "Deactivate" : "Reactivate"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {totalPages > 1 && (
+                <div style={{ display: "flex", gap: "8px", marginTop: 14, alignItems: "center", justifyContent: "center" }}>
+                  <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Prev</button>
+                  <span style={{ fontSize: 13 }}>Page {page} of {totalPages}</span>
+                  <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
+
+      {editTarget && (
+        <div className="review-modal" onClick={() => setEditTarget(null)}>
+          <div className="panel" onClick={e => e.stopPropagation()}>
+            <div className="panel-head">
+              <h3>Edit Student</h3>
+              <button onClick={() => setEditTarget(null)}>Close</button>
+            </div>
+            <form onSubmit={saveEdit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <label>Name
+                <input name="editName" defaultValue={editTarget.name} required />
+              </label>
+              <label>Email
+                <input name="editEmail" type="email" defaultValue={editTarget.email} required />
+              </label>
+              <label>Phone
+                <input name="editPhone" defaultValue={editTarget.phone || ""} />
+              </label>
+              <label>Department
+                <input name="editDepartment" defaultValue={editTarget.department || ""} />
+              </label>
+              <button className="gold-btn" type="submit" disabled={submitting}>
+                {submitting ? "Saving…" : "Save Changes"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {batchTarget && (
+        <div className="review-modal" onClick={() => setBatchTarget(null)}>
+          <div className="panel" onClick={e => e.stopPropagation()}>
+            <div className="panel-head">
+              <h3>Change Batch — {batchTarget.name}</h3>
+              <button onClick={() => setBatchTarget(null)}>Close</button>
+            </div>
+            <form onSubmit={changeBatch} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <p style={{ fontSize: 13, margin: 0 }}>
+                Current batch: <strong>{batchTarget.batch?.name || "None"}</strong>.
+                Task history and submissions are preserved.
+              </p>
+              <label>New batch
+                <select name="newBatch" required>
+                  <option value="">Select batch</option>
+                  {batches.filter(b => b.id !== batchTarget.batch_id).map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </label>
+              <button className="gold-btn" type="submit" disabled={submitting}>
+                {submitting ? "Changing…" : "Change Batch"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

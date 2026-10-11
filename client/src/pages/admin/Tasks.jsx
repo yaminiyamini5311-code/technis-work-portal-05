@@ -25,7 +25,12 @@ const DOMAINS = [
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
   const [students, setStudents] = useState([]);
+  const [batches, setBatches] = useState([]);
+  const [batchesLoading, setBatchesLoading] = useState(true);
+  const [batchesError, setBatchesError] = useState("");
   const [domainFilter, setDomainFilter] = useState("");
+  const [targetType, setTargetType] = useState("student"); // "student" | "batch" | "program"
+  const [batchId, setBatchId] = useState("");
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -44,24 +49,30 @@ export default function Tasks() {
   const [review, setReview] = useState({ decision: "revision", comment: "" });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const load = async () => {
     try {
       const h = auth();
-      const [tasksRes, studentsRes] = await Promise.all([
-        fetch(`${API_URL}/api/tasks`, { headers: h }), 
-        fetch(`${API_URL}/api/students`, { headers: h })
+      const [tasksRes, studentsRes, batchesRes] = await Promise.all([
+        fetch(`${API_URL}/api/tasks`, { headers: h }),
+        fetch(`${API_URL}/api/students`, { headers: h }),
+        fetch(`${API_URL}/api/batches`, { headers: h }),
       ]);
-      const [taskData, studentData] = await Promise.all([tasksRes.json(), studentsRes.json()]);
+      const [taskData, studentData, batchData] = await Promise.all([tasksRes.json(), studentsRes.json(), batchesRes.json()]);
       if (!tasksRes.ok) throw new Error(taskData.message || "Unable to load tasks");
-      setTasks(taskData.tasks || []); 
-      setStudents(studentData.students || []); 
+      setTasks(taskData.tasks || []);
+      setStudents(studentData.students || []);
+      setBatches(batchData.batches || []);
+      setBatchesError("");
       setError("");
-    } catch (e) { 
-      setError(e.message); 
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBatchesLoading(false);
     }
   };
-  
+
   useEffect(() => { load(); }, []);
 
   const create = async (event) => {
@@ -69,9 +80,15 @@ export default function Tasks() {
     setMessage("");
     setError("");
 
-    // Validate that either student or program is selected
-    if (!student && !program) {
-      return setError("Select a student or a program");
+    // Validate target selection
+    if (targetType === "student" && !student) {
+      return setError("Select a student");
+    }
+    if (targetType === "batch" && !batchId) {
+      return setError("Select a batch");
+    }
+    if (targetType === "program" && !program) {
+      return setError("Select a program");
     }
 
     // Validate start/end dates
@@ -79,36 +96,50 @@ export default function Tasks() {
       return setError("Starting Date cannot be after Ending Date");
     }
 
+    // IDs are ObjectId STRINGS — never convert to Number (that was the bug)
     const payload = {
       ...form,
-      assigned_to: student ? Number(student) : null,
-      program: program || null,
+      target_type: targetType,
+      assigned_to: targetType === "student" && student ? student : null,
+      student_ids: targetType === "student" && student ? [student] : [],
+      batch_id: targetType === "batch" ? batchId : null,
+      program: targetType === "program" ? program : null,
       domain: form.domain
     };
 
-    const res = await fetch(`${API_URL}/api/tasks`, {
-      method: "POST",
-      headers: { ...auth(), "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
+    try {
+      setSubmitting(true);
+      const res = await fetch(`${API_URL}/api/tasks`, {
+        method: "POST",
+        headers: { ...auth(), "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
 
-    if (!res.ok) return setError(data.message || "Unable to create task");
+      if (!res.ok) return setError(data.message || "Unable to create task");
 
-    setMessage(`Task ${data.taskCode} assigned successfully.`);
-    setForm({
-      title: "",
-      description: "",
-      priority: "medium",
-      start_date: "",
-      due_date: "",
-      domain: "edutins",
-      how_to_do: "",
-      expected_output: "",
-      submission_requirements: ""
-    });
-    reset();
-    load();
+      const parts = [`Task ${data.taskCode} assigned`];
+      if (data.assigned_count) parts.push(`to ${data.assigned_count} student${data.assigned_count === 1 ? "" : "s"}`);
+      setMessage(parts.join(" ") + ".");
+      setForm({
+        title: "",
+        description: "",
+        priority: "medium",
+        start_date: "",
+        due_date: "",
+        domain: "edutins",
+        how_to_do: "",
+        expected_output: "",
+        submission_requirements: ""
+      });
+      reset();
+      setBatchId("");
+      await load();
+    } catch (e) {
+      setError(e.message || "Unable to create task");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const openReview = async (task) => {
@@ -162,6 +193,24 @@ export default function Tasks() {
         />
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <label htmlFor="task-target-type" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Assign To <span style={{ color: '#FA9A02' }}>*</span>
+          </label>
+          <select
+            id="task-target-type"
+            name="task-target-type"
+            value={targetType}
+            onChange={e => setTargetType(e.target.value)}
+            required
+            autoComplete="off"
+          >
+            <option value="student">Individual Student</option>
+            <option value="batch">Entire Batch</option>
+            <option value="program">Program (legacy)</option>
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <label htmlFor="task-student" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Select Student
           </label>
@@ -170,19 +219,45 @@ export default function Tasks() {
             name="task-student"
             value={student}
             onChange={e => setStudent(e.target.value)}
-            disabled={isStudentDisabled}
+            disabled={isStudentDisabled || targetType !== "student"}
             autoComplete="off"
-            style={isStudentDisabled ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#F3F4F6' } : {}}
-            title={isStudentDisabled ? "Disabled because a program is selected" : ""}
-            aria-disabled={isStudentDisabled}
+            style={isStudentDisabled || targetType !== "student" ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#F3F4F6' } : {}}
+            title={isStudentDisabled ? "Disabled because a program is selected" : targetType !== "student" ? "Select 'Individual Student' above" : ""}
+            aria-disabled={isStudentDisabled || targetType !== "student"}
           >
             <option value="">Select student</option>
             {students.map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+              <option key={s.id} value={s.id}>{s.name}{s.batch_name ? ` (${s.batch_name})` : ""}</option>
             ))}
           </select>
-          {isStudentDisabled && (
-            <small style={{ fontSize: '10px', color: 'var(--text-muted-on-light)', marginTop: '2px' }}>Disabled because a program is selected</small>
+          {targetType !== "student" && (
+            <small style={{ fontSize: '10px', color: 'var(--text-muted-on-light)', marginTop: '2px' }}>Choose “Individual Student” to pick a student</small>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <label htmlFor="task-batch" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Select Batch
+          </label>
+          <select
+            id="task-batch"
+            name="task-batch"
+            value={batchId}
+            onChange={e => setBatchId(e.target.value)}
+            disabled={batchesLoading || targetType !== "batch"}
+            autoComplete="off"
+            style={batchesLoading || targetType !== "batch" ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#F3F4F6' } : {}}
+            title={targetType !== "batch" ? "Select 'Entire Batch' above" : ""}
+            aria-disabled={batchesLoading || targetType !== "batch"}
+          >
+            <option value="">{batchesLoading ? "Loading batches..." : "Select batch"}</option>
+            {batches.map(b => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+          {batchesError && <small style={{ fontSize: '10px', color: '#B42318', marginTop: '2px' }}>{batchesError}</small>}
+          {targetType === "batch" && !batchesLoading && !batchesError && batches.length === 0 && (
+            <small style={{ fontSize: '10px', color: '#B42318', marginTop: '2px' }}>No batches available</small>
           )}
         </div>
         
@@ -250,19 +325,19 @@ export default function Tasks() {
             name="task-program"
             value={program}
             onChange={e => setProgram(e.target.value)}
-            disabled={isProgramDisabled}
+            disabled={isProgramDisabled || targetType !== "program"}
             autoComplete="off"
-            style={isProgramDisabled ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#F3F4F6' } : {}}
-            title={isProgramDisabled ? "Disabled because a student is selected" : ""}
-            aria-disabled={isProgramDisabled}
+            style={isProgramDisabled || targetType !== "program" ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#F3F4F6' } : {}}
+            title={isProgramDisabled ? "Disabled because a student is selected" : targetType !== "program" ? "Select 'Program (legacy)' above" : ""}
+            aria-disabled={isProgramDisabled || targetType !== "program"}
           >
             <option value="">Select program</option>
             {PROGRAMS.map(prog => (
               <option key={prog.value} value={prog.value}>{prog.label}</option>
             ))}
           </select>
-          {isProgramDisabled && (
-            <small style={{ fontSize: '10px', color: 'var(--text-muted-on-light)', marginTop: '2px' }}>Disabled because a student is selected</small>
+          {targetType !== "program" && (
+            <small style={{ fontSize: '10px', color: 'var(--text-muted-on-light)', marginTop: '2px' }}>Choose “Program (legacy)” to use program grouping</small>
           )}
         </div>
         
@@ -302,7 +377,9 @@ export default function Tasks() {
           autoComplete="off"
         />
         
-        <button className="gold-btn" type="submit">Assign Task</button>
+        <button className="gold-btn" type="submit" disabled={submitting}>
+          {submitting ? "Assigning…" : "Assign Task"}
+        </button>
       </form>
 
       <div className="panel table-wrap">
@@ -331,7 +408,7 @@ export default function Tasks() {
             <tr>
               <th>Task</th>
               <th>Domain</th>
-              <th>Student</th>
+              <th>Student / Batch</th>
               <th>Program</th>
               <th>Workflow</th>
               <th>Priority</th>
@@ -361,7 +438,16 @@ export default function Tasks() {
                     {t.domain ? DOMAINS.find(d => d.value === t.domain)?.label || t.domain : '—'}
                   </span>
                 </td>
-                <td>{t.student_name}</td>
+                <td>
+                  {t.target_type === "batch" ? (
+                    <>
+                      <strong>{t.batch_name || "Batch"}</strong>
+                      <small>{t.assignee_count || 0} assignees</small>
+                    </>
+                  ) : (
+                    t.student_name
+                  )}
+                </td>
                 <td>{t.program ? t.program.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '—'}</td>
                 <td>
                   <span className={`pill ${t.status}`}>

@@ -16,8 +16,17 @@ async function getStudentDashboard(db, userId) {
   const student = await db.collection("users").findOne({ _id: toId(userId) }, { projection: { password: 0 } });
   if (!student) return null;
 
-  const [tasks, missions, activities, review] = await Promise.all([
-    db.collection("tasks").find({ assigned_to: String(userId) }).sort({ created_at: -1 }).toArray(),
+  // Tasks visible to this student: legacy direct assignments plus
+  // any task with a TaskAssignment for them (batch or multi-student).
+  const { getStudentTaskIds } = require("../models/TaskAssignment");
+  const assignedTaskIds = await getStudentTaskIds(db, String(userId));
+  const tasks = await db.collection("tasks").find({
+    $or: [
+      { _id: { $in: assignedTaskIds.map(id => { try { return new ObjectId(id); } catch { return id; } }) } },
+      { assigned_to: String(userId) },
+    ]
+  }).sort({ created_at: -1 }).toArray();
+  const [missions, activities, review] = await Promise.all([
     db.collection("missions").find({ assigned_to: String(userId) }).sort({ created_at: -1 }).toArray(),
     db.collection("daily_activities").find({ user_id: String(userId) }).sort({ date: -1 }).toArray(),
     db.collection("performance").find({ user_id: String(userId) }).sort({ created_at: -1 }).limit(1).toArray().then(r => r[0] || null)

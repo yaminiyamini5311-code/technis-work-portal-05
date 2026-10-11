@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import TechinsLoader from "./components/TechinsLoader";
 import Login from "./pages/Login";
@@ -24,6 +24,8 @@ import Feedback from "./pages/admin/feedback";
 import AdminPerformance from "./pages/admin/performance";
 import AuditLogs from "./pages/admin/AuditLogs";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 function Protected({ role, children }) {
   const token = localStorage.getItem("token");
   let user = {};
@@ -40,53 +42,91 @@ function Protected({ role, children }) {
 
 export default function App() {
   const [booting, setBooting] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Restore auth on load: verify the stored token with /me before
+  // route guards decide. Clears stale tokens (expired, server restart
+  // with rotated secret, deactivated account).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const token = localStorage.getItem("token");
+      if (!token) { setAuthChecked(true); return; }
+      try {
+        const res = await fetch(`${API_URL}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.user) {
+            localStorage.setItem("user", JSON.stringify(data.user));
+            localStorage.setItem("role", data.user.role);
+          }
+        } else {
+          // Invalid/expired token or deactivated account — clear it
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          localStorage.removeItem("role");
+        }
+      } catch {
+        // Network error: keep the token, retry on next navigation
+      } finally {
+        if (!cancelled) setAuthChecked(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <>
       {booting && <TechinsLoader duration={3000} onDone={() => setBooting(false)} />}
-      <BrowserRouter><Routes>
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      {(!booting && !authChecked) ? <TechinsLoader /> : null}
+      {booting || !authChecked ? null : (
+        <BrowserRouter><Routes>
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
-    <Route element={<Protected role="student"><StudentLayout /></Protected>}>
-      <Route path="/student" element={<StudentDashboard />} />
-      <Route path="/student/tasks" element={<MyTasks />} />
-      <Route path="/student/daily-activity" element={<DailyActivity />} />
-      <Route path="/student/missions" element={<Missions />} />
-      <Route path="/student/work-history" element={<WorkHistory />} />
-      <Route path="/student/performance" element={<StudentPerformance />} />
-      <Route path="/student/feedback" element={<StudentFeedback />} />
-      <Route path="/student/profile" element={<Profile />} />
-    </Route>
+        <Route element={<Protected role="student"><StudentLayout /></Protected>}>
+          <Route path="/student" element={<StudentDashboard />} />
+          <Route path="/student/tasks" element={<MyTasks />} />
+          <Route path="/student/daily-activity" element={<DailyActivity />} />
+          <Route path="/student/missions" element={<Missions />} />
+          <Route path="/student/work-history" element={<WorkHistory />} />
+          <Route path="/student/performance" element={<StudentPerformance />} />
+          <Route path="/student/feedback" element={<StudentFeedback />} />
+          <Route path="/student/profile" element={<Profile />} />
+        </Route>
 
-    <Route element={<Protected role="manager"><RoleLayout role="manager" /></Protected>}>
-      <Route path="/manager" element={<ManagerDashboard />} />
-      <Route path="/manager/monitor" element={<ActivityMonitor />} />
-      <Route path="/manager/students" element={<Students />} />
-      <Route path="/manager/tasks" element={<AdminTasks />} />
-      <Route path="/manager/missions" element={<AdminMissions />} />
-      <Route path="/manager/daily-activities" element={<DailyActivities />} />
-      <Route path="/manager/performance" element={<AdminPerformance />} />
-      <Route path="/manager/feedback" element={<Feedback />} />
-    </Route>
+        <Route element={<Protected role="manager"><RoleLayout role="manager" /></Protected>}>
+          <Route path="/manager" element={<ManagerDashboard />} />
+          <Route path="/manager/monitor" element={<ActivityMonitor />} />
+          <Route path="/manager/students" element={<Students />} />
+          <Route path="/manager/tasks" element={<AdminTasks />} />
+          <Route path="/manager/missions" element={<AdminMissions />} />
+          <Route path="/manager/daily-activities" element={<DailyActivities />} />
+          <Route path="/manager/performance" element={<AdminPerformance />} />
+          <Route path="/manager/feedback" element={<Feedback />} />
+        </Route>
 
-    <Route element={<Protected role="admin"><RoleLayout role="admin" /></Protected>}>
-      <Route path="/admin" element={<AdminDashboard />} />
-      <Route path="/admin/students" element={<Students />} />
-      <Route path="/admin/tasks" element={<AdminTasks />} />
-      <Route path="/admin/missions" element={<AdminMissions />} />
-      <Route path="/admin/daily-activities" element={<DailyActivities />} />
-      <Route path="/admin/performance" element={<AdminPerformance />} />
-      <Route path="/admin/feedback" element={<Feedback />} />
-      <Route path="/admin/audit" element={<AuditLogs />} />
-    </Route>
+        <Route element={<Protected role="admin"><RoleLayout role="admin" /></Protected>}>
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/students" element={<Students />} />
+          <Route path="/admin/tasks" element={<AdminTasks />} />
+          <Route path="/admin/missions" element={<AdminMissions />} />
+          <Route path="/admin/daily-activities" element={<DailyActivities />} />
+          <Route path="/admin/performance" element={<AdminPerformance />} />
+          <Route path="/admin/feedback" element={<Feedback />} />
+          <Route path="/admin/audit" element={<AuditLogs />} />
+        </Route>
 
-    {/* Redirect old CEO routes to Admin */}
-    <Route path="/ceo" element={<Navigate to="/admin" replace />} />
-    <Route path="/ceo/*" element={<Navigate to="/admin" replace />} />
+        {/* Redirect old CEO routes to Admin */}
+        <Route path="/ceo" element={<Navigate to="/admin" replace />} />
+        <Route path="/ceo/*" element={<Navigate to="/admin" replace />} />
 
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes></BrowserRouter>
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes></BrowserRouter>
+      )}
     </>
   );
 }

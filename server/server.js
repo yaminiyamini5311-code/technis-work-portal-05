@@ -19,7 +19,13 @@ if (missing.length) {
     `Add them in Vercel Dashboard → Settings → Environment Variables.`
   );
   // DO NOT call process.exit() on Vercel — it kills the entire serverless instance.
-  // We throw instead so every request gets a clear 503 rather than a generic 500.
+  // The env-guard middleware below returns a clear 503 per request instead.
+  // On long-running servers (local dev, Render) fail fast instead: without
+  // JWT_SECRET no token can be issued or verified, so the process cannot
+  // serve auth traffic at all.
+  if (!process.env.VERCEL) {
+    process.exit(1);
+  }
 }
 
 const { connect, healthCheck } = require("./mongodb");
@@ -213,6 +219,7 @@ const missionRoutes      = require("./routes/missionRoutes");
 const performanceRoutes  = require("./routes/performanceRoutes");
 const auditRoutes        = require("./routes/auditRoutes");
 const authorizedUsersRoutes = require("./routes/authorizedUsersRoutes");
+const batchRoutes        = require("./routes/batchRoutes");
 
 app.use("/api/auth",         authRoutes);
 app.use("/api/admin",        adminRoutes);
@@ -225,6 +232,7 @@ app.use("/api/missions",     missionRoutes);
 app.use("/api/performance",  performanceRoutes);
 app.use("/api/audit-logs",   auditRoutes);
 app.use("/api/authorized-users", authorizedUsersRoutes);
+app.use("/api/batches",      batchRoutes);
 
 // ─── 404 ───────────────────────────────────────────────────────────────────
 app.use((req, res) => {
@@ -255,38 +263,70 @@ app.use((error, req, res, next) => {
 async function ensureDefaultAccounts(db) {
   try {
     // ═══════════════════════════════════════════════════════════════════════
-    // CEO EMAIL CLEANUP - RUNS FIRST, BEFORE ANY LOGIN REQUESTS
+    // CEO AUTH SEEDING - RUNS FIRST, BEFORE ANY LOGIN REQUESTS
     // ═══════════════════════════════════════════════════════════════════════
-    // Remove any users collection documents with the CEO email (case-insensitive)
-    // CEO authentication is handled ONLY via environment variables, not database
+    // CEO authentication is handled ONLY via environment variables:
+    //   CEO_EMAIL         - the CEO email address
+    //   CEO_PASSWORD_HASH - bcrypt hash of the CEO password (cost 12)
+    //   CEO_PASSWORD      - (optional) plaintext; hash is generated on first
+    //                       startup if CEO_PASSWORD_HASH is missing.
+    // Never overwrites an existing hash and never touches DB users.
     const CEO_EMAIL_RAW = process.env.CEO_EMAIL || null;
     const CEO_EMAIL = CEO_EMAIL_RAW ? CEO_EMAIL_RAW.trim().toLowerCase() : null;
-    
+    const CEO_PASSWORD = process.env.CEO_PASSWORD || null;
+    const CEO_PASSWORD_HASH = process.env.CEO_PASSWORD_HASH || null;
+
     console.log("[Accounts] CEO_EMAIL configured:", Boolean(CEO_EMAIL_RAW));
-    
+
+    // If CEO_PASSWORD is provided but CEO_PASSWORD_HASH is not, generate
+    // the hash once and write it back to .env (idempotent on next start).
+    if (CEO_EMAIL && CEO_PASSWORD && !CEO_PASSWORD_HASH) {
+      try {
+        const generatedHash = await bcrypt.hash(CEO_PASSWORD, 12);
+        process.env.CEO_PASSWORD_HASH = generatedHash;
+        // Persist to .env so subsequent starts don't regenerate
+        try {
+          const fs = require("fs");
+          const path = require("path");
+          const envPath = path.join(__dirname, ".env");
+          const lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
+          const out = [];
+          let found = false;
+          for (const line of lines) {
+            if (/^\s*CEO_PASSWORD_HASH\s*=/.test(line)) {
+              out.push("CEO_PASSWORD_HASH=" + generatedHash);
+              found = true;
+            } else {
+              out.push(line);
+            }
+          }
+          if (!found) out.push("CEO_PASSWORD_HASH=" + generatedHash);
+          fs.writeFileSync(envPath, out.join("\n"));
+          console.log("[Accounts] CEO_PASSWORD_HASH generated from CEO_PASSWORD and saved to .env");
+        } catch (envErr) {
+          console.error("[Accounts] Could not persist CEO_PASSWORD_HASH to .env:", envErr.message);
+        }
+      } catch (hashErr) {
+        console.error("[Accounts] Failed to generate CEO_PASSWORD_HASH:", hashErr.message);
+      }
+    }
+
+    // Remove any DB documents with the CEO email (case-insensitive) so
+    // CEO auth can NEVER be bypassed via a DB user with the same email.
     if (CEO_EMAIL) {
       try {
-        console.log("[Accounts] Starting CEO email cleanup from users collection");
-        
-        // Delete all documents matching CEO email (case-insensitive)
-        // Use regex with escaped email to prevent injection
         const escapedEmail = CEO_EMAIL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const deleteResult = await db.collection("users").deleteMany({
           email: { $regex: new RegExp(`^${escapedEmail}$`, 'i') }
         });
-        
         if (deleteResult.deletedCount > 0) {
           console.log(`[Accounts] ✓ Removed ${deleteResult.deletedCount} document(s) with CEO email from users collection`);
-          console.log("[Accounts] CEO authentication is env-var only (no database)");
-        } else {
-          console.log("[Accounts] No documents with CEO email found in users collection");
         }
       } catch (cleanupError) {
         console.error("[Accounts] CEO email cleanup error:", cleanupError.message);
-        // Don't fail initialization on cleanup error
       }
     } else {
-      console.warn("[Accounts] CEO_EMAIL not configured - skipping CEO cleanup");
+      console.warn("[Accounts] CEO_EMAIL not configured - CEO login will not work");
     }
     
     // ═══════════════════════════════════════════════════════════════════════

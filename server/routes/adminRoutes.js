@@ -71,22 +71,67 @@ router.get("/progress", authenticateToken, authorizeRoles("admin", "manager", "c
   }
 });
 
-/* ─── GET STUDENTS ──────────────────────────────────────────────────────── */
+/* ─── GET STUDENTS (search, batch filter, pagination) ───── */
 router.get("/students", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
   try {
     const db = req.db;
-    const students = await db.collection("users").find(
-      { role: "student" },
-      { projection: { password: 0 } }
-    ).sort({ name: 1 }).toArray();
+    const search = String(req.query?.search || "").trim();
+    const batch = String(req.query?.batch || "").trim();
+    const includeInactive = String(req.query?.include_inactive || "") === "true";
+    const page = Math.max(1, Number(req.query?.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query?.limit) || 25));
+
+    const filter = { role: "student" };
+    if (!includeInactive) filter.active = 1;
+    if (search) {
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      filter.$or = [
+        { name: { $regex: escaped, $options: "i" } },
+        { email: { $regex: escaped, $options: "i" } },
+      ];
+    }
+    if (batch) {
+      const { ObjectId: Oid } = require("mongodb");
+      let batchOid;
+      try { batchOid = new Oid(batch); } catch { batchOid = null; }
+      if (!batchOid) return res.status(400).json({ success: false, message: "Invalid batch filter" });
+      filter.batch_id = String(batchOid);
+    }
+
+    const [total, students] = await Promise.all([
+      db.collection("users").countDocuments(filter),
+      db.collection("users")
+        .find(filter, { projection: { password: 0 } })
+        .sort({ name: 1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .toArray(),
+    ]);
+
+    // Resolve batch names for display
+    const batchIds = [...new Set(students.map(s => s.batch_id).filter(Boolean))];
+    const batches = batchIds.length
+      ? await db.collection("batches").find({ _id: { $in: batchIds.map(id => { try { return toId(id); } catch { return id; } }) } }, { projection: { name: 1, active: 1 } }).toArray()
+      : [];
+    const batchById = new Map(batches.map(b => [String(b._id), b]));
 
     const activeCount = await db.collection("users").countDocuments({ role: "student", active: 1 });
 
     res.json({
       success: true,
-      students: students.map(fmt),
-      total: activeCount,
+      students: students.map(s => {
+        const d = fmt(s);
+        d.batch = s.batch_id && batchById.has(String(s.batch_id))
+          ? { id: String(s.batch_id), name: batchById.get(String(s.batch_id)).name, active: batchById.get(String(s.batch_id)).active !== false }
+          : null;
+        return d;
+      }),
+      total,
+      active_total: activeCount,
       limit: MAX_STUDENT_ACCOUNTS,
+      page,
+      page_size: limit,
+      total_pages: Math.ceil(total / limit) || 1,
     });
   } catch (error) {
     console.error("Admin students error:", error);
@@ -98,7 +143,7 @@ router.get("/students", authenticateToken, authorizeRoles("admin", "manager", "c
 router.post("/students", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
   try {
     const db = req.db;
-    const { name, email, password, department, program } = req.body || {};
+    const { name, email, password, department, program, batchId } = req.body || {};
 
     if (!name || !email || !password) {
       return res.status(400).json({ success: false, message: "Name, email, and password are required" });
@@ -107,7 +152,21 @@ router.post("/students", authenticateToken, authorizeRoles("admin", "ceo"), asyn
       return res.status(400).json({ success: false, message: "Cannot select both Department and Program. Choose one." });
     }
 
-    const existing = await db.collection("users").findOne({ email: String(email).trim().toLowerCase() });
+    const cleanEmail = String(email).trim().toLowerCase();
+
+    // Batch validation — never trust the client
+    let batchRecord = null;
+    if (batchId) {
+      const { ObjectId: Oid } = require("mongodb");
+      let batchOid;
+      try { batchOid = new Oid(String(batchId).trim()); } catch { batchOid = null; }
+      if (!batchOid) return res.status(400).json({ success: false, message: "Invalid batch id" });
+      batchRecord = await db.collection("batches").findOne({ _id: batchOid });
+      if (!batchRecord) return res.status(404).json({ success: false, message: "Batch not found" });
+      if (batchRecord.active === false) return res.status(400).json({ success: false, message: "Batch is deactivated" });
+    }
+
+    const existing = await db.collection("users").findOne({ email: cleanEmail });
     if (existing) return res.status(409).json({ success: false, message: "Email already exists" });
 
     const studentCount = await db.collection("users").countDocuments({ role: "student", active: 1 });
@@ -118,15 +177,22 @@ router.post("/students", authenticateToken, authorizeRoles("admin", "ceo"), asyn
     const hashedPassword = await bcrypt.hash(String(password), 12);
     const result = await db.collection("users").insertOne({
       name: String(name).trim(),
-      email: String(email).trim().toLowerCase(),
+      email: cleanEmail,
       password: hashedPassword,
       role: "student",
       department: department ? String(department).trim().toLowerCase() : null,
-      program: program ? String(program).trim().toLowerCase() : null,
+      program: program ? String(program).trim().toLowerCase() : (batchRecord ? String(batchRecord.name) : null),
+      batch_id: batchRecord ? String(batchRecord._id) : null,
       active: 1,
       registration_status: "approved",
       created_at: new Date().toISOString()
     });
+
+    // New batch member: materialize assignments for the batch's active tasks
+    if (batchRecord) {
+      const { createAssignmentsForStudent } = require("../models/TaskAssignment");
+      await createAssignmentsForStudent(db, String(result.insertedId), String(batchRecord._id));
+    }
 
     const created = await db.collection("users").findOne({ _id: result.insertedId }, { projection: { password: 0 } });
     res.status(201).json({ success: true, message: "Student created successfully", studentId: String(result.insertedId), student: fmt(created) });
@@ -134,6 +200,214 @@ router.post("/students", authenticateToken, authorizeRoles("admin", "ceo"), asyn
     console.error("Create student error:", error);
     if (error.code === 11000) return res.status(409).json({ success: false, message: "Email already exists" });
     res.status(500).json({ success: false, message: "Unable to create student" });
+  }
+});
+
+/* ─── EDIT STUDENT ──────────────────────────────────────────────── */
+router.put("/students/:id", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+    const userId = toId(req.params.id);
+    if (!userId) return res.status(400).json({ success: false, message: "Invalid student id" });
+    const user = await db.collection("users").findOne({ _id: userId });
+    if (!user) return res.status(404).json({ success: false, message: "Student not found" });
+
+    const { name, email, phone, department } = req.body || {};
+    const updates = {};
+    if (name !== undefined) {
+      const cleanName = String(name).trim();
+      if (!cleanName) return res.status(400).json({ success: false, message: "Name cannot be empty" });
+      updates.name = cleanName;
+    }
+    if (email !== undefined) {
+      const cleanEmail = String(email).trim().toLowerCase();
+      if (!cleanEmail) return res.status(400).json({ success: false, message: "Email cannot be empty" });
+      const clash = await db.collection("users").findOne({ email: cleanEmail, _id: { $ne: userId } });
+      if (clash) return res.status(409).json({ success: false, message: "Another account already uses this email" });
+      updates.email = cleanEmail;
+    }
+    if (phone !== undefined) updates.phone = String(phone).trim() || null;
+    if (department !== undefined) updates.department = String(department).trim().toLowerCase() || null;
+
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ success: false, message: "Nothing to update" });
+    }
+
+    updates.updated_at = new Date().toISOString();
+    await db.collection("users").updateOne({ _id: userId }, { $set: updates });
+    await writeAudit(db, { actorId: req.user.id, action: "student_updated", entityType: "user", entityId: String(userId), previousValue: { name: user.name, email: user.email, phone: user.phone, department: user.department }, newValue: updates });
+
+    const updated = await db.collection("users").findOne({ _id: userId }, { projection: { password: 0 } });
+    res.json({ success: true, message: "Student updated", student: fmt(updated) });
+  } catch (error) {
+    console.error("Edit student error:", error);
+    if (error.code === 11000) return res.status(409).json({ success: false, message: "Another account already uses this email" });
+    res.status(500).json({ success: false, message: "Unable to update student" });
+  }
+});
+
+/* ─── CHANGE STUDENT BATCH ──────────────────────────────────── */
+router.patch("/students/:id/batch", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+    const userId = toId(req.params.id);
+    if (!userId) return res.status(400).json({ success: false, message: "Invalid student id" });
+    const user = await db.collection("users").findOne({ _id: userId });
+    if (!user || user.role !== "student") return res.status(404).json({ success: false, message: "Student not found" });
+
+    const batchId = req.body?.batchId ? String(req.body.batchId).trim() : null;
+    if (!batchId) return res.status(400).json({ success: false, message: "batchId is required" });
+
+    const { ObjectId: Oid } = require("mongodb");
+    let batchOid;
+    try { batchOid = new Oid(batchId); } catch { batchOid = null; }
+    if (!batchOid) return res.status(400).json({ success: false, message: "Invalid batch id" });
+
+    const batch = await db.collection("batches").findOne({ _id: batchOid });
+    if (!batch) return res.status(404).json({ success: false, message: "Batch not found" });
+    if (batch.active === false) return res.status(400).json({ success: false, message: "Batch is deactivated" });
+
+    const previousBatchId = user.batch_id ? String(user.batch_id) : null;
+    if (previousBatchId === String(batch._id)) {
+      return res.json({ success: true, message: "Student is already in this batch" });
+    }
+
+    // Move the student. Historical submissions and task
+    // history are kept: existing assignments stay with
+    // their original tasks.
+    await db.collection("users").updateOne(
+      { _id: userId },
+      { $set: { batch_id: String(batch._id), program: String(batch.name), updated_at: new Date().toISOString() } }
+    );
+
+    // Materialize assignments for the new batch's active tasks
+    const { createAssignmentsForStudent } = require("../models/TaskAssignment");
+    await createAssignmentsForStudent(db, String(userId), String(batch._id));
+
+    await writeAudit(db, { actorId: req.user.id, action: "student_batch_changed", entityType: "user", entityId: String(userId), previousValue: { batch_id: previousBatchId }, newValue: { batch_id: String(batch._id), batch_name: batch.name } });
+
+    const updated = await db.collection("users").findOne({ _id: userId }, { projection: { password: 0 } });
+    res.json({ success: true, message: `Student moved to ${batch.name}`, student: fmt(updated) });
+  } catch (error) {
+    console.error("Change batch error:", error);
+    res.status(500).json({ success: false, message: "Unable to change student batch" });
+  }
+});
+
+/* ─── REMOVE STUDENT FROM BATCH ───────────────────────────── */
+router.patch("/students/:id/remove-batch", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+    const userId = toId(req.params.id);
+    if (!userId) return res.status(400).json({ success: false, message: "Invalid student id" });
+    const user = await db.collection("users").findOne({ _id: userId });
+    if (!user || user.role !== "student") return res.status(404).json({ success: false, message: "Student not found" });
+    if (!user.batch_id) {
+      return res.json({ success: true, message: "Student is not in a batch" });
+    }
+
+    const previousBatchId = String(user.batch_id);
+    // Soft removal only: batch_id cleared, all history and
+    // existing assignments (and their submissions) preserved.
+    await db.collection("users").updateOne(
+      { _id: userId },
+      { $set: { batch_id: null, updated_at: new Date().toISOString() } }
+    );
+
+    await writeAudit(db, { actorId: req.user.id, action: "student_batch_removed", entityType: "user", entityId: String(userId), previousValue: { batch_id: previousBatchId }, newValue: { batch_id: null } });
+
+    const updated = await db.collection("users").findOne({ _id: userId }, { projection: { password: 0 } });
+    res.json({ success: true, message: "Student removed from batch", student: fmt(updated) });
+  } catch (error) {
+    console.error("Remove batch error:", error);
+    res.status(500).json({ success: false, message: "Unable to remove student from batch" });
+  }
+});
+
+/* ─── DEACTIVATE STUDENT ──────────────────────────────────── */
+router.patch("/students/:id/deactivate", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+    const userId = toId(req.params.id);
+    if (!userId) return res.status(400).json({ success: false, message: "Invalid student id" });
+    const user = await db.collection("users").findOne({ _id: userId });
+    if (!user) return res.status(404).json({ success: false, message: "Student not found" });
+    if (Number(user.active) !== 1) {
+      return res.json({ success: true, message: "Student is already deactivated" });
+    }
+    await db.collection("users").updateOne(
+      { _id: userId },
+      { $set: { active: 0, updated_at: new Date().toISOString() } }
+    );
+    await writeAudit(db, { actorId: req.user.id, action: "student_deactivated", entityType: "user", entityId: String(userId), previousValue: { active: 1 }, newValue: { active: 0 } });
+    const updated = await db.collection("users").findOne({ _id: userId }, { projection: { password: 0 } });
+    res.json({ success: true, message: "Student deactivated", student: fmt(updated) });
+  } catch (error) {
+    console.error("Deactivate student error:", error);
+    res.status(500).json({ success: false, message: "Unable to deactivate student" });
+  }
+});
+
+/* ─── REACTIVATE STUDENT ──────────────────────────────────── */
+router.patch("/students/:id/reactivate", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+    const userId = toId(req.params.id);
+    if (!userId) return res.status(400).json({ success: false, message: "Invalid student id" });
+    const user = await db.collection("users").findOne({ _id: userId });
+    if (!user) return res.status(404).json({ success: false, message: "Student not found" });
+    if (Number(user.active) === 1) {
+      return res.json({ success: true, message: "Student is already active" });
+    }
+    await db.collection("users").updateOne(
+      { _id: userId },
+      { $set: { active: 1, updated_at: new Date().toISOString() } }
+    );
+    await writeAudit(db, { actorId: req.user.id, action: "student_reactivated", entityType: "user", entityId: String(userId), previousValue: { active: 0 }, newValue: { active: 1 } });
+    const updated = await db.collection("users").findOne({ _id: userId }, { projection: { password: 0 } });
+    res.json({ success: true, message: "Student reactivated", student: fmt(updated) });
+  } catch (error) {
+    console.error("Reactivate student error:", error);
+    res.status(500).json({ success: false, message: "Unable to reactivate student" });
+  }
+});
+
+/* ─── DELETE STUDENT (guarded) ──────────────────────────────
+ * Hard delete is BLOCKED while related records exist (tasks,
+ * submissions, assignments, activities, missions). Deactivate
+ * instead — soft delete preserves all history.
+ */
+router.delete("/students/:id", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+    const userId = toId(req.params.id);
+    if (!userId) return res.status(400).json({ success: false, message: "Invalid student id" });
+    const user = await db.collection("users").findOne({ _id: userId });
+    if (!user) return res.status(404).json({ success: false, message: "Student not found" });
+
+    const related = {
+      tasks: await db.collection("tasks").countDocuments({ $or: [{ assigned_to: String(userId) }, { assigned_by: String(userId) }] }),
+      submissions: await db.collection("submissions").countDocuments({ student_id: String(userId) }),
+      assignments: await db.collection("task_assignments").countDocuments({ student_id: String(userId) }),
+      daily_activities: await db.collection("daily_activities").countDocuments({ user_id: String(userId) }),
+      missions: await db.collection("missions").countDocuments({ assigned_to: String(userId) }),
+      notifications: await db.collection("notifications").countDocuments({ user_id: String(userId) }),
+    };
+    const hasRelated = Object.values(related).some(n => n > 0);
+    if (hasRelated) {
+      return res.status(409).json({
+        success: false,
+        message: "Cannot delete: student has related records. Deactivate the account instead to preserve history.",
+        related,
+      });
+    }
+
+    await db.collection("users").deleteOne({ _id: userId });
+    await writeAudit(db, { actorId: req.user.id, action: "student_deleted", entityType: "user", entityId: String(userId), previousValue: { name: user.name, email: user.email } });
+    res.json({ success: true, message: "Student deleted" });
+  } catch (error) {
+    console.error("Delete student error:", error);
+    res.status(500).json({ success: false, message: "Unable to delete student" });
   }
 });
 

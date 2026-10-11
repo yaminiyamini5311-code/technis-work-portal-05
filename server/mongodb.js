@@ -92,14 +92,29 @@ async function connect() {
 async function ensureIndexes(db) {
   try {
     await db.collection("users").createIndex({ email: 1 }, { unique: true });
+    // Case-insensitive unique email (normalized on write; this is the
+    // hard DB-level guard against case-variant duplicates)
+    await db.collection("users").createIndex(
+      { email: 1 },
+      { unique: true, name: "email_1_ci", collation: { locale: "en", strength: 2 } }
+    );
     await db.collection("users").createIndex({ role: 1, active: 1 });
     await db.collection("users").createIndex({ program: 1 }, { sparse: true });
+    await db.collection("users").createIndex({ batch_id: 1 }, { sparse: true });
+    await db.collection("batches").createIndex(
+      { name: 1 },
+      { unique: true, name: "batch_name_ci", collation: { locale: "en", strength: 2 } }
+    );
     await db.collection("tasks").createIndex({ task_code: 1 }, { unique: true, sparse: true });
     await db.collection("tasks").createIndex({ assigned_to: 1 });
     await db.collection("tasks").createIndex({ assigned_by: 1 });
     await db.collection("tasks").createIndex({ program: 1 }, { sparse: true });
+    await db.collection("tasks").createIndex({ batch_id: 1 }, { sparse: true });
+    await db.collection("tasks").createIndex({ target_type: 1 }, { sparse: true });
     await db.collection("tasks").createIndex({ due_date: 1 }, { sparse: true });
     await db.collection("tasks").createIndex({ workflow_status: 1 });
+    await db.collection("task_assignments").createIndex({ task_id: 1, student_id: 1 }, { unique: true, name: "task_student_unique" });
+    await db.collection("task_assignments").createIndex({ student_id: 1 });
     await db.collection("submissions").createIndex({ task_id: 1 });
     await db.collection("submissions").createIndex({ student_id: 1 });
     await db.collection("notifications").createIndex({ user_id: 1, read_at: 1 });

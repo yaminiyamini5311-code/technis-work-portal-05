@@ -14,10 +14,33 @@ export default function Register() {
     password: "",
     confirmPassword: "",
     role: "student",
-    phone: ""
+    phone: "",
+    batchId: ""
   });
+  const [batches, setBatches] = useState([]);
+  const [batchesLoading, setBatchesLoading] = useState(true);
+  const [batchesError, setBatchesError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Load active batches from the public API (id + name only)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setBatchesLoading(true);
+        const { data } = await axios.get(`${API_URL}/api/batches`);
+        if (cancelled) return;
+        setBatches(data.batches || []);
+        setBatchesError("");
+      } catch (err) {
+        if (!cancelled) setBatchesError(err.response?.data?.message || "Unable to load batches. Please try again.");
+      } finally {
+        if (!cancelled) setBatchesLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Scroll error into view when it appears
   useEffect(() => {
@@ -33,6 +56,7 @@ export default function Register() {
     if (form.password.length < 8) return "Password must be at least 8 characters";
     if (form.password !== form.confirmPassword) return "Passwords do not match";
     if (form.role === "student" && !form.phone.trim()) return "Phone number is required for students";
+    if (form.role === "student" && !form.batchId) return "Batch selection is required";
     return null;
   };
 
@@ -53,7 +77,8 @@ export default function Register() {
         email: form.email.trim().toLowerCase(),
         password: form.password,
         role: form.role,
-        phone: form.phone.trim() || null
+        phone: form.phone.trim() || null,
+        batchId: form.role === "student" ? form.batchId : undefined
       });
 
       if (data.success) {
@@ -162,8 +187,25 @@ export default function Register() {
             >
               <option value="student">Student</option>
               <option value="manager">Manager</option>
-              <option value="ceo">CEO</option>
             </select>
+
+            <label htmlFor="register-batch">Batch (required for students)</label>
+            <select
+              id="register-batch"
+              value={form.batchId}
+              onChange={(e) => setForm({ ...form, batchId: e.target.value })}
+              disabled={batchesLoading}
+              required={form.role === "student"}
+            >
+              <option value="">{batchesLoading ? "Loading batches..." : "Select a batch"}</option>
+              {batches.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+            {batchesError && <small className="field-error">{batchesError}</small>}
+            {!batchesLoading && !batchesError && batches.length === 0 && (
+              <small className="field-error">No batches available. Contact your administrator.</small>
+            )}
 
             <label htmlFor="register-password">Password</label>
             <div className="password-field">

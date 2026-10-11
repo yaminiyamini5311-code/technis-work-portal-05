@@ -30,14 +30,13 @@ export default function Login() {
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("role", data.user.role);
-      navigate(
-        data.user.role === "admin"
-          ? "/admin"
-          : data.user.role === "manager"
-            ? "/manager"
-            : "/student",
-        { replace: true }
-      );
+      const role = String(data.user.role || "").toLowerCase();
+      const dest = role === "admin" || role === "ceo"
+        ? "/admin"
+        : role === "manager"
+          ? "/manager"
+          : "/student";
+      navigate(dest, { replace: true });
     } catch (err) {
       setError(err.response?.data?.message || "Unable to connect to the server.");
     } finally {

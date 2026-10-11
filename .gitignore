@@ -43,3 +43,7 @@ sqlite_backup.json
 techins.db
 server/.env
 client/.env
+
+# Local database backups / data dumps — never commit
+server/backup/
+backup/
