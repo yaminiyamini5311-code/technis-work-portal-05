@@ -34,6 +34,14 @@ const CANONICAL_BATCHES = [
   "Unlock"
 ];
 
+// Known WRONG spellings that must be RENAMED IN PLACE to a canonical name,
+// never duplicated. Keyed by normalized wrong name -> canonical name.
+// Only applied when the canonical name does not already exist.
+const RENAME_ALIASES = {
+  "techis60": "Techins 60",
+  "techin 16": "Techins 60"
+};
+
 function normalizeName(name) {
   return String(name || "").trim().toLowerCase();
 }
@@ -82,6 +90,41 @@ async function main() {
     for (const batch of existingBatches) {
       existingMap.set(normalizeName(batch.name), batch);
     }
+
+    // ── RENAME KNOWN-WRONG SPELLINGS IN PLACE (never duplicate) ──
+    console.log("[seed] ───────────────────────────────────────────────────────────");
+    console.log("[seed] Checking for known-wrong batch names to rename...");
+
+    let renamed = 0;
+    for (const [wrongKey, canonicalName] of Object.entries(RENAME_ALIASES)) {
+      const canonicalKey = normalizeName(canonicalName);
+      if (existingMap.has(canonicalKey)) {
+        if (existingMap.has(wrongKey)) {
+          console.log(`[seed] ⊘ SKIP rename: "${canonicalName}" already exists; `
+            + `leaving "${existingMap.get(wrongKey).name}" untouched - report manually`);
+        }
+        continue;
+      }
+      const wrongDoc = existingMap.get(wrongKey);
+      if (!wrongDoc) continue;
+
+      const refUsers = await db.collection("users").countDocuments({ batch_id: String(wrongDoc._id) });
+      const refTasks = await db.collection("tasks").countDocuments({ batch_id: String(wrongDoc._id) });
+      console.log(`[seed] RENAME: "${wrongDoc.name}" (${wrongDoc._id}) -> "${canonicalName}"`
+        + `  [users referencing: ${refUsers}, tasks referencing: ${refTasks}]`);
+      await db.collection("batches").updateOne(
+        { _id: wrongDoc._id },
+        { $set: { name: canonicalName } }
+      );
+      await db.collection("users").updateMany(
+        { batch_id: String(wrongDoc._id), program: wrongDoc.name },
+        { $set: { program: canonicalName } }
+      );
+      existingMap.delete(wrongKey);
+      existingMap.set(canonicalKey, { ...wrongDoc, name: canonicalName });
+      renamed++;
+    }
+    if (renamed === 0) console.log("[seed] (no renames needed)");
 
     console.log("[seed] ───────────────────────────────────────────────────────────");
     console.log("[seed] SEEDING batches (idempotent)...");

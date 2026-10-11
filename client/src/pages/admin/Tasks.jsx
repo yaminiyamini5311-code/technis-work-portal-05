@@ -36,8 +36,7 @@ export default function Tasks() {
     submission_requirements: ""
   });
 
-  const { student, program, setStudent, setProgram, reset, isStudentDisabled, isProgramDisabled } = useExclusiveSelect();
-  const [programBatches, setProgramBatches] = useState([]); // Batches for legacy "program" dropdown
+  const { student, setStudent, reset, isStudentDisabled } = useExclusiveSelect();
   const [selected, setSelected] = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [review, setReview] = useState({ decision: "revision", comment: "" });
@@ -59,7 +58,6 @@ export default function Tasks() {
       setStudents(studentData.students || []);
       const fetchedBatches = batchData.batches || [];
       setBatches(fetchedBatches);
-      setProgramBatches(fetchedBatches); // Use same source for legacy program dropdown
       setBatchesError("");
       setError("");
     } catch (e) {
@@ -83,9 +81,6 @@ export default function Tasks() {
     if (targetType === "batch" && !batchId) {
       return setError("Select a batch");
     }
-    if (targetType === "program" && !program) {
-      return setError("Select a program");
-    }
 
     // Validate start/end dates
     if (form.start_date && form.due_date && form.start_date > form.due_date) {
@@ -99,7 +94,6 @@ export default function Tasks() {
       assigned_to: targetType === "student" && student ? student : null,
       student_ids: targetType === "student" && student ? [student] : [],
       batch_id: targetType === "batch" ? batchId : null,
-      program: targetType === "program" ? program : null,
       domain: form.domain
     };
 
@@ -202,7 +196,6 @@ export default function Tasks() {
           >
             <option value="student">Individual Student</option>
             <option value="batch">Entire Batch</option>
-            <option value="program">Program (legacy)</option>
           </select>
         </div>
 
@@ -310,31 +303,6 @@ export default function Tasks() {
             onChange={e => setForm({ ...form, due_date: e.target.value })} 
             autoComplete="off"
           />
-        </div>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label htmlFor="task-program" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Program (group target)
-          </label>
-          <select
-            id="task-program"
-            name="task-program"
-            value={program}
-            onChange={e => setProgram(e.target.value)}
-            disabled={isProgramDisabled || targetType !== "program" || batchesLoading}
-            autoComplete="off"
-            style={isProgramDisabled || targetType !== "program" || batchesLoading ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#F3F4F6' } : {}}
-            title={isProgramDisabled ? "Disabled because a student is selected" : targetType !== "program" ? "Select 'Program (legacy)' above" : batchesLoading ? "Loading programs..." : ""}
-            aria-disabled={isProgramDisabled || targetType !== "program" || batchesLoading}
-          >
-            <option value="">{batchesLoading ? "Loading programs..." : "Select program"}</option>
-            {programBatches.map(batch => (
-              <option key={batch.id} value={batch.name.toLowerCase()}>{batch.name}</option>
-            ))}
-          </select>
-          {targetType !== "program" && (
-            <small style={{ fontSize: '10px', color: 'var(--text-muted-on-light)', marginTop: '2px' }}>Choose “Program (legacy)” to use program grouping</small>
-          )}
         </div>
         
         <textarea 
