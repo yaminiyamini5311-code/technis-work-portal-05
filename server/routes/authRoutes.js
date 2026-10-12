@@ -7,6 +7,13 @@ const { rateLimit } = require("../middleware/rateLimit");
 const { MAX_STUDENT_ACCOUNTS, ALLOWED_DEPARTMENTS, ALLOWED_PROGRAMS } = require("../config");
 const { writeAudit } = require("../utils/audit_mongo");
 const { createCeoNotification } = require("../utils/ceoNotification");
+const {
+  normalizeEmail,
+  normalizeRole,
+  normalizeRegistrationStatus,
+  isActiveFlag,
+  isBlockedRegistrationStatus,
+} = require("../utils/userAccount");
 
 const router = express.Router();
 
@@ -32,7 +39,7 @@ function timingSafeEqual(a, b) {
 router.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }), async (req, res) => {
   try {
     const emailRaw = String(req.body?.email || "");
-    const email = emailRaw.trim().toLowerCase();
+    const email = normalizeEmail(emailRaw);
     const password = String(req.body?.password || "");
 
     if (!email || !password) {
@@ -120,29 +127,54 @@ router.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }), async (r
     const user = await db.collection("users").findOne({ email });
 
     if (!user) {
+      // User does not exist. Generic client message (no email enumeration);
+      // the reason is only visible in the server log.
+      console.log("[AUTH] Login rejected: no user found for submitted email");
       return res.status(401).json({ success: false, message: "Invalid email or password" });
-    }
-
-    // Account status checks
-    if (Number(user.active) !== 1) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "Account is pending approval or has been deactivated" 
-      });
     }
 
     if (!user.password) {
+      // Account has no password set (broken/imported row) — treat like a
+      // wrong password, never reveal which accounts are usable.
+      console.log("[AUTH] Login rejected: account has no password set");
       return res.status(401).json({ success: false, message: "Invalid email or password" });
     }
 
-    // Password verification
+    // Password verification FIRST: account status must never be observable
+    // before the caller proves knowledge of the password.
     const passwordMatch = await bcrypt.compare(password, String(user.password));
 
     if (!passwordMatch) {
+      console.log("[AUTH] Login rejected: password mismatch");
       return res.status(401).json({ success: false, message: "Invalid email or password" });
     }
 
-    const role = String(user.role || "").trim().toLowerCase();
+    // ── Account status checks (after password verification) ──
+    // Robust to legacy shapes: NULL, boolean, "1"/"true" strings, casing.
+    // Truly pending and truly deactivated accounts are still blocked.
+    const registrationStatus = normalizeRegistrationStatus(user.registration_status);
+
+    if (isBlockedRegistrationStatus(registrationStatus)) {
+      if (registrationStatus === "pending") {
+        console.log("[AUTH] Login blocked: registration is pending approval");
+      } else {
+        console.log("[AUTH] Login blocked: registration was rejected");
+      }
+      return res.status(401).json({
+        success: false,
+        message: "Your account is pending approval or has been deactivated"
+      });
+    }
+
+    if (!isActiveFlag(user.active)) {
+      console.log("[AUTH] Login blocked: account is deactivated");
+      return res.status(401).json({
+        success: false,
+        message: "Your account is pending approval or has been deactivated"
+      });
+    }
+
+    const role = normalizeRole(user.role);
     const userId = String(user._id);
 
     // Generate JWT token with user ID and role (1 day expiry for regular users)
@@ -176,14 +208,33 @@ router.get("/me", authenticateToken, async (req, res) => {
     if (req.user.role === "ceo") {
       const CEO_EMAIL = process.env.CEO_EMAIL ? process.env.CEO_EMAIL.trim().toLowerCase() : "ceo@techins.com";
       const CEO_NAME = process.env.CEO_NAME ? process.env.CEO_NAME.trim() : "TECHINS CEO";
-      
+
+      // Prefer the name saved on the CEO profile page (see /api/admin/profile)
+      // so /me and the profile screen agree and a reload does not reset it to
+      // the environment default. Email and role stay env/token sourced.
+      let name = CEO_NAME;
+      let phone = null;
+      let avatar = null;
+      try {
+        const saved = await req.db.collection("ceo_profile").findOne({ _id: "ceo" });
+        if (saved) {
+          name = saved.name || CEO_NAME;
+          phone = saved.phone || null;
+          avatar = saved.avatar || null;
+        }
+      } catch (e) {
+        console.error("CEO profile lookup failed, falling back to env:", e.message);
+      }
+
       return res.json({
         success: true,
         user: {
           id: "ceo",
-          name: CEO_NAME,
+          name,
           email: CEO_EMAIL,
           role: "ceo",
+          phone,
+          avatar,
           department: "Executive",
           active: 1,
           registration_status: "approved",
@@ -197,7 +248,7 @@ router.get("/me", authenticateToken, async (req, res) => {
       { _id: toId(req.user.id) },
       { projection: { password: 0 } }
     );
-    if (!user || Number(user.active) !== 1) {
+    if (!user || !isActiveFlag(user.active)) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
@@ -234,7 +285,7 @@ router.get("/me", authenticateToken, async (req, res) => {
 router.post("/register", authenticateToken, authorizeRoles("admin"), async (req, res) => {
   try {
     const name = String(req.body?.name || "").trim();
-    const email = String(req.body?.email || "").trim().toLowerCase();
+    const email = normalizeEmail(req.body?.email);
     const password = String(req.body?.password || "");
     const department = String(req.body?.department || "").trim().toLowerCase();
     const program = req.body?.program ? String(req.body.program).trim().toLowerCase() : null;
@@ -279,9 +330,9 @@ router.post("/register", authenticateToken, authorizeRoles("admin"), async (req,
 router.post("/signup", async (req, res) => {
   try {
     const name = String(req.body?.name || "").trim();
-    const email = String(req.body?.email || "").trim().toLowerCase();
+    const email = normalizeEmail(req.body?.email);
     const password = String(req.body?.password || "");
-    const role = String(req.body?.role || "student").trim().toLowerCase();
+    const role = normalizeRole(req.body?.role || "student");
     const phone = req.body?.phone ? String(req.body.phone).trim() : null;
     const batchId = req.body?.batchId ? String(req.body.batchId).trim() : null;
 
@@ -359,7 +410,13 @@ router.post("/signup", async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const requiresApproval = role === "manager";  // Managers need approval, students don't
+
+    // ── Account defaults (single source of truth: utils/userAccount.js) ──
+    // Students start INACTIVE + PENDING: they cannot log in until an
+    // admin/CEO approves the registration (approve-registration sets
+    // active=1 AND registration_status="approved"). Managers keep the
+    // previous behaviour (inactive until an admin activates the account).
+    const requiresApproval = role === "student" || role === "manager";
     const active = requiresApproval ? 0 : 1;
     const registrationStatus = role === "student" ? "pending" : "approved";
 

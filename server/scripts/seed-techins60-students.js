@@ -12,6 +12,11 @@ const fs = require("fs");
 const path = require("path");
 const { MongoClient } = require("mongodb");
 const bcrypt = require("bcryptjs");
+const {
+  normalizeEmail,
+  normalizeRole,
+  isActiveFlag,
+} = require("../utils/userAccount");
 
 const MONGODB_URI = (process.env.MONGODB_URI || "mongodb://127.0.0.1:27017").trim();
 const MONGODB_DB_NAME = (process.env.MONGODB_DB_NAME || "techins").trim();
@@ -57,28 +62,33 @@ async function main() {
   let created = 0, updated = 0, skipped = 0;
   for (const row of rows) {
     const name = String(row["Name"] || "").trim();
-    const email = String(row["Portal Email"] || "").trim().toLowerCase();
+    const email = normalizeEmail(row["Portal Email"]);
     const tempPassword = String(row["Temporary Password"] || "").trim();
     const learnerId = String(row["Learner ID"] || "").trim();
     if (!name || !email || !tempPassword) { skipped++; continue; }
 
     const existing = await db.collection("users").findOne({ email });
     if (existing) {
-      // Link to the batch + learner id, never touch the password on re-runs
-      await db.collection("users").updateOne(
-        { _id: existing._id },
-        { $set: { batch_id: batchId, program: "techins 60", learner_id: learnerId, active: 1 } }
-      );
+      // Link to the batch + learner id, never touch the password on re-runs.
+      // Only REPAIR a missing/invalid `active` value — an explicit 0 is a
+      // deliberate deactivation by an admin and must never be overridden.
+      const patch = { batch_id: batchId, program: "techins 60", learner_id: learnerId };
+      if (!isActiveFlag(existing.active) && existing.active !== 0) {
+        patch.active = 1;
+      }
+      await db.collection("users").updateOne({ _id: existing._id }, { $set: patch });
       updated++;
       continue;
     }
 
     const passwordHash = await bcrypt.hash(tempPassword, 12);
+    // Master-list students are provisioned by the organisation: approved and
+    // active on insert. New signups (public route) start pending instead.
     await db.collection("users").insertOne({
       name,
       email,
       password: passwordHash,
-      role: "student",
+      role: normalizeRole("student"),
       department: "Techins",
       program: "techins 60",
       batch_id: batchId,

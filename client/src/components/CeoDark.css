@@ -1,0 +1,389 @@
+/**
+ * CEO WORKSPACE — dark theme + motion.
+ *
+ * Scoped entirely to `.role-layout.ceo-dark`, which is only applied to the
+ * CEO/admin workspace (see RoleLayout.jsx). The manager portal, the student
+ * portal and the login page are unaffected.
+ *
+ * Visual reference: Pinterest pin 895512707182308163 ("Handshake Influence
+ * Dashboard") — near-black canvas, soft violet/teal ambient glows, dark
+ * elevated panels with hairline borders, muted jewel-tone accents, small
+ * tracked uppercase labels.
+ *
+ * Performance notes (deliberate):
+ *  - No `filter: blur()`, no `backdrop-filter`, no large animated shadows.
+ *  - Motion is transform/opacity only, so it stays on the compositor.
+ *  - The ambient glow layer animates very slowly and is `will-change: transform`.
+ *  - Every animation is disabled under `prefers-reduced-motion: reduce`.
+ */
+
+.role-layout.ceo-dark {
+  /* ── Palette ─────────────────────────────────────────────────────────── */
+  --ceo-void: #05070d;
+  --ceo-void-2: #080b14;
+  --ceo-surface: rgba(17, 22, 36, 0.72);
+  --ceo-surface-2: rgba(23, 29, 45, 0.78);
+  --ceo-border: rgba(255, 255, 255, 0.08);
+  --ceo-border-strong: rgba(255, 255, 255, 0.14);
+  --ceo-text: #eef2fb;
+  --ceo-text-dim: #9aa6c2;
+  --ceo-text-mute: #6b7691;
+
+  --ceo-violet: #7c6cff;
+  --ceo-teal: #2fd4c4;
+  --ceo-amber: #f5a524;
+  --ceo-rose: #f2557a;
+  --ceo-green: #35d07f;
+
+  --ceo-radius: 14px;
+  --ceo-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  position: relative;
+  min-height: 100vh;
+  color: var(--ceo-text);
+  background:
+    radial-gradient(1100px 620px at 12% -8%, rgba(124, 108, 255, 0.16), transparent 62%),
+    radial-gradient(900px 540px at 92% 6%, rgba(47, 212, 196, 0.10), transparent 60%),
+    radial-gradient(760px 520px at 50% 108%, rgba(245, 165, 36, 0.07), transparent 62%),
+    linear-gradient(180deg, var(--ceo-void) 0%, var(--ceo-void-2) 100%);
+  background-attachment: fixed;
+}
+
+/* Slow ambient drift. Transform-only (compositor), very long cycle so it
+   reads as "living" rather than distracting. */
+.role-layout.ceo-dark::before {
+  content: "";
+  position: fixed;
+  inset: -20%;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(680px 680px at 28% 30%, rgba(124, 108, 255, 0.12), transparent 65%),
+    radial-gradient(560px 560px at 72% 62%, rgba(47, 212, 196, 0.08), transparent 65%);
+  animation: ceo-drift 48s var(--ceo-ease) infinite alternate;
+  will-change: transform;
+}
+
+@keyframes ceo-drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(-2.5%, 1.5%, 0) scale(1.06); }
+}
+
+.role-layout.ceo-dark > * { position: relative; z-index: 1; }
+
+/* ── Chrome ───────────────────────────────────────────────────────────── */
+/* Frosted blur is pointless over an opaque dark canvas and costs a full
+   backdrop sample on every frame, so it is dropped inside the CEO scope.
+   (Tiny static icon drop-shadows are left alone - they are not animated
+   and cost almost nothing.) */
+.role-layout.ceo-dark .navbar-hamburger,
+.role-layout.ceo-dark .navbar-backdrop,
+.role-layout.ceo-dark .notification-button,
+.role-layout.ceo-dark .role-topbar,
+.role-layout.ceo-dark .panel,
+.role-layout.ceo-dark .admin-stat,
+.role-layout.ceo-dark .task-card,
+.role-layout.ceo-dark .mission-card,
+.role-layout.ceo-dark .summary-card {
+  backdrop-filter: none;
+}
+
+.role-layout.ceo-dark .role-topbar {
+  background: rgba(8, 11, 20, 0.86) !important;
+  backdrop-filter: none;
+  border-bottom: 1px solid var(--ceo-border) !important;
+  color: var(--ceo-text) !important;
+}
+.role-layout.ceo-dark .role-topbar h1 { color: var(--ceo-text) !important; }
+.role-layout.ceo-dark .role-eyebrow {
+  color: var(--ceo-text-mute) !important;
+  letter-spacing: 1.6px;
+}
+.role-layout.ceo-dark .role-top-user strong,
+.role-layout.ceo-dark .role-top-user span { color: var(--ceo-text) !important; }
+.role-layout.ceo-dark .role-top-user small { color: var(--ceo-text-dim) !important; }
+
+.role-layout.ceo-dark .navbar,
+.role-layout.ceo-dark .role-sidebar {
+  background: rgba(8, 11, 20, 0.82) !important;
+  border-color: var(--ceo-border) !important;
+  color: var(--ceo-text) !important;
+}
+.role-layout.ceo-dark .navbar strong { color: var(--ceo-text) !important; }
+.role-layout.ceo-dark .navbar small,
+.role-layout.ceo-dark .role-sidebar p { color: var(--ceo-text-mute) !important; }
+
+.role-layout.ceo-dark .navbar-profile {
+  background: var(--ceo-surface) !important;
+  border: 1px solid var(--ceo-border) !important;
+  color: var(--ceo-text) !important;
+}
+.role-layout.ceo-dark .navbar-profile strong { color: var(--ceo-text) !important; }
+.role-layout.ceo-dark .navbar-profile span { color: var(--ceo-text-dim) !important; }
+.role-layout.ceo-dark .navbar-avatar {
+  background: linear-gradient(135deg, rgba(124, 108, 255, 0.35), rgba(47, 212, 196, 0.28)) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .role-content { color: var(--ceo-text); }
+
+/* ── Panels & cards ────────────────────────────────────────────────────── */
+.role-layout.ceo-dark .panel,
+.role-layout.ceo-dark .admin-stat,
+.role-layout.ceo-dark .summary-card,
+.role-layout.ceo-dark .task-card,
+.role-layout.ceo-dark .mission-card,
+.role-layout.ceo-dark .student-profile,
+.role-layout.ceo-dark .role-user,
+.role-layout.ceo-dark .feedback-box,
+.role-layout.ceo-dark .upload-box,
+.role-layout.ceo-dark .performance-card,
+.role-layout.ceo-dark .detail-card,
+.role-layout.ceo-dark .overall-progress,
+.role-layout.ceo-dark .activity-history-card {
+  background: var(--ceo-surface) !important;
+  border: 1px solid var(--ceo-border) !important;
+  color: var(--ceo-text) !important;
+  border-radius: var(--ceo-radius) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.46) !important;
+  backdrop-filter: none;
+}
+
+.role-layout.ceo-dark .panel-head h3,
+.role-layout.ceo-dark .panel h2,
+.role-layout.ceo-dark .panel h3,
+.role-layout.ceo-dark h2,
+.role-layout.ceo-dark h3 { color: var(--ceo-text) !important; }
+
+.role-layout.ceo-dark .panel-head p,
+.role-layout.ceo-dark .panel p,
+.role-layout.ceo-dark .page-description,
+.role-layout.ceo-dark .task-card-top p,
+.role-layout.ceo-dark .feedback-box p { color: var(--ceo-text-dim) !important; }
+
+.role-layout.ceo-dark span,
+.role-layout.ceo-dark small { color: var(--ceo-text-dim); }
+
+.role-layout.ceo-dark .section-kicker,
+.role-layout.ceo-dark .page-label {
+  color: var(--ceo-violet) !important;
+  letter-spacing: 1.8px;
+  font-weight: 700;
+}
+
+/* Hairline separators, matching the reference's thin dividers. */
+.role-layout.ceo-dark .panel-head,
+.role-layout.ceo-dark .task-details,
+.role-layout.ceo-dark thead th { border-color: var(--ceo-border) !important; }
+
+/* ── Stat tiles ────────────────────────────────────────────────────────── */
+.role-layout.ceo-dark .admin-stat {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.45s var(--ceo-ease), border-color 0.45s var(--ceo-ease),
+              box-shadow 0.45s var(--ceo-ease);
+}
+.role-layout.ceo-dark .admin-stat::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--ceo-violet), var(--ceo-teal));
+  opacity: 0;
+  transition: opacity 0.4s var(--ceo-ease);
+}
+.role-layout.ceo-dark .admin-stat:hover {
+  transform: translateY(-3px);
+  border-color: var(--ceo-border-strong) !important;
+  box-shadow: 0 22px 52px rgba(0, 0, 0, 0.55) !important;
+}
+.role-layout.ceo-dark .admin-stat:hover::after { opacity: 1; }
+.role-layout.ceo-dark .admin-stat small { color: var(--ceo-text-mute) !important; }
+.role-layout.ceo-dark .admin-stat span { color: var(--ceo-text-dim) !important; }
+.role-layout.ceo-dark .admin-stat strong { color: var(--ceo-text) !important; }
+
+/* ── Tables & lists (student data) ─────────────────────────────────────── */
+.role-layout.ceo-dark table { background: transparent !important; color: var(--ceo-text); }
+.role-layout.ceo-dark thead th {
+  background: rgba(255, 255, 255, 0.035) !important;
+  color: var(--ceo-text-mute) !important;
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--ceo-border) !important;
+}
+.role-layout.ceo-dark tbody tr { border-bottom: 1px solid var(--ceo-border); }
+.role-layout.ceo-dark tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.018); }
+.role-layout.ceo-dark tbody tr:hover { background: rgba(124, 108, 255, 0.08); }
+.role-layout.ceo-dark tbody td { color: var(--ceo-text) !important; border-color: var(--ceo-border); }
+.role-layout.ceo-dark tbody td strong { color: var(--ceo-text) !important; }
+
+.role-layout.ceo-dark .submission-row,
+.role-layout.ceo-dark .pending-registration-item,
+.role-layout.ceo-dark .list-row {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid var(--ceo-border) !important;
+  border-radius: 12px;
+  transition: border-color 0.35s var(--ceo-ease), transform 0.35s var(--ceo-ease);
+}
+.role-layout.ceo-dark .submission-row:hover,
+.role-layout.ceo-dark .pending-registration-item:hover,
+.role-layout.ceo-dark .list-row:hover {
+  border-color: var(--ceo-border-strong) !important;
+  transform: translateX(3px);
+}
+.role-layout.ceo-dark .submission-avatar,
+.role-layout.ceo-dark .pending-student-avatar {
+  background: linear-gradient(135deg, rgba(124, 108, 255, 0.4), rgba(47, 212, 196, 0.3)) !important;
+  color: var(--ceo-text) !important;
+}
+
+/* ── Status pills (muted jewel tones, as in the reference deltas) ─────── */
+.role-layout.ceo-dark .pill { background: rgba(255, 255, 255, 0.07) !important; color: var(--ceo-text) !important; }
+.role-layout.ceo-dark .pill.completed { background: rgba(53, 208, 127, 0.16) !important; color: var(--ceo-green) !important; }
+.role-layout.ceo-dark .pill.pending   { background: rgba(245, 165, 36, 0.16) !important; color: var(--ceo-amber) !important; }
+.role-layout.ceo-dark .pill.progress,
+.role-layout.ceo-dark .pill.in_progress { background: rgba(47, 212, 196, 0.16) !important; color: var(--ceo-teal) !important; }
+.role-layout.ceo-dark .pill.overdue    { background: rgba(242, 85, 122, 0.16) !important; color: var(--ceo-rose) !important; }
+
+/* ── Forms ────────────────────────────────────────────────────────────── */
+.role-layout.ceo-dark input,
+.role-layout.ceo-dark textarea,
+.role-layout.ceo-dark select {
+  background: rgba(255, 255, 255, 0.045) !important;
+  color: var(--ceo-text) !important;
+  border: 1px solid var(--ceo-border) !important;
+  border-radius: 10px !important;
+}
+.role-layout.ceo-dark input::placeholder,
+.role-layout.ceo-dark textarea::placeholder { color: var(--ceo-text-mute) !important; }
+.role-layout.ceo-dark input:focus,
+.role-layout.ceo-dark textarea:focus,
+.role-layout.ceo-dark select:focus {
+  border-color: var(--ceo-violet) !important;
+  box-shadow: 0 0 0 3px rgba(124, 108, 255, 0.16) !important;
+  outline: none;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────── */
+.role-layout.ceo-dark button {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--ceo-text) !important;
+  border: 1px solid var(--ceo-border-strong) !important;
+  border-radius: 10px;
+  transition: transform 0.3s var(--ceo-ease), background-color 0.3s var(--ceo-ease),
+              border-color 0.3s var(--ceo-ease);
+}
+.role-layout.ceo-dark button:hover:not(:disabled) {
+  background: rgba(124, 108, 255, 0.16) !important;
+  border-color: rgba(124, 108, 255, 0.5) !important;
+  transform: translateY(-1px);
+}
+.role-layout.ceo-dark button:active:not(:disabled) { transform: translateY(0); }
+.role-layout.ceo-dark button:disabled { opacity: 0.45; cursor: not-allowed; }
+.role-layout.ceo-dark .gold-btn {
+  background: linear-gradient(135deg, var(--ceo-violet), #5b4bdb) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+}
+.role-layout.ceo-dark .approve-btn {
+  background: rgba(53, 208, 127, 0.16) !important;
+  color: var(--ceo-green) !important;
+  border-color: rgba(53, 208, 127, 0.4) !important;
+}
+.role-layout.ceo-dark .reject-btn {
+  background: rgba(242, 85, 122, 0.14) !important;
+  color: var(--ceo-rose) !important;
+  border-color: rgba(242, 85, 122, 0.4) !important;
+}
+
+/* ── Chart ────────────────────────────────────────────────────────────── */
+.role-layout.ceo-dark .chart-shell { background: rgba(255, 255, 255, 0.02) !important; }
+.role-layout.ceo-dark .chart-grid { stroke: rgba(255, 255, 255, 0.06); }
+.role-layout.ceo-dark .chart-line { stroke: var(--ceo-teal); stroke-width: 2; }
+.role-layout.ceo-dark .chart-area { fill: rgba(47, 212, 196, 0.12); }
+.role-layout.ceo-dark .chart-dot { fill: var(--ceo-teal); }
+.role-layout.ceo-dark .chart-labels { color: var(--ceo-text-mute) !important; }
+.role-layout.ceo-dark .chart-tabs button.active {
+  background: rgba(124, 108, 255, 0.2) !important;
+  color: var(--ceo-text) !important;
+  border-color: rgba(124, 108, 255, 0.45) !important;
+}
+
+/* Capacity meter */
+.role-layout.ceo-dark .capacity { background: rgba(255, 255, 255, 0.07) !important; }
+.role-layout.ceo-dark .capacity i { background: linear-gradient(90deg, var(--ceo-violet), var(--ceo-teal)) !important; }
+
+/* ── Motion ───────────────────────────────────────────────────────────── */
+/* NOTE: entrance animation was moved out of this file. `.page-enter`,
+   `.admin-stat`, `.panel`, `.mission-card`, `.task-card` and `.summary-card`
+   are now animated exclusively by CeoMotion.css through the `.ceo-r-*` /
+   `.ceo-in` reveal system. A second `animation: ... both` here used to fight
+   that system over the same element: the finished fill-mode pinned
+   `opacity: 1`, outranking the reveal system's `opacity: 0` hidden state, so
+   unrevealed cards stayed visible and the stagger ran twice. Entrance motion
+   now has exactly one owner. Ambient/background motion stays below. */
+
+.role-layout.ceo-dark .panel-link { color: var(--ceo-teal) !important; }
+.role-layout.ceo-dark .quick-actions a {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid var(--ceo-border);
+  border-radius: 10px;
+  color: var(--ceo-text) !important;
+  transition: border-color 0.3s var(--ceo-ease), transform 0.3s var(--ceo-ease),
+              background-color 0.3s var(--ceo-ease);
+}
+.role-layout.ceo-dark .quick-actions a:hover {
+  border-color: rgba(124, 108, 255, 0.5);
+  background: rgba(124, 108, 255, 0.12);
+  transform: translateY(-2px);
+}
+
+.role-layout.ceo-dark .empty-state {
+  background: rgba(255, 255, 255, 0.025) !important;
+  border: 1px solid var(--ceo-border) !important;
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .error-msg,
+.role-layout.ceo-dark .task-alert {
+  background: rgba(242, 85, 122, 0.12) !important;
+  border: 1px solid rgba(242, 85, 122, 0.36) !important;
+  color: #ffd9e2 !important;
+}
+.role-layout.ceo-dark .success-msg,
+.role-layout.ceo-dark .info-msg {
+  background: rgba(53, 208, 127, 0.12) !important;
+  border: 1px solid rgba(53, 208, 127, 0.34) !important;
+  color: #d6ffe9 !important;
+}
+
+/* ── Reduced motion: kill every animation, keep the look ──────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .role-layout.ceo-dark::before { animation: none; }
+  .role-layout.ceo-dark .page-enter,
+  .role-layout.ceo-dark .admin-stat,
+  .role-layout.ceo-dark .panel,
+  .role-layout.ceo-dark .mission-card,
+  .role-layout.ceo-dark .task-card,
+  .role-layout.ceo-dark .summary-card {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .role-layout.ceo-dark * {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .role-layout.ceo-dark .admin-stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .role-layout.ceo-dark { background-attachment: scroll; }
+  .role-layout.ceo-dark::before { animation: none; }
+  .role-layout.ceo-dark .admin-stat-grid { grid-template-columns: 1fr; }
+  .role-layout.ceo-dark .role-content { padding: 16px; }
+}

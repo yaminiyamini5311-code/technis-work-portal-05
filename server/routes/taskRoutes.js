@@ -8,6 +8,7 @@ const { sendTaskAssignmentEmail } = require("../utils/email");
 const { writeAudit } = require("../utils/audit_mongo");
 const { ALLOWED_DOMAINS, ALLOWED_PROGRAMS } = require("../config");
 const { createCeoNotification, createUserNotification } = require("../utils/ceoNotification");
+const { normalizeRegistrationStatus } = require("../utils/userAccount");
 
 const router = express.Router();
 const upload = multer({
@@ -181,7 +182,7 @@ router.get("/", authenticateToken, async (req, res) => {
       if (req.user.role === "student") {
         const user = await db.collection("users").findOne({ _id: toId(req.user.id) }, { projection: { registration_status: 1 } });
         if (!user) return res.status(404).json({ success: false, message: "User not found" });
-        const status = user.registration_status || "approved";
+        const status = normalizeRegistrationStatus(user.registration_status);
         if (status === "pending") return res.status(403).json({ success: false, code: "REGISTRATION_PENDING", message: "Your registration is pending CEO approval" });
         if (status === "rejected") return res.status(403).json({ success: false, code: "REGISTRATION_REJECTED", message: "Your registration has been rejected" });
       }

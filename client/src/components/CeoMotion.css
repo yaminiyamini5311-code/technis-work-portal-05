@@ -1,0 +1,401 @@
+/**
+ * CEO PORTAL — motion layer.
+ *
+ * Recreates the motion language of the reference film (pin 895512707182308163):
+ * one continuous, unhurried ease-out; content that cascades in item-by-item
+ * rather than all at once; scale-pops for emphasis; stroke/path draws for the
+ * chart; a slow ambient arc field behind everything.
+ *
+ * Everything here is transform/opacity only (stays on the compositor), and
+ * every rule is disabled under `prefers-reduced-motion: reduce`.
+ *
+ * Nothing is hidden until `useCeoReveal` adds `.ceo-motion-ready` to the root,
+ * so a slow or failed script still renders a fully visible portal.
+ */
+
+.role-layout.ceo-dark {
+  /* ── Motion tokens ──────────────────────────────────────────────────── */
+  --m-fast: 260ms;   /* hover / focus / micro */
+  --m-base: 520ms;   /* element entry */
+  --m-slow: 900ms;   /* section + chart */
+  --m-step: 60ms;    /* stagger increment */
+  --m-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --m-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --d-card: 16px;
+  --d-row: 8px;
+  --d-chrome: 10px;
+}
+
+/* ── Single ownership of entrance motion ───────────────────────────────── */
+/* Two global, pre-existing entrance systems also claim these surfaces:
+ *
+ *   index.css  — `animation: card-rise .45s ... both` on .admin-stat/.panel/
+ *                .summary-card/.mission-card/.task-card and friends
+ *   motion.css — `animation: techins-page-in ... both` on .role-content > *
+ *                and on .role-topbar, plus nth-child stagger delays
+ *
+ * In the cascade an animation declaration outranks a normal author
+ * declaration, so their `fill-mode: both` pinned `opacity: 1` and silently
+ * beat this file's `opacity: 0` hidden state — unrevealed cards rendered
+ * visible, and every card played two entrance animations on arrival.
+ *
+ * Neutralising them here (scoped to the CEO workspace only, so the student
+ * and manager portals keep their existing motion) hands entrance ownership
+ * to the `.ceo-r-*` / `.ceo-in` reveal system below. The reveal rules are
+ * more specific (0,4,0 vs 0,3,0), so they still win once `.ceo-in` lands.
+ * Only `animation-name` is cleared; transitions and hover motion are untouched. */
+.role-layout.ceo-motion-ready .dash-stat,
+.role-layout.ceo-motion-ready .dash-card,
+.role-layout.ceo-motion-ready .admin-stat,
+.role-layout.ceo-motion-ready .panel,
+.role-layout.ceo-motion-ready .summary-card,
+.role-layout.ceo-motion-ready .mission-card,
+.role-layout.ceo-motion-ready .task-card,
+.role-layout.ceo-motion-ready .activity-admin,
+.role-layout.ceo-motion-ready .feedback-item,
+.role-layout.ceo-motion-ready .student-profile-card,
+.role-layout.ceo-motion-ready .role-content > *,
+.role-layout.ceo-motion-ready .role-topbar {
+  animation-name: none;
+}
+
+/* ── Ambient arc field (reference: faint concentric rings behind the set) ── */
+/* Second pseudo-element (the first is the drifting glow in CeoDark.css). */
+.role-layout.ceo-dark::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    repeating-radial-gradient(circle at 78% 14%,
+      rgba(255, 255, 255, 0.028) 0 1px,
+      transparent 1px 128px),
+    repeating-radial-gradient(circle at 18% 96%,
+      rgba(124, 108, 255, 0.030) 0 1px,
+      transparent 1px 168px);
+  mask-image: radial-gradient(120% 90% at 60% 30%, #000 20%, transparent 78%);
+  -webkit-mask-image: radial-gradient(120% 90% at 60% 30%, #000 20%, transparent 78%);
+  opacity: 0.9;
+  animation: ceo-arcs 90s linear infinite;
+  will-change: transform;
+}
+
+@keyframes ceo-arcs {
+  from { transform: rotate(0deg) scale(1); }
+  to   { transform: rotate(6deg) scale(1.03); }
+}
+
+/* Soft vignette so the "room" darkens at the edges, as in the reference. */
+.role-layout.ceo-dark .role-main::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(130% 110% at 50% 40%, transparent 46%, rgba(0, 0, 0, 0.42) 100%);
+}
+
+/* ── Chrome entry ────────────────────────────────────────────────────── */
+.role-layout.ceo-motion-ready .role-topbar {
+  animation: ceo-chrome-drop var(--m-slow) var(--m-ease) both;
+}
+
+@keyframes ceo-chrome-drop {
+  from { opacity: 0; transform: translate3d(0, calc(var(--d-chrome) * -1), 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Sidebar / navbar slides in from the left, like the reference's panel. */
+.role-layout.ceo-motion-ready .navbar-menu {
+  animation: ceo-slide-left var(--m-slow) var(--m-ease) both;
+}
+
+@keyframes ceo-slide-left {
+  from { opacity: 0; transform: translate3d(-14px, 0, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Nav links cascade — matches the reference's sequential panel build. */
+.role-layout.ceo-motion-ready .navbar-links a,
+.role-layout.ceo-motion-ready .navbar-links button {
+  animation: ceo-rise var(--m-base) var(--m-ease) both;
+  animation-delay: calc(120ms + var(--ceo-nav-i, 0) * var(--m-step));
+}
+
+/* Assign stagger order to nav links without touching their component. */
+.role-layout.ceo-motion-ready .navbar-links > *:nth-child(1) { --ceo-nav-i: 0; }
+.role-layout.ceo-motion-ready .navbar-links > *:nth-child(2) { --ceo-nav-i: 1; }
+.role-layout.ceo-motion-ready .navbar-links > *:nth-child(3) { --ceo-nav-i: 2; }
+.role-layout.ceo-motion-ready .navbar-links > *:nth-child(4) { --ceo-nav-i: 3; }
+.role-layout.ceo-motion-ready .navbar-links > *:nth-child(5) { --ceo-nav-i: 4; }
+.role-layout.ceo-motion-ready .navbar-links > *:nth-child(6) { --ceo-nav-i: 5; }
+.role-layout.ceo-motion-ready .navbar-links > *:nth-child(7) { --ceo-nav-i: 6; }
+.role-layout.ceo-motion-ready .navbar-links > *:nth-child(8) { --ceo-nav-i: 7; }
+
+.role-layout.ceo-motion-ready .navbar-brand,
+.role-layout.ceo-motion-ready .navbar-profile {
+  animation: ceo-rise var(--m-slow) var(--m-ease) both;
+}
+
+/* ── Page transitions ────────────────────────────────────────────────── */
+/* Re-keyed on route change by RoleLayout remounting the content wrapper. */
+@keyframes ceo-page-in {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+.role-layout.ceo-motion-ready .role-content {
+  animation: ceo-page-in var(--m-slow) var(--m-ease) both;
+}
+
+/* ── Reveal variants (driven by useCeoReveal) ────────────────────────── */
+@keyframes ceo-rise {
+  from { opacity: 0; transform: translate3d(0, var(--d-card), 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes ceo-rise-row {
+  from { opacity: 0; transform: translate3d(0, var(--d-row), 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Emphasis pop for stat tiles — the reference's node "scale-in". */
+@keyframes ceo-pop {
+  from { opacity: 0; transform: translate3d(0, var(--d-card), 0) scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Only hide once the hook has confirmed it is running. */
+.role-layout.ceo-motion-ready .ceo-r-panel:not(.ceo-in),
+.role-layout.ceo-motion-ready .ceo-r-head:not(.ceo-in) {
+  opacity: 0;
+}
+.role-layout.ceo-motion-ready .ceo-r-tile:not(.ceo-in),
+.role-layout.ceo-motion-ready .ceo-r-row:not(.ceo-in) {
+  opacity: 0;
+}
+
+.role-layout.ceo-motion-ready .ceo-r-panel.ceo-in {
+  animation: ceo-rise var(--m-base) var(--m-ease) both;
+}
+.role-layout.ceo-motion-ready .ceo-r-head.ceo-in {
+  animation: ceo-rise var(--m-base) var(--m-ease) both;
+}
+.role-layout.ceo-motion-ready .ceo-r-tile.ceo-in {
+  animation: ceo-pop var(--m-base) var(--m-ease-out) both;
+  animation-delay: calc(var(--ceo-i, 0) * var(--m-step));
+}
+.role-layout.ceo-motion-ready .ceo-r-row.ceo-in {
+  animation: ceo-rise-row var(--m-base) var(--m-ease) both;
+  animation-delay: calc(var(--ceo-i, 0) * var(--m-step));
+}
+
+/* Section kickers settle their tracking as they arrive. */
+.role-layout.ceo-motion-ready .ceo-r-head.ceo-in .section-kicker,
+.role-layout.ceo-motion-ready .ceo-r-head.ceo-in .role-eyebrow {
+  animation: ceo-track var(--m-slow) var(--m-ease) both;
+}
+
+@keyframes ceo-track {
+  from { opacity: 0; letter-spacing: 4px; }
+  to   { opacity: 1; }
+}
+
+/* ── Chart: retimed draw, teal like the reference ────────────────────── */
+.role-layout.ceo-dark .chart-line {
+  stroke: var(--ceo-teal);
+  stroke-width: 3;
+  stroke-dasharray: 1600;
+  stroke-dashoffset: 1600;
+  animation: draw-chart var(--m-slow) var(--m-ease) 0.15s forwards;
+}
+
+.role-layout.ceo-dark .chart-area {
+  fill: rgba(47, 212, 196, 0.12);
+  animation: fade-area var(--m-slow) var(--m-ease) 0.35s both;
+}
+
+.role-layout.ceo-dark .chart-dot {
+  fill: var(--ceo-teal);
+  stroke: var(--ceo-void-2);
+  stroke-width: 3;
+  animation: dot-pop var(--m-base) var(--m-ease-out) both;
+}
+
+@keyframes fade-area {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes dot-pop {
+  from { opacity: 0; transform: scale(0.4); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Capacity meter sweeps in. */
+.role-layout.ceo-dark .capacity i {
+  animation: ceo-sweep var(--m-slow) var(--m-ease) 0.25s both;
+}
+
+@keyframes ceo-sweep {
+  from { transform: scaleX(0); transform-origin: left center; }
+  to   { transform: scaleX(1); transform-origin: left center; }
+}
+
+/* ── Hover / focus (transform + opacity only) ────────────────────────── */
+.role-layout.ceo-dark .panel,
+.role-layout.ceo-dark .admin-stat,
+.role-layout.ceo-dark .mission-card,
+.role-layout.ceo-dark .task-card,
+.role-layout.ceo-dark .summary-card,
+.role-layout.ceo-dark .performance-card,
+.role-layout.ceo-dark .detail-card {
+  transition:
+    transform var(--m-fast) var(--m-ease),
+    border-color var(--m-fast) var(--m-ease),
+    box-shadow var(--m-fast) var(--m-ease);
+}
+
+.role-layout.ceo-dark .panel:hover,
+.role-layout.ceo-dark .admin-stat:hover,
+.role-layout.ceo-dark .mission-card:hover,
+.role-layout.ceo-dark .task-card:hover,
+.role-layout.ceo-dark .summary-card:hover,
+.role-layout.ceo-dark .performance-card:hover,
+.role-layout.ceo-dark .detail-card:hover {
+  transform: translate3d(0, -3px, 0);
+  border-color: var(--ceo-border-strong);
+  box-shadow: 0 22px 52px rgba(0, 0, 0, 0.55);
+}
+
+.role-layout.ceo-dark .pending-registration-item,
+.role-layout.ceo-dark .submission-row,
+.role-layout.ceo-dark .audit-table tbody tr,
+.role-layout.ceo-dark .table-wrap tbody tr {
+  transition:
+    transform var(--m-fast) var(--m-ease),
+    background-color var(--m-fast) var(--m-ease);
+}
+
+.role-layout.ceo-dark .audit-table tbody tr:hover,
+.role-layout.ceo-dark .table-wrap tbody tr:hover {
+  background: rgba(124, 108, 255, 0.08);
+  transform: translate3d(3px, 0, 0);
+}
+
+/* Focus ring stays visible and follows the accent. */
+.role-layout.ceo-dark a:focus-visible,
+.role-layout.ceo-dark button:focus-visible,
+.role-layout.ceo-dark input:focus-visible,
+.role-layout.ceo-dark select:focus-visible,
+.role-layout.ceo-dark textarea:focus-visible {
+  outline: 2px solid var(--ceo-teal);
+  outline-offset: 2px;
+}
+
+/* Buttons lift, then press. */
+.role-layout.ceo-dark .gold-btn,
+.role-layout.ceo-dark .approve-btn,
+.role-layout.ceo-dark .reject-btn,
+.role-layout.ceo-dark .quick-actions a,
+.role-layout.ceo-dark .panel-link {
+  transition:
+    transform var(--m-fast) var(--m-ease),
+    background-color var(--m-fast) var(--m-ease),
+    border-color var(--m-fast) var(--m-ease),
+    color var(--m-fast) var(--m-ease);
+}
+
+.role-layout.ceo-dark .gold-btn:hover:not(:disabled),
+.role-layout.ceo-dark .approve-btn:hover:not(:disabled),
+.role-layout.ceo-dark .reject-btn:hover:not(:disabled) {
+  transform: translate3d(0, -2px, 0);
+}
+
+.role-layout.ceo-dark .gold-btn:active:not(:disabled),
+.role-layout.ceo-dark .approve-btn:active:not(:disabled),
+.role-layout.ceo-dark .reject-btn:active:not(:disabled) {
+  transform: translate3d(0, 0, 0) scale(0.99);
+}
+
+/* ── Loading + empty states ──────────────────────────────────────────── */
+.role-layout.ceo-dark .portal-loading {
+  animation: ceo-fade var(--m-base) var(--m-ease) both;
+}
+
+@keyframes ceo-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.role-layout.ceo-dark .loader-dot {
+  animation: ceo-bounce 1.05s var(--m-ease) infinite;
+}
+
+@keyframes ceo-bounce {
+  0%, 80%, 100% { transform: translate3d(0, 0, 0); opacity: 0.45; }
+  40%           { transform: translate3d(0, -7px, 0); opacity: 1; }
+}
+
+.role-layout.ceo-dark .loader-dot:nth-child(2) { animation-delay: 0.12s; }
+.role-layout.ceo-dark .loader-dot:nth-child(3) { animation-delay: 0.24s; }
+
+.role-layout.ceo-dark .empty-state {
+  animation: ceo-rise var(--m-base) var(--m-ease) both;
+}
+
+/* ── Inline light-theme overrides that would otherwise fight the dark ── */
+/* Students.jsx writes light borders inline; reclaim them for the dark UI. */
+.role-layout.ceo-dark .table-wrap table,
+.role-layout.ceo-dark .table-wrap th,
+.role-layout.ceo-dark .table-wrap td {
+  border-color: var(--ceo-border) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .table-wrap tbody tr {
+  border-bottom: 1px solid var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark .table-wrap thead tr {
+  border-bottom: 2px solid var(--ceo-border-strong) !important;
+}
+
+.role-layout.ceo-dark .table-wrap input,
+.role-layout.ceo-dark .table-wrap select {
+  border: 1px solid var(--ceo-border) !important;
+}
+
+/* ── Reduced motion: keep the look, drop the movement ────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .role-layout.ceo-dark::after { animation: none; }
+
+  .role-layout.ceo-motion-ready .role-topbar,
+  .role-layout.ceo-motion-ready .navbar-menu,
+  .role-layout.ceo-motion-ready .navbar-brand,
+  .role-layout.ceo-motion-ready .navbar-profile,
+  .role-layout.ceo-motion-ready .role-content,
+  .role-layout.ceo-motion-ready .navbar-links a,
+  .role-layout.ceo-motion-ready .navbar-links button,
+  .role-layout.ceo-motion-ready .ceo-r-panel,
+  .role-layout.ceo-motion-ready .ceo-r-head,
+  .role-layout.ceo-motion-ready .ceo-r-tile,
+  .role-layout.ceo-motion-ready .ceo-r-row,
+  .role-layout.ceo-dark .chart-line,
+  .role-layout.ceo-dark .chart-area,
+  .role-layout.ceo-dark .chart-dot,
+  .role-layout.ceo-dark .capacity i,
+  .role-layout.ceo-dark .portal-loading,
+  .role-layout.ceo-dark .loader-dot,
+  .role-layout.ceo-dark .empty-state {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+
+  .role-layout.ceo-dark * {
+    transition-duration: 0.01ms !important;
+  }
+}

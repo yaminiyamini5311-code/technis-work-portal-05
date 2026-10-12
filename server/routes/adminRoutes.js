@@ -3,9 +3,24 @@ const { ObjectId } = require("mongodb");
 const { authenticateToken, authorizeRoles } = require("../middleware/authMiddleware");
 const { MAX_STUDENT_ACCOUNTS } = require("../config");
 const { writeAudit } = require("../utils/audit_mongo");
+const { isActiveFlag, normalizeRegistrationStatus } = require("../utils/userAccount");
 const bcrypt = require("bcryptjs");
+const multer = require("multer");
+const fs = require("fs");
+const path = require("path");
 
 const router = express.Router();
+
+// Same limits as the student avatar upload (JPEG/PNG/WebP, 2MB max).
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    const ok = allowed.includes(file.mimetype);
+    cb(ok ? null : new Error("Only JPEG, PNG, and WebP images are allowed"), ok);
+  }
+});
 
 function toId(id) { try { return new ObjectId(id); } catch { return id; } }
 function fmt(doc) {
@@ -14,6 +29,126 @@ function fmt(doc) {
   delete d._id;
   return d;
 }
+
+/* ─── PROFILE (CEO / ADMIN) ────────────────────────────────────────────────
+ * Mirrors GET/PUT /api/student/profile for the CEO Workspace.
+ *
+ * The CEO account is env-driven and has NO row in `users`
+ * (ensureDefaultAccounts deletes any DB user matching CEO_EMAIL on every
+ * boot, and signup refuses role=ceo). The JWT therefore carries the literal
+ * id "ceo". Storing CEO profile fields on a users row would be deleted on the
+ * next restart, so they are persisted in a dedicated `ceo_profile` document
+ * keyed by the CEO email.
+ *
+ * Email and role are ALWAYS taken from the environment / token and are never
+ * accepted from the request body, so they cannot be modified through this API.
+ */
+const CEO_PROFILE_ID = "ceo";
+
+function ceoIdentity() {
+  return {
+    email: (process.env.CEO_EMAIL || "ceo@techins.com").trim().toLowerCase(),
+    name: (process.env.CEO_NAME || "TECHINS CEO").trim(),
+  };
+}
+
+async function saveAvatar(userKey, file) {
+  const uploadsDir = path.join(__dirname, "..", "uploads", "avatars");
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+  const safeName = `${userKey}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${path.extname(file.originalname)}`;
+  const abs = path.join(uploadsDir, safeName);
+  fs.writeFileSync(abs, file.buffer);
+  return `/uploads/avatars/${safeName}`;
+}
+
+router.get("/profile", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+
+    if (req.user.role === "ceo") {
+      const identity = ceoIdentity();
+      const saved = await db.collection("ceo_profile").findOne({ _id: CEO_PROFILE_ID });
+      return res.json({
+        success: true,
+        user: {
+          id: CEO_PROFILE_ID,
+          // env name is the default; a saved name overrides it
+          name: saved?.name || identity.name,
+          phone: saved?.phone || "",
+          avatar: saved?.avatar || null,
+          email: identity.email,
+          role: "ceo",
+        },
+      });
+    }
+
+    const user = await db.collection("users").findOne({ _id: toId(req.user.id) }, { projection: { password: 0 } });
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    return res.json({ success: true, user: { ...user, id: String(user._id) } });
+  } catch (e) {
+    console.error("Fetch profile error:", e);
+    return res.status(500).json({ success: false, message: "Unable to fetch profile" });
+  }
+});
+
+router.put("/profile", authenticateToken, authorizeRoles("admin", "ceo"), avatarUpload.single("avatar"), async (req, res) => {
+  try {
+    const db = req.db;
+    const { name, phone } = req.body || {};
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ success: false, message: "Name is required" });
+    }
+
+    let avatarPath = null;
+    if (req.file) {
+      avatarPath = await saveAvatar(req.user.role === "ceo" ? CEO_PROFILE_ID : req.user.id, req.file);
+    }
+
+    const cleanName = String(name).trim();
+    const cleanPhone = phone ? String(phone).trim() : null;
+
+    if (req.user.role === "ceo") {
+      const identity = ceoIdentity();
+      const update = { name: cleanName, phone: cleanPhone };
+      if (avatarPath) {
+        update.avatar = avatarPath;
+        const prev = await db.collection("ceo_profile").findOne({ _id: CEO_PROFILE_ID }, { projection: { avatar: 1 } });
+        if (prev?.avatar) {
+          const oldAbs = path.join(__dirname, "..", prev.avatar);
+          if (fs.existsSync(oldAbs)) fs.unlinkSync(oldAbs);
+        }
+      }
+      await db.collection("ceo_profile").updateOne(
+        { _id: CEO_PROFILE_ID },
+        { $set: update, $setOnInsert: { email: identity.email, created_at: new Date().toISOString() } },
+        { upsert: true }
+      );
+      await writeAudit(db, { actorId: req.user.id, action: "ceo_profile_updated", entityType: "ceo_profile", entityId: CEO_PROFILE_ID, newValue: { name: cleanName } });
+      return res.json({ success: true, message: "Profile updated successfully" });
+    }
+    const update = { name: cleanName, phone: cleanPhone };
+    if (avatarPath) update.avatar = avatarPath;
+    await db.collection("users").updateOne({ _id: toId(req.user.id) }, { $set: update });
+    return res.json({ success: true, message: "Profile updated successfully" });
+  } catch (e) {
+    console.error("Update profile error:", e);
+    return res.status(500).json({ success: false, message: "Unable to update profile" });
+  }
+});
+
+// Multer rejects a bad avatar in middleware, before the handler runs, so the
+// error bypasses the try/catch above and would surface as a generic 500.
+// Mounted directly after the profile routes so only they are affected.
+router.use((err, req, res, next) => {
+  if (!err) return next();
+  if (err.code === "LIMIT_FILE_SIZE") {
+    return res.status(400).json({ success: false, message: "File size must be less than 2MB" });
+  }
+  if (err.code === "LIMIT_UNEXPECTED_FILE" || /JPEG, PNG, and WebP/i.test(err.message || "")) {
+    return res.status(400).json({ success: false, message: "Only JPEG, PNG, and WebP images are allowed" });
+  }
+  return next(err);
+});
 
 /* ─── STATS ─────────────────────────────────────────────────────────────── */
 router.get("/stats", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
@@ -332,7 +467,7 @@ router.patch("/students/:id/deactivate", authenticateToken, authorizeRoles("admi
     if (!userId) return res.status(400).json({ success: false, message: "Invalid student id" });
     const user = await db.collection("users").findOne({ _id: userId });
     if (!user) return res.status(404).json({ success: false, message: "Student not found" });
-    if (Number(user.active) !== 1) {
+    if (!isActiveFlag(user.active)) {
       return res.json({ success: true, message: "Student is already deactivated" });
     }
     await db.collection("users").updateOne(
@@ -356,7 +491,7 @@ router.patch("/students/:id/reactivate", authenticateToken, authorizeRoles("admi
     if (!userId) return res.status(400).json({ success: false, message: "Invalid student id" });
     const user = await db.collection("users").findOne({ _id: userId });
     if (!user) return res.status(404).json({ success: false, message: "Student not found" });
-    if (Number(user.active) === 1) {
+    if (isActiveFlag(user.active)) {
       return res.json({ success: true, message: "Student is already active" });
     }
     await db.collection("users").updateOne(
@@ -431,9 +566,9 @@ router.post("/approve-user/:id", authenticateToken, authorizeRoles("admin", "ceo
   try {
     const db = req.db;
     const userId = req.params.id;
-    const user = await db.collection("users").findOne({ _id: toId(userId) });
+    const user = await db.collection("users").findOne({ _id: userId });
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
-    if (Number(user.active) === 1) return res.status(400).json({ success: false, message: "User is already active" });
+    if (isActiveFlag(user.active)) return res.status(400).json({ success: false, message: "User is already active" });
 
     await db.collection("users").updateOne({ _id: toId(userId) }, { $set: { active: 1 } });
     await writeAudit(db, { actorId: req.user.id, action: "user_approved", entityType: "user", entityId: userId, newValue: { name: user.name, email: user.email, role: user.role, active: 1 } });
@@ -517,7 +652,12 @@ router.post("/approve-registration/:id", authenticateToken, authorizeRoles("admi
     if (user.role !== "student") return res.status(400).json({ success: false, message: "Only student registrations can be approved" });
     if (user.registration_status === "approved") return res.json({ success: true, message: "Student is already approved" });
 
-    await db.collection("users").updateOne({ _id: toId(userId) }, { $set: { registration_status: "approved" } });
+    // Approval grants BOTH signals so the login gate and the approval
+    // workflow can never drift apart again.
+    await db.collection("users").updateOne(
+      { _id: toId(userId) },
+      { $set: { registration_status: "approved", active: 1 } }
+    );
 
     // Mark related notifications as read
     await db.collection("notifications").updateMany(
@@ -543,7 +683,10 @@ router.post("/reject-registration/:id", authenticateToken, authorizeRoles("admin
     if (user.role !== "student") return res.status(400).json({ success: false, message: "Only student registrations can be rejected" });
     if (user.registration_status === "rejected") return res.json({ success: true, message: "Student is already rejected" });
 
-    await db.collection("users").updateOne({ _id: toId(userId) }, { $set: { registration_status: "rejected" } });
+    await db.collection("users").updateOne(
+      { _id: toId(userId) },
+      { $set: { registration_status: "rejected", active: 0 } }
+    );
 
     await db.collection("notifications").updateMany(
       { type: "registration_pending", message: { $regex: user.email }, read_at: null },

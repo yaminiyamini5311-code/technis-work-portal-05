@@ -15,13 +15,13 @@ function DailyActivity() {
     const [success, setSuccess] = useState("");
 
     // Scroll reveal effect for space theme - sophisticated animation
-    useScrollReveal('.reveal-card', { 
-        stagger: 110,
-        initialScale: 0.85,
-        initialOpacity: 0.1,
-        initialTranslateY: 50,
-        initialBlur: 5
-    });
+    useScrollReveal('.reveal-card', {
+    stagger: 60,
+    initialScale: 0.96,
+    initialOpacity: 0.15,
+    initialTranslateY: 24,
+    initialBlur: 0
+  });
 
     const [form, setForm] = useState({
         work_title: "",

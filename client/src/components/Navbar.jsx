@@ -1,21 +1,36 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import TechinsIcon from "./TechinsIcon";
 import "./Navbar.css";
 
+const readStoredUser = () => {
+  try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
+};
+
 export default function Navbar({ role }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
-  
-  let user = {};
-  try {
-    user = JSON.parse(localStorage.getItem("user") || "{}");
-  } catch {}
+
+  // Held in state (not read inline) so a profile save can refresh the
+  // displayed name immediately instead of on the next full reload.
+  const [user, setUser] = useState(readStoredUser);
+
+  useEffect(() => {
+    setUser(readStoredUser());
+    const onUserUpdated = () => setUser(readStoredUser());
+    window.addEventListener("techins:user-updated", onUserUpdated);
+    return () => window.removeEventListener("techins:user-updated", onUserUpdated);
+  }, []);
 
   const logout = () => {
     localStorage.clear();
     navigate("/login", { replace: true });
   };
+
+  // The profile page lives under the portal that owns this navbar.
+  // CEO and admin share the /admin portal (see the /ceo redirect in App.jsx).
+  // null => no profile page for this role, render the static block instead.
+  const profilePath = role === "admin" || role === "ceo" ? "/admin/profile" : null;
 
   // Define navigation items based on role
   const getNavigationItems = () => {
@@ -102,16 +117,31 @@ export default function Navbar({ role }) {
           </div>
         </div>
 
-        {/* User Profile */}
-        <div className="navbar-profile">
-          <div className="navbar-avatar">
-            {(user.name || role || "U").charAt(0).toUpperCase()}
+        {/* User Profile — for the CEO/admin portal this links to the profile
+            page (it was a plain <div>, so it looked clickable but did nothing).
+            The manager portal has no profile page yet, so it keeps the static
+            block rather than linking to a route that does not exist. */}
+        {profilePath ? (
+          <NavLink to={profilePath} className="navbar-profile" onClick={() => setMenuOpen(false)}>
+            <div className="navbar-avatar">
+              {(user.name || role || "U").charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <strong>{user.name || "User"}</strong>
+              <span>{user.email || ""}</span>
+            </div>
+          </NavLink>
+        ) : (
+          <div className="navbar-profile">
+            <div className="navbar-avatar">
+              {(user.name || role || "U").charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <strong>{user.name || "User"}</strong>
+              <span>{user.email || ""}</span>
+            </div>
           </div>
-          <div>
-            <strong>{user.name || "User"}</strong>
-            <span>{user.email || ""}</span>
-          </div>
-        </div>
+        )}
 
         {/* Navigation Links */}
         <div className="navbar-links">

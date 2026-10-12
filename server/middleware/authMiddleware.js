@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const { normalizeRegistrationStatus } = require("../utils/userAccount");
 
 function getSecret() {
   const secret = process.env.JWT_SECRET;
@@ -105,7 +106,7 @@ async function checkStudentRegistrationStatus(req, res, next) {
       const user = await db.collection("users").findOne(query, { projection: { registration_status: 1 } });
       if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
-      const status = user.registration_status || "approved";
+      const status = normalizeRegistrationStatus(user.registration_status);
       if (status === "pending") {
         return res.status(403).json({ success: false, code: "REGISTRATION_PENDING", message: "Your registration is pending CEO approval" });
       }

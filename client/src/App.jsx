@@ -23,6 +23,7 @@ import DailyActivities from "./pages/admin/DailyActivities";
 import Feedback from "./pages/admin/feedback";
 import AdminPerformance from "./pages/admin/performance";
 import AuditLogs from "./pages/admin/AuditLogs";
+import AdminProfile from "./pages/admin/Profile";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -41,7 +42,6 @@ function Protected({ role, children }) {
 }
 
 export default function App() {
-  const [booting, setBooting] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
 
   // Restore auth on load: verify the stored token with /me before
@@ -79,9 +79,14 @@ export default function App() {
 
   return (
     <>
-      {booting && <TechinsLoader duration={3000} onDone={() => setBooting(false)} />}
-      {(!booting && !authChecked) ? <TechinsLoader /> : null}
-      {booting || !authChecked ? null : (
+      {/* A SINGLE loader instance. Previously `booting` and `authChecked`
+          drove two separate <TechinsLoader />s: the first ran its full 3s,
+          then the second mounted and ran another 3s, so the loading screen
+          appeared twice and the app waited ~6s. One instance now waits for
+          BOTH the auth check and its own minimum display time, whichever is
+          later, so it can never re-appear mid-session. */}
+      {!authChecked && <TechinsLoader duration={1500} authPending />}
+      {authChecked ? (
         <BrowserRouter><Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
@@ -118,6 +123,7 @@ export default function App() {
           <Route path="/admin/performance" element={<AdminPerformance />} />
           <Route path="/admin/feedback" element={<Feedback />} />
           <Route path="/admin/audit" element={<AuditLogs />} />
+          <Route path="/admin/profile" element={<AdminProfile />} />
         </Route>
 
         {/* Redirect old CEO routes to Admin */}
@@ -126,7 +132,7 @@ export default function App() {
 
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes></BrowserRouter>
-      )}
+      ) : null}
     </>
   );
 }

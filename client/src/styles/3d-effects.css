@@ -17,10 +17,9 @@
 .list-row,
 .overall-progress,
 .login-card {
-  transform-style: preserve-3d;
+  transform-style: flat;
   transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
               box-shadow 0.4s ease;
-  will-change: transform;
   position: relative;
 }
 
@@ -65,17 +64,13 @@
   box-shadow: 0 20px 60px rgba(12, 18, 12, 0.18);
 }
 
-/* Ensure text remains readable during transform */
-.task-card *,
-.workspace-card *,
-.summary-card *,
-.admin-stat *,
-.mission-card *,
-.panel *,
-.student-profile-card * {
-  transform-style: preserve-3d;
-  backface-visibility: hidden;
-}
+/* Ensure text remains readable during transform.
+   NOTE: `transform-style: preserve-3d` + `backface-visibility: hidden` were
+   applied to EVERY descendant of every card. That forced the browser to
+   maintain a 3D rendering context (and a composited layer) for each child
+   node, which is very expensive while scrolling a long page - especially on
+   mobile. The parent hover transform still works without them, so they are
+   no longer forced onto all descendants. */
 
 /* Inner content subtle depth */
 .task-card:hover .task-index,

@@ -30,6 +30,6 @@
 .tl__bar{width:160px;height:3px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden}
 .tl__bar span{display:block;height:100%;width:0;border-radius:3px;
   background:linear-gradient(90deg,#ff9f1a,#ffd36b);box-shadow:0 0 10px rgba(255,176,32,.7);
-  animation:tl-fill 3s linear forwards}
+  animation:tl-fill var(--tl-fill,1500ms) linear forwards}
 @keyframes tl-fill{to{width:100%}}
 @media (prefers-reduced-motion:reduce){.tl,.tl *{animation-duration:.01s!important}}

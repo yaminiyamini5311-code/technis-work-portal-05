@@ -164,7 +164,9 @@ export function mountSpace({ force = false } = {}) {
     lastT = performance.now(),
     fpsT = lastT,
     fpsN = 0,
-    fps = 0;
+    fps = 0,
+    // Last scroll progress painted. Used to skip work on idle frames.
+    lastProgress = -1;
 
   const badge = debug ? Object.assign(document.createElement('div'), {}) : null;
   if (badge) {
@@ -273,6 +275,17 @@ export function mountSpace({ force = false } = {}) {
     const target = clamp(input, -100, 100);
     v += (target - v) * (target !== 0 ? 0.25 : 0.06); // smooth glide in/out
     if (Math.abs(v) < 0.02) v = 0;
+
+    // Nothing in the scene is animating when the field is at rest and the
+    // user is not scrolling, so skip the canvas repaint and the per-element
+    // layout reads entirely. Previously this loop redrew the starfield and
+    // called getBoundingClientRect() on every visible card on every single
+    // frame - a forced synchronous reflow per element per frame, which is
+    // what made scrolling stutter. Idle frames now cost almost nothing.
+    const moving = input !== 0 || Math.abs(v) > 0.02;
+    if (!moving && progress === lastProgress) return;
+
+    lastProgress = progress;
 
     const dz = -(0.0006 + v * 0.00045) * dt; // down = fly forward (zoom in), up = backward (zoom out)
     draw(dz, t);
