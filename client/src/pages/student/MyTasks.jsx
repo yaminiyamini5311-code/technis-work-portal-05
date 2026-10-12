@@ -15,13 +15,6 @@ const DOMAINS = [
   { value: "program", label: "Program" }
 ];
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return "Not set";
-  const d = new Date(dateStr + 'T00:00:00');
-  if (isNaN(d.getTime())) return "Not set";
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-};
-
 export default function MyTasks() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,12 +27,12 @@ export default function MyTasks() {
   const previousApproved = useRef(null);
 
   // Scroll reveal effect for space theme - sophisticated animation
-  useScrollReveal('.reveal-card', { 
-    stagger: 110,
-    initialScale: 0.85,
-    initialOpacity: 0.1,
-    initialTranslateY: 50,
-    initialBlur: 5
+  useScrollReveal('.reveal-card', {
+    stagger: 60,
+    initialScale: 0.96,
+    initialOpacity: 0.15,
+    initialTranslateY: 24,
+    initialBlur: 0
   });
 
   const load = async () => {
@@ -173,7 +166,17 @@ export default function MyTasks() {
             
             return (
               <article className={`task-card reveal-card ${task.status} ${isOverdue ? 'overdue' : ''}`} key={task.id}>
-                <div className="task-card-top"><div><span className="task-label">{task.task_code || "TASK"}</span><h2>{task.title}</h2><p>{task.description || "No description provided."}</p></div><span className={`status ${task.status} ${isOverdue ? 'overdue-badge' : ''}`}>{isOverdue ? '⚠ Overdue' : workflow}</span></div>
+                <div className="task-card-top">
+                  <div>
+                    <span className="task-label">{task.task_code || "TASK"}</span>
+                    <h2>{task.title}</h2>
+                    {task.description && <div className="task-section"><strong>Description:</strong><p style={{ whiteSpace: 'pre-wrap' }}>{task.description}</p></div>}
+                    {task.expected_output && <div className="task-section"><strong>Expected Output:</strong><p style={{ whiteSpace: 'pre-wrap' }}>{task.expected_output}</p></div>}
+                    {task.how_to_do && <div className="task-section"><strong>How to Do:</strong><p style={{ whiteSpace: 'pre-wrap' }}>{task.how_to_do}</p></div>}
+                    {task.submission_requirements && <div className="task-section"><strong>Submission Requirements:</strong><p style={{ whiteSpace: 'pre-wrap' }}>{task.submission_requirements}</p></div>}
+                  </div>
+                  <span className={`status ${task.status} ${isOverdue ? 'overdue-badge' : ''}`}>{isOverdue ? '⚠ Overdue' : workflow}</span>
+                </div>
                 <div className="task-meta-grid">
                   <div><span>Priority</span><strong className={`priority ${task.priority}`}>{task.priority || "medium"}</strong></div>
                   {task.domain && <div><span>Domain</span><strong style={{ textTransform: 'capitalize' }}>{task.domain}</strong></div>}
