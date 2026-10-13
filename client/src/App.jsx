@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import TechinsLoader from "./components/TechinsLoader";
+import TechinsLoader, { LOADER_DURATION_MS } from "./components/TechinsLoader";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import StudentLayout from "./components/StudentLayout";
@@ -43,6 +43,7 @@ function Protected({ role, children }) {
 
 export default function App() {
   const [authChecked, setAuthChecked] = useState(false);
+  const [booted, setBooted] = useState(false);
 
   // Restore auth on load: verify the stored token with /me before
   // route guards decide. Clears stale tokens (expired, server restart
@@ -79,14 +80,13 @@ export default function App() {
 
   return (
     <>
-      {/* A SINGLE loader instance. Previously `booting` and `authChecked`
-          drove two separate <TechinsLoader />s: the first ran its full 3s,
-          then the second mounted and ran another 3s, so the loading screen
-          appeared twice and the app waited ~6s. One instance now waits for
-          BOTH the auth check and its own minimum display time, whichever is
-          later, so it can never re-appear mid-session. */}
-      {!authChecked && <TechinsLoader duration={1500} authPending />}
-      {authChecked ? (
+      {/* A SINGLE loader instance. It stays mounted until BOTH its own
+          minimum display time (LOADER_DURATION_MS: 3.5s portal sequence +
+          3s outward wave, signalled via onDone) AND the auth check have
+          finished, whichever is later, so the loading screen plays exactly
+          once for the full duration and can never re-appear mid-session. */}
+      {(!booted || !authChecked) && <TechinsLoader duration={LOADER_DURATION_MS} onDone={() => setBooted(true)} />}
+      {authChecked && booted ? (
         <BrowserRouter><Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
