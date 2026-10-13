@@ -97,6 +97,15 @@ const icons = {
     </svg>
   ),
   
+  download: (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 3v13m0 0l-4-4m4 4l4-4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="icon-accent-stroke"/>
+      <path d="M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" className="icon-stroke"/>
+      <circle cx="12" cy="16" r="1.5" fill="currentColor" className="icon-accent"/>
+      <rect x="6" y="18" width="12" height="3" rx="1" fill="currentColor" opacity="0.12" className="icon-fill"/>
+    </svg>
+  ),
+  
   gauge: (
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M12 18a6 6 0 110-12 6 6 0 010 12z" stroke="currentColor" strokeWidth="1.75" className="icon-stroke"/>
