@@ -9,6 +9,7 @@ const { writeAudit } = require("../utils/audit_mongo");
 const { ALLOWED_DOMAINS, ALLOWED_PROGRAMS } = require("../config");
 const { createCeoNotification, createUserNotification } = require("../utils/ceoNotification");
 const { normalizeRegistrationStatus } = require("../utils/userAccount");
+const { uploadFile, downloadFile, migrateFileToGridFS } = require("../utils/fileStorage");
 
 const router = express.Router();
 const upload = multer({
@@ -225,24 +226,85 @@ router.get("/submissions", authenticateToken, authorizeRoles("admin", "manager",
 });
 
 /* ─── DOWNLOAD SUBMISSION FILE ──────────────────────────────────────────
- * Streams one file from `submission_files` for admin/manager/ceo review.
- * Files live on local disk: present in local dev; on ephemeral hosting
- * (Vercel) older files may be gone — that returns an honest 404, and the
- * database row is left untouched.
+ * Streams file from MongoDB GridFS or migrates from legacy filesystem.
+ * Supports both new GridFS files and old filesystem files for backward compatibility.
  */
 router.get("/files/:fileId/download", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
   try {
     const db = req.db;
     const file = await db.collection("submission_files").findOne({ _id: toId(req.params.fileId) });
     if (!file) return res.status(404).json({ success: false, message: "File not found" });
+    
     const sub = await db.collection("submissions").findOne({ _id: toId(file.submission_id) });
     if (!sub) return res.status(404).json({ success: false, message: "Submission not found" });
-    if (!file.storage_path || !fs.existsSync(file.storage_path)) {
-      return res.status(404).json({ success: false, message: "File is no longer available on the server" });
+    
+    // Try GridFS first (new storage)
+    if (file.gridfs_id) {
+      try {
+        const { stream, file: gridfsFile } = await downloadFile(db, file.gridfs_id);
+        
+        res.setHeader("Content-Type", file.mime_type || "application/octet-stream");
+        res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(file.original_name || "submission-file")}"`);
+        
+        stream.pipe(res);
+        
+        await writeAudit(db, { 
+          actorId: req.user.id, 
+          action: "submission_file_downloaded", 
+          entityType: "submission_file", 
+          entityId: String(file._id), 
+          newValue: { submission_id: String(sub._id), storage_type: "gridfs" } 
+        });
+        
+        return;
+      } catch (gridfsError) {
+        console.error("[Download] GridFS error:", gridfsError.message);
+        return res.status(404).json({ success: false, message: "File is no longer available" });
+      }
     }
-    await writeAudit(db, { actorId: req.user.id, action: "submission_file_downloaded", entityType: "submission_file", entityId: String(file._id), newValue: { submission_id: String(sub._id) } });
-    res.download(file.storage_path, file.original_name || "submission-file");
-  } catch (e) { console.error("DOWNLOAD FILE:", e); res.status(500).json({ success: false, message: "Unable to download file" }); }
+    
+    // Fallback to filesystem (old storage) and attempt migration
+    if (file.storage_path) {
+      // Try to read from filesystem
+      if (fs.existsSync(file.storage_path)) {
+        // Migrate to GridFS in background (don't block download)
+        migrateFileToGridFS(db, file.storage_path, file.original_name, {
+          submission_id: file.submission_id,
+          mime_type: file.mime_type,
+          size: file.size
+        }).then(gridfsId => {
+          if (gridfsId) {
+            // Update file record with GridFS ID
+            db.collection("submission_files").updateOne(
+              { _id: file._id },
+              { $set: { gridfs_id: gridfsId, storage_type: "gridfs", migrated_at: new Date().toISOString() } }
+            ).catch(err => console.error("[Download] Migration update error:", err.message));
+          }
+        }).catch(err => console.error("[Download] Migration error:", err.message));
+        
+        // Serve from filesystem
+        await writeAudit(db, { 
+          actorId: req.user.id, 
+          action: "submission_file_downloaded", 
+          entityType: "submission_file", 
+          entityId: String(file._id), 
+          newValue: { submission_id: String(sub._id), storage_type: "filesystem" } 
+        });
+        
+        return res.download(file.storage_path, file.original_name || "submission-file");
+      }
+    }
+    
+    // File not found in either storage
+    return res.status(404).json({ 
+      success: false, 
+      message: "File is no longer available. It may have been uploaded before the system migration." 
+    });
+    
+  } catch (e) { 
+    console.error("DOWNLOAD FILE:", e); 
+    res.status(500).json({ success: false, message: "Unable to download file" }); 
+  }
 });
 
 /* ─── GET ALL TASKS ─────────────────────────────────────────────────────── */
@@ -682,10 +744,6 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
     const submissionCode = await nextSubmissionCode(db);
     const submittedAt = new Date().toISOString();
 
-    // Store files in uploads directory
-    const folder = path.join(__dirname, "..", "uploads", `student_${req.user.id}`, `task_${task._id}`, `submission_v${version}`);
-    fs.mkdirSync(folder, { recursive: true });
-
     const subResult = await db.collection("submissions").insertOne({
       submission_code: submissionCode,
       task_id: String(task._id),
@@ -701,11 +759,30 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
     });
     const sid = String(subResult.insertedId);
 
+    // Upload files to MongoDB GridFS (serverless-compatible)
     for (const file of (req.files || [])) {
-      const safe = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-      const full = path.join(folder, safe);
-      fs.writeFileSync(full, file.buffer);
-      await db.collection("submission_files").insertOne({ submission_id: sid, original_name: file.originalname, stored_name: safe, mime_type: file.mimetype, size: file.size, storage_path: full, created_at: submittedAt });
+      try {
+        const gridfsId = await uploadFile(db, file.buffer, file.originalname, {
+          submission_id: sid,
+          task_id: String(task._id),
+          student_id: req.user.id,
+          mime_type: file.mimetype,
+          size: file.size
+        });
+        
+        await db.collection("submission_files").insertOne({
+          submission_id: sid,
+          original_name: file.originalname,
+          mime_type: file.mimetype,
+          size: file.size,
+          gridfs_id: gridfsId,
+          storage_type: "gridfs",
+          created_at: submittedAt
+        });
+      } catch (fileError) {
+        console.error(`[Submit] File upload error for ${file.originalname}:`, fileError.message);
+        // Continue with other files even if one fails
+      }
     }
 
     await transition(db, task, version > 1 ? "Resubmitted" : "Submitted", req.user.id, "Submission received");
