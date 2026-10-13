@@ -1,14 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import "./SubmissionsView.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
-
-// View modes
-const VIEW_MODES = {
-  TASKS: 'tasks',          // Task-wise list (default)
-  TASK_STUDENTS: 'task_students',  // Students who submitted a specific task
-  STUDENT_DETAIL: 'student_detail' // Individual student submission detail
-};
 
 function formatBytes(n) {
   if (n === null || n === undefined) return "";
@@ -295,49 +289,31 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
 export default function SubmissionsView({ eyebrow, title, subtitle }) {
   // Data state
   const [items, setItems] = useState([]);
-  const [tasks, setTasks] = useState([]);
-  const [batches, setBatches] = useState([]);
-  
-  // UI state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   
   // View state
-  const [viewMode, setViewMode] = useState(VIEW_MODES.TASKS);
-  const [selectedTask, setSelectedTask] = useState(null);
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   
   // Filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [filterTask, setFilterTask] = useState("all");
   const [filterBatch, setFilterBatch] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
 
-  // Load submissions and related data
+  // Load submissions
   const load = async () => {
     try {
       setLoading(true);
       setError("");
       
-      const [submissionsRes, tasksRes, batchesRes] = await Promise.all([
-        fetch(`${API_URL}/api/tasks/submissions?limit=500`, { headers: auth() }),
-        fetch(`${API_URL}/api/tasks`, { headers: auth() }),
-        fetch(`${API_URL}/api/batches`, { headers: auth() }).catch(() => ({ ok: false, json: async () => ({ batches: [] }) }))
-      ]);
+      const res = await fetch(`${API_URL}/api/tasks/submissions?limit=500`, { headers: auth() });
+      const data = await res.json();
       
-      const [submissionsData, tasksData, batchesData] = await Promise.all([
-        submissionsRes.json(),
-        tasksRes.json(),
-        batchesRes.json()
-      ]);
+      if (!res.ok) throw new Error(data.message || "Unable to load submissions");
       
-      if (!submissionsRes.ok) throw new Error(submissionsData.message || "Unable to load submissions");
-      
-      setItems(submissionsData.submissions || []);
-      setTasks(tasksData.tasks || []);
-      setBatches(batchesData.batches || []);
+      setItems(data.submissions || []);
     } catch (e) {
       setError(e.message || "Unable to load submissions. Check your connection.");
     } finally {
@@ -347,142 +323,42 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
 
   useEffect(() => { load(); }, []);
 
-  // Group submissions by task
-  const taskGroups = useMemo(() => {
-    const groups = new Map();
-    
-    items.forEach(submission => {
-      const taskId = submission.task_id;
-      if (!groups.has(taskId)) {
-        groups.set(taskId, {
-          task_id: taskId,
-          task_code: submission.task_code,
-          task_title: submission.task_title || submission.title,
-          task_description: submission.task_description,
-          workflow_status: submission.workflow_status,
-          submissions: [],
-          student_count: 0,
-          total_files: 0
-        });
-      }
-      
-      const group = groups.get(taskId);
-      group.submissions.push(submission);
-      group.total_files += (submission.file_count || 0);
-    });
-    
-    // Calculate unique students per task
-    groups.forEach(group => {
-      const uniqueStudents = new Set(group.submissions.map(s => s.student_id));
-      group.student_count = uniqueStudents.size;
-    });
-    
-    return Array.from(groups.values());
-  }, [items]);
-
   // Available filter options
   const statuses = useMemo(() => 
     ["all", ...new Set(items.map(i => i.status).filter(Boolean))],
     [items]
   );
   
-  const taskOptions = useMemo(() => {
-    const options = taskGroups.map(g => ({
-      id: g.task_id,
-      label: `${g.task_code || ''} - ${g.task_title || 'Untitled'}`
-    }));
-    return [{ id: "all", label: "All tasks" }, ...options];
-  }, [taskGroups]);
-  
-  const batchOptions = useMemo(() => {
+  const batches = useMemo(() => {
     const batchSet = new Set(items.map(i => i.batch_name).filter(Boolean));
     return ["all", ...Array.from(batchSet)];
   }, [items]);
 
   // Apply filters and sorting
-  const filteredTaskGroups = useMemo(() => {
-    let filtered = taskGroups;
-    
-    // Filter by task
-    if (filterTask !== "all") {
-      filtered = filtered.filter(g => g.task_id === filterTask);
-    }
+  const filteredSubmissions = useMemo(() => {
+    let filtered = [...items];
     
     // Filter by search query
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
-      filtered = filtered.filter(g =>
-        (g.task_title || "").toLowerCase().includes(q) ||
-        (g.task_code || "").toLowerCase().includes(q) ||
-        g.submissions.some(s =>
-          (s.student_name || "").toLowerCase().includes(q) ||
-          (s.student_email || "").toLowerCase().includes(q)
-        )
+      filtered = filtered.filter(item =>
+        (item.student_name || "").toLowerCase().includes(q) ||
+        (item.student_email || "").toLowerCase().includes(q) ||
+        (item.task_title || "").toLowerCase().includes(q) ||
+        (item.task_code || "").toLowerCase().includes(q) ||
+        (item.submission_code || "").toLowerCase().includes(q) ||
+        (item.student_id || "").toLowerCase().includes(q)
       );
     }
     
-    // Filter by status (at submission level)
+    // Filter by status
     if (filterStatus !== "all") {
-      filtered = filtered.map(g => ({
-        ...g,
-        submissions: g.submissions.filter(s => s.status === filterStatus)
-      })).filter(g => g.submissions.length > 0);
+      filtered = filtered.filter(item => item.status === filterStatus);
     }
     
-    // Filter by batch (at submission level)
+    // Filter by batch
     if (filterBatch !== "all") {
-      filtered = filtered.map(g => ({
-        ...g,
-        submissions: g.submissions.filter(s => s.batch_name === filterBatch)
-      })).filter(g => g.submissions.length > 0);
-    }
-    
-    // Sort
-    const sortFn = {
-      newest: (a, b) => {
-        const aMax = Math.max(...a.submissions.map(s => new Date(s.submitted_at || 0)));
-        const bMax = Math.max(...b.submissions.map(s => new Date(s.submitted_at || 0)));
-        return bMax - aMax;
-      },
-      oldest: (a, b) => {
-        const aMin = Math.min(...a.submissions.map(s => new Date(s.submitted_at || 0)));
-        const bMin = Math.min(...b.submissions.map(s => new Date(s.submitted_at || 0)));
-        return aMin - bMin;
-      },
-      task: (a, b) => (a.task_title || "").localeCompare(b.task_title || ""),
-      students: (a, b) => b.student_count - a.student_count,
-    }[sortBy] || (() => 0);
-    
-    return [...filtered].sort(sortFn);
-  }, [taskGroups, searchQuery, filterStatus, filterTask, filterBatch, sortBy]);
-
-  // Get submissions for selected task
-  const taskSubmissions = useMemo(() => {
-    if (!selectedTask) return [];
-    
-    const group = taskGroups.find(g => g.task_id === selectedTask.task_id);
-    if (!group) return [];
-    
-    let submissions = [...group.submissions];
-    
-    // Apply status filter
-    if (filterStatus !== "all") {
-      submissions = submissions.filter(s => s.status === filterStatus);
-    }
-    
-    // Apply batch filter
-    if (filterBatch !== "all") {
-      submissions = submissions.filter(s => s.batch_name === filterBatch);
-    }
-    
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      submissions = submissions.filter(s =>
-        (s.student_name || "").toLowerCase().includes(q) ||
-        (s.student_email || "").toLowerCase().includes(q) ||
-        (s.submission_code || "").toLowerCase().includes(q)
-      );
+      filtered = filtered.filter(item => item.batch_name === filterBatch);
     }
     
     // Sort
@@ -490,43 +366,37 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
       newest: (a, b) => new Date(b.submitted_at || 0) - new Date(a.submitted_at || 0),
       oldest: (a, b) => new Date(a.submitted_at || 0) - new Date(b.submitted_at || 0),
       student: (a, b) => (a.student_name || "").localeCompare(b.student_name || ""),
+      task: (a, b) => (a.task_title || "").localeCompare(b.task_title || ""),
       status: (a, b) => (a.status || "").localeCompare(b.status || ""),
     }[sortBy] || (() => 0);
     
-    return submissions.sort(sortFn);
-  }, [selectedTask, taskGroups, filterStatus, filterBatch, searchQuery, sortBy]);
+    return filtered.sort(sortFn);
+  }, [items, searchQuery, filterStatus, filterBatch, sortBy]);
 
-  // Navigation handlers
-  const handleTaskClick = (taskGroup) => {
-    setSelectedTask(taskGroup);
-    setViewMode(VIEW_MODES.TASK_STUDENTS);
-    setSelectedSubmission(null);
-  };
-
-  const handleSubmissionClick = (submission) => {
+  const handleViewDetails = (submission) => {
     setSelectedSubmission(submission);
-    setViewMode(VIEW_MODES.STUDENT_DETAIL);
   };
 
-  const handleBack = () => {
-    if (viewMode === VIEW_MODES.STUDENT_DETAIL) {
-      setViewMode(VIEW_MODES.TASK_STUDENTS);
-      setSelectedSubmission(null);
-    } else if (viewMode === VIEW_MODES.TASK_STUDENTS) {
-      setViewMode(VIEW_MODES.TASKS);
-      setSelectedTask(null);
-      setSelectedSubmission(null);
-    }
+  const handleCloseDetails = () => {
+    setSelectedSubmission(null);
+    setNotice("");
   };
 
   const handleReviewed = (nextStatus) => {
-    setViewMode(VIEW_MODES.TASK_STUDENTS);
     setSelectedSubmission(null);
     setNotice(`Review saved (${nextStatus}). List refreshed.`);
     load();
   };
 
-  if (loading) return <div className="portal-loading"><div className="loader-dot" /><h2>Loading submissions</h2><p>Fetching student work.</p></div>;
+  if (loading) {
+    return (
+      <div className="portal-loading">
+        <div className="loader-dot" />
+        <h2>Loading submissions</h2>
+        <p>Fetching student work.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-simple page-enter">
@@ -536,150 +406,174 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
         <p>{subtitle}</p>
       </div>
       
-      {error && <div className="error-msg">{error} <button onClick={load}>Retry</button></div>}
+      {error && (
+        <div className="error-msg">
+          {error} <button onClick={load}>Retry</button>
+        </div>
+      )}
+      
       {notice && <div className="info-msg">{notice}</div>}
 
-      {/* Filters and Search */}
+      {/* Filters and Controls */}
       <section className="panel">
         <div className="panel-head chart-head">
           <div>
-            <span className="section-kicker">
-              {viewMode === VIEW_MODES.TASKS && "TASK-WISE VIEW"}
-              {viewMode === VIEW_MODES.TASK_STUDENTS && `STUDENTS FOR: ${selectedTask?.task_code || ''} ${selectedTask?.task_title || ''}`}
-              {viewMode === VIEW_MODES.STUDENT_DETAIL && "SUBMISSION DETAIL"}
-            </span>
-            <h3>
-              {viewMode === VIEW_MODES.TASKS && `${filteredTaskGroups.length} task${filteredTaskGroups.length === 1 ? '' : 's'} with submissions`}
-              {viewMode === VIEW_MODES.TASK_STUDENTS && `${taskSubmissions.length} student${taskSubmissions.length === 1 ? '' : 's'}`}
-              {viewMode === VIEW_MODES.STUDENT_DETAIL && selectedSubmission?.student_name}
-            </h3>
+            <span className="section-kicker">SUBMISSION RECORDS</span>
+            <h3>{filteredSubmissions.length} submission{filteredSubmissions.length === 1 ? '' : 's'}</h3>
           </div>
           <div className="chart-tabs">
-            {(viewMode === VIEW_MODES.TASK_STUDENTS || viewMode === VIEW_MODES.STUDENT_DETAIL) && (
-              <button onClick={handleBack}>← Back</button>
-            )}
             <input 
               value={searchQuery} 
               onChange={e => setSearchQuery(e.target.value)} 
-              placeholder={viewMode === VIEW_MODES.TASKS ? "Search tasks or students…" : "Search students…"} 
-              aria-label="Search" 
+              placeholder="Search student, task, email…" 
+              aria-label="Search submissions"
+              style={{ minWidth: '200px' }}
             />
-            {viewMode === VIEW_MODES.TASKS && (
-              <select value={filterTask} onChange={e => setFilterTask(e.target.value)} aria-label="Filter by task">
-                {taskOptions.map(opt => <option key={opt.id} value={opt.id}>{opt.label}</option>)}
-              </select>
-            )}
-            <select value={filterBatch} onChange={e => setFilterBatch(e.target.value)} aria-label="Filter by batch">
+            <select 
+              value={filterBatch} 
+              onChange={e => setFilterBatch(e.target.value)} 
+              aria-label="Filter by batch"
+            >
               <option value="all">All batches</option>
-              {batchOptions.filter(b => b !== "all").map(b => <option key={b} value={b}>{b}</option>)}
+              {batches.filter(b => b !== "all").map(b => 
+                <option key={b} value={b}>{b}</option>
+              )}
             </select>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} aria-label="Filter by status">
-              {statuses.map(s => <option key={s} value={s}>{s === "all" ? "All statuses" : s}</option>)}
+            <select 
+              value={filterStatus} 
+              onChange={e => setFilterStatus(e.target.value)} 
+              aria-label="Filter by status"
+            >
+              {statuses.map(s => 
+                <option key={s} value={s}>{s === "all" ? "All statuses" : s}</option>
+              )}
             </select>
-            <select value={sortBy} onChange={e => setSortBy(e.target.value)} aria-label="Sort">
+            <select 
+              value={sortBy} 
+              onChange={e => setSortBy(e.target.value)} 
+              aria-label="Sort by"
+            >
               <option value="newest">Newest first</option>
               <option value="oldest">Oldest first</option>
-              {viewMode === VIEW_MODES.TASKS && <option value="students">Most students</option>}
-              {viewMode === VIEW_MODES.TASKS && <option value="task">Task A–Z</option>}
-              {viewMode === VIEW_MODES.TASK_STUDENTS && <option value="student">Student A–Z</option>}
-              {viewMode === VIEW_MODES.TASK_STUDENTS && <option value="status">Status A–Z</option>}
+              <option value="student">Student A–Z</option>
+              <option value="task">Task A–Z</option>
+              <option value="status">Status A–Z</option>
             </select>
-            <button onClick={load} disabled={loading}>{loading ? "Loading…" : "Refresh"}</button>
+            <button onClick={load} disabled={loading}>
+              {loading ? "Loading…" : "Refresh"}
+            </button>
           </div>
         </div>
 
-        {/* Task-wise view */}
-        {viewMode === VIEW_MODES.TASKS && (
-          filteredTaskGroups.length ? (
-            <div className="submission-list">
-              {filteredTaskGroups.map(taskGroup => (
-                <button 
-                  className="submission-row" 
-                  key={taskGroup.task_id} 
-                  onClick={() => handleTaskClick(taskGroup)}
-                  style={{ width: "100%", textAlign: "left", cursor: "pointer" }}
-                >
-                  <div className="submission-avatar">📋</div>
-                  <div>
-                    <strong>{taskGroup.task_code || 'No code'} - {taskGroup.task_title || 'Untitled task'}</strong>
-                    <small>
-                      {taskGroup.student_count} student{taskGroup.student_count === 1 ? '' : 's'} submitted · 
-                      {taskGroup.submissions.length} total submission{taskGroup.submissions.length === 1 ? '' : 's'} · 
-                      {taskGroup.total_files} file{taskGroup.total_files === 1 ? '' : 's'}
-                    </small>
-                    {taskGroup.task_description && (
-                      <small style={{ opacity: 0.7 }}>
-                        {taskGroup.task_description.slice(0, 100)}
-                        {taskGroup.task_description.length > 100 ? '…' : ''}
-                      </small>
-                    )}
-                  </div>
-                  <span className={`pill ${(taskGroup.workflow_status || '').toLowerCase().replace(/\s+/g, '_')}`}>
-                    {taskGroup.workflow_status || 'Active'}
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state">
-              {items.length 
-                ? "No tasks match your filters." 
-                : "No student submissions yet. Submitted work will appear here."}
-            </div>
-          )
-        )}
-
-        {/* Task students view */}
-        {viewMode === VIEW_MODES.TASK_STUDENTS && (
-          taskSubmissions.length ? (
-            <div className="submission-list">
-              {taskSubmissions.map(submission => (
-                <button 
-                  className="submission-row" 
-                  key={submission.id} 
-                  onClick={() => handleSubmissionClick(submission)}
-                  style={{ width: "100%", textAlign: "left", cursor: "pointer" }}
-                >
-                  <div className="submission-avatar">
-                    {(submission.student_name || "S").charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <strong>{submission.student_name || "Unknown student"}</strong>
-                    <small>
-                      {submission.student_email || "No email"} · 
-                      {submission.batch_name || "No batch"} · 
-                      v{submission.version || 1} · 
-                      {formatDateTime(submission.submitted_at)}
-                    </small>
-                    <small>
-                      {submission.submission_code || "No code"} · 
-                      {submission.file_count || 0} file{(submission.file_count || 0) === 1 ? '' : 's'}
-                      {submission.comment && ` · ${submission.comment.slice(0, 60)}${submission.comment.length > 60 ? '…' : ''}`}
-                    </small>
-                  </div>
-                  <span className={`pill ${(submission.status || '').toLowerCase().replace(/\s+/g, '_')}`}>
-                    {submission.status || 'Submitted'}
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state">
-              No students match your filters for this task.
-            </div>
-          )
-        )}
-
-        {/* Student detail view */}
-        {viewMode === VIEW_MODES.STUDENT_DETAIL && selectedSubmission && (
-          <DetailModal 
-            item={selectedSubmission} 
-            onClose={handleBack}
-            onReviewed={handleReviewed}
-            inline={true}
-          />
+        {/* Submissions Table */}
+        {filteredSubmissions.length > 0 ? (
+          <div className="submissions-table-wrapper">
+            <table className="submissions-table">
+              <thead>
+                <tr>
+                  <th>Student Name</th>
+                  <th>Student Details</th>
+                  <th>Task</th>
+                  <th>Response</th>
+                  <th>Files</th>
+                  <th>Submitted</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredSubmissions.map(item => (
+                  <tr key={item.id}>
+                    <td className="student-name">
+                      <div className="student-avatar">
+                        {(item.student_name || "S").charAt(0).toUpperCase()}
+                      </div>
+                      <strong>{item.student_name || "Unknown"}</strong>
+                    </td>
+                    <td className="student-details">
+                      <div className="detail-line">
+                        <span className="label">Email:</span> {item.student_email || "—"}
+                      </div>
+                      <div className="detail-line">
+                        <span className="label">ID:</span> {item.student_id || "—"}
+                      </div>
+                      <div className="detail-line">
+                        <span className="label">Program:</span> {item.student_program || "—"}
+                      </div>
+                      <div className="detail-line">
+                        <span className="label">Batch:</span> {item.batch_name || "—"}
+                      </div>
+                    </td>
+                    <td className="task-info">
+                      <strong>{item.task_code || "No code"}</strong>
+                      <div className="task-title">{item.task_title || "Untitled task"}</div>
+                      {item.task_description && (
+                        <div className="task-desc">
+                          {item.task_description.slice(0, 80)}
+                          {item.task_description.length > 80 ? '…' : ''}
+                        </div>
+                      )}
+                    </td>
+                    <td className="response-column">
+                      {item.comment ? (
+                        <div className="response-text">
+                          {item.comment.slice(0, 100)}
+                          {item.comment.length > 100 ? '…' : ''}
+                        </div>
+                      ) : (
+                        <span className="no-response">No written response</span>
+                      )}
+                      <div className="submission-meta">
+                        v{item.version || 1} · {item.submission_code || "—"}
+                      </div>
+                    </td>
+                    <td className="files-column">
+                      {item.file_count > 0 ? (
+                        <div className="file-count">
+                          📎 {item.file_count} file{item.file_count === 1 ? '' : 's'}
+                        </div>
+                      ) : (
+                        <span className="no-files">No files</span>
+                      )}
+                    </td>
+                    <td className="timestamp-column">
+                      {formatDateTime(item.submitted_at)}
+                    </td>
+                    <td className="status-column">
+                      <span className={`pill ${(item.status || '').toLowerCase().replace(/\s+/g, '_')}`}>
+                        {item.status || 'Submitted'}
+                      </span>
+                    </td>
+                    <td className="actions-column">
+                      <button 
+                        className="view-details-btn"
+                        onClick={() => handleViewDetails(item)}
+                      >
+                        View Details
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="empty-state">
+            {items.length 
+              ? "No submissions match your filters." 
+              : "No student submissions yet. Submitted work will appear here."}
+          </div>
         )}
       </section>
+
+      {/* Detail Modal */}
+      {selectedSubmission && (
+        <DetailModal 
+          item={selectedSubmission} 
+          onClose={handleCloseDetails}
+          onReviewed={handleReviewed}
+        />
+      )}
     </div>
   );
 }
