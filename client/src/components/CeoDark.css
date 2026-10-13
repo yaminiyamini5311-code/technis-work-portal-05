@@ -544,3 +544,131 @@
   .role-layout.ceo-dark .admin-stat-grid { grid-template-columns: 1fr; }
   .role-layout.ceo-dark .role-content { padding: 16px; }
 }
+
+/* ── Submissions Table Dark Theme ───────────────────────────────────────── */
+.role-layout.ceo-dark .submissions-table-wrapper {
+  background: transparent !important;
+  border-color: var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark .submissions-table {
+  background: transparent !important;
+}
+
+.role-layout.ceo-dark .submissions-table thead {
+  background: rgba(255, 255, 255, 0.035) !important;
+  border-bottom-color: var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark .submissions-table th {
+  color: var(--ceo-text-mute) !important;
+  border-color: var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark .submissions-table tbody tr {
+  border-bottom-color: var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark .submissions-table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.018) !important;
+}
+
+.role-layout.ceo-dark .submissions-table tbody tr:hover {
+  background: rgba(124, 108, 255, 0.08) !important;
+}
+
+.role-layout.ceo-dark .submissions-table td {
+  color: var(--ceo-text) !important;
+  border-color: var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark .student-name strong {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .student-avatar {
+  background: linear-gradient(135deg, rgba(124, 108, 255, 0.4), rgba(47, 212, 196, 0.3)) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .detail-line {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .detail-line .label {
+  color: var(--ceo-text-mute) !important;
+}
+
+.role-layout.ceo-dark .task-info strong {
+  color: var(--ceo-violet) !important;
+}
+
+.role-layout.ceo-dark .task-title {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .task-desc {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .response-text {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .no-response,
+.role-layout.ceo-dark .no-files {
+  color: var(--ceo-text-mute) !important;
+}
+
+.role-layout.ceo-dark .submission-meta {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .file-count {
+  background: rgba(124, 108, 255, 0.12) !important;
+  color: var(--ceo-text) !important;
+  border: 1px solid rgba(124, 108, 255, 0.3) !important;
+}
+
+.role-layout.ceo-dark .timestamp-column {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .view-details-btn {
+  background: linear-gradient(135deg, var(--ceo-violet), #5b4bdb) !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+.role-layout.ceo-dark .view-details-btn:hover {
+  background: linear-gradient(135deg, #8a7bff, #6d5ee5) !important;
+  box-shadow: 0 4px 16px rgba(124, 108, 255, 0.4) !important;
+}
+
+.role-layout.ceo-dark .simple-head h2 {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .simple-head p {
+  color: var(--ceo-text-dim) !important;
+}
+
+/* Review Modal in Dark Theme */
+.role-layout.ceo-dark .review-modal {
+  background: rgba(5, 7, 13, 0.92) !important;
+}
+
+.role-layout.ceo-dark .review-modal .panel {
+  background: var(--ceo-surface) !important;
+  border-color: var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark .review-modal .panel-head button {
+  background: rgba(242, 85, 122, 0.16) !important;
+  color: var(--ceo-rose) !important;
+  border: 1px solid rgba(242, 85, 122, 0.4) !important;
+}
+
+.role-layout.ceo-dark .review-modal .panel-head button:hover {
+  background: rgba(242, 85, 122, 0.24) !important;
+}

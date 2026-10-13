@@ -1,0 +1,729 @@
+/* SubmissionsView Component Styles */
+
+.admin-simple {
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.simple-head {
+  margin-bottom: 24px;
+}
+
+.simple-head span {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: #FA9A02;
+  font-weight: 900;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.simple-head h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #0C120C;
+  margin: 0 0 8px;
+}
+
+.simple-head p {
+  font-size: 14px;
+  color: #5F625F;
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* Error and Info Messages */
+.error-msg {
+  background: #FEE2E2;
+  border: 1px solid #EF4444;
+  color: #991B1B;
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.error-msg button {
+  padding: 6px 12px;
+  background: #EF4444;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.info-msg {
+  background: #DBEAFE;
+  border: 1px solid #3B82F6;
+  color: #1E40AF;
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Loading State */
+.portal-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 16px;
+}
+
+.loader-dot {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(250, 154, 2, 0.2);
+  border-top-color: #FA9A02;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.portal-loading h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0C120C;
+  margin: 0;
+}
+
+.portal-loading p {
+  font-size: 14px;
+  color: #5F625F;
+  margin: 0;
+}
+
+/* Panel Styles */
+.panel {
+  background: #FFFFFF;
+  border: 1px solid #D9D9D9;
+  border-radius: 17px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 25px rgba(16, 24, 40, 0.04);
+  overflow: hidden;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+}
+
+.panel-head > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.section-kicker {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: #FA9A02;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.panel-head h3 {
+  margin: 2px 0 6px;
+  font-family: Manrope, sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0C120C;
+}
+
+.panel-head p {
+  color: #5F625F;
+  font-size: 13px;
+  margin: 0;
+}
+
+/* Chart Head and Tabs (Filters) */
+.chart-head {
+  align-items: flex-start;
+}
+
+.chart-tabs {
+  display: flex;
+  gap: 8px;
+  background: #f3f5f8;
+  padding: 6px;
+  border-radius: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.chart-tabs input,
+.chart-tabs select {
+  padding: 9px 14px;
+  border: 1px solid #D9D9D9;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0C120C;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.chart-tabs input {
+  min-width: 220px;
+  flex: 1;
+  max-width: 300px;
+}
+
+.chart-tabs input::placeholder {
+  color: #9CA3AF;
+}
+
+.chart-tabs input:focus,
+.chart-tabs select:focus {
+  outline: none;
+  border-color: #FA9A02;
+  box-shadow: 0 0 0 3px rgba(250, 154, 2, 0.1);
+}
+
+.chart-tabs select {
+  cursor: pointer;
+  min-width: 140px;
+}
+
+.chart-tabs button {
+  padding: 9px 16px;
+  border: 1px solid #D9D9D9;
+  background: white;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #0C120C;
+  white-space: nowrap;
+}
+
+.chart-tabs button:hover:not(:disabled) {
+  background: #FA9A02;
+  color: white;
+  border-color: #FA9A02;
+  transform: translateY(-1px);
+}
+
+.chart-tabs button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Submissions Table Wrapper */
+.submissions-table-wrapper {
+  overflow-x: auto;
+  margin-top: 16px;
+  border-radius: 10px;
+  border: 1px solid #E5E7EB;
+}
+
+/* Submissions Table */
+.submissions-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  font-size: 13px;
+}
+
+.submissions-table thead {
+  background: #F9FAFB;
+  border-bottom: 2px solid #E5E7EB;
+}
+
+.submissions-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 700;
+  font-size: 12px;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.submissions-table tbody tr {
+  border-bottom: 1px solid #E5E7EB;
+  transition: background-color 0.2s ease;
+}
+
+.submissions-table tbody tr:hover {
+  background: #F9FAFB;
+}
+
+.submissions-table td {
+  padding: 14px 16px;
+  vertical-align: top;
+  color: #374151;
+}
+
+/* Student Name Column */
+.student-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 160px;
+}
+
+.student-avatar {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #FFA500, #FF8C00);
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 16px;
+  color: white;
+  box-shadow: 0 2px 8px rgba(255, 165, 0, 0.3);
+}
+
+.student-name strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.4;
+}
+
+/* Student Details Column */
+.student-details {
+  min-width: 240px;
+  max-width: 280px;
+}
+
+.detail-line {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.detail-line .label {
+  font-weight: 700;
+  color: #6B7280;
+  min-width: 60px;
+}
+
+.detail-line:last-child {
+  margin-bottom: 0;
+}
+
+/* Task Info Column */
+.task-info {
+  min-width: 200px;
+  max-width: 300px;
+}
+
+.task-info strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #FA9A02;
+  margin-bottom: 4px;
+}
+
+.task-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.task-desc {
+  font-size: 12px;
+  color: #6B7280;
+  line-height: 1.4;
+}
+
+/* Response Column */
+.response-column {
+  min-width: 200px;
+  max-width: 300px;
+}
+
+.response-text {
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.5;
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.no-response {
+  font-size: 12px;
+  color: #9CA3AF;
+  font-style: italic;
+}
+
+.submission-meta {
+  font-size: 11px;
+  color: #6B7280;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* Files Column */
+.files-column {
+  min-width: 120px;
+}
+
+.file-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #F3F4F6;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.no-files {
+  font-size: 12px;
+  color: #9CA3AF;
+  font-style: italic;
+}
+
+/* Timestamp Column */
+.timestamp-column {
+  min-width: 160px;
+  font-size: 12px;
+  color: #6B7280;
+  white-space: nowrap;
+}
+
+/* Status Column */
+.status-column {
+  min-width: 140px;
+}
+
+.pill {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.pill.submitted {
+  background: #DBEAFE;
+  color: #1E40AF;
+}
+
+.pill.approved {
+  background: #D1FAE5;
+  color: #065F46;
+}
+
+.pill.revision_required {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+.pill.pending {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.pill.draft {
+  background: #E5E7EB;
+  color: #374151;
+}
+
+/* Actions Column */
+.actions-column {
+  min-width: 120px;
+}
+
+.view-details-btn {
+  padding: 8px 16px;
+  background: #FA9A02;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.view-details-btn:hover {
+  background: #E88C00;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(250, 154, 2, 0.3);
+}
+
+/* Empty State */
+.empty-state {
+  padding: 60px 24px;
+  text-align: center;
+  color: #6B7280;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.6;
+  background: #F9FAFB;
+  border-radius: 10px;
+  margin-top: 16px;
+}
+
+/* Review Modal */
+.review-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 1000;
+  overflow-y: auto;
+}
+
+.review-modal .panel {
+  max-width: 900px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  margin: auto;
+}
+
+.review-modal .panel-head button {
+  padding: 8px 16px;
+  background: #EF4444;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.review-modal .panel-head button:hover {
+  background: #DC2626;
+}
+
+/* Submission Row in Modal */
+.submission-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: #F7F7F7;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.submission-row:hover {
+  background: #E5E7EB;
+}
+
+.submission-row > div:not(.submission-avatar) {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.submission-row strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.submission-row small {
+  font-size: 12px;
+  color: #6B7280;
+  display: block;
+}
+
+.submission-row p {
+  margin: 4px 0;
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.submission-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* Quick Actions */
+.quick-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.quick-actions button {
+  padding: 8px 16px;
+  border: 1px solid #D9D9D9;
+  background: white;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #0C120C;
+}
+
+.quick-actions button:hover:not(:disabled) {
+  background: #FA9A02;
+  color: white;
+  border-color: #FA9A02;
+}
+
+.quick-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Textarea */
+textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #D9D9D9;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
+  transition: all 0.2s ease;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: #FA9A02;
+  box-shadow: 0 0 0 3px rgba(250, 154, 2, 0.1);
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .chart-tabs {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .chart-tabs input,
+  .chart-tabs select,
+  .chart-tabs button {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-simple {
+    padding: 0;
+  }
+  
+  .panel {
+    padding: 16px;
+  }
+  
+  .panel-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .chart-tabs {
+    width: 100%;
+  }
+  
+  .submissions-table {
+    font-size: 12px;
+  }
+  
+  .submissions-table th,
+  .submissions-table td {
+    padding: 10px 12px;
+  }
+  
+  .student-name {
+    min-width: 140px;
+  }
+  
+  .student-details,
+  .task-info,
+  .response-column {
+    min-width: 180px;
+  }
+}
+
+@media (max-width: 480px) {
+  .simple-head h2 {
+    font-size: 22px;
+  }
+  
+  .submissions-table {
+    font-size: 11px;
+  }
+  
+  .student-avatar {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    font-size: 14px;
+  }
+}
+
+/* Page Enter Animation */
+.page-enter {
+  animation: fadeInUp 0.4s ease;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Prevent horizontal scroll on the main container */
+.role-content {
+  overflow-x: hidden;
+}
