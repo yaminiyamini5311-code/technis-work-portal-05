@@ -40,11 +40,41 @@ async function downloadFile(file, onError) {
   }
 }
 
+/* Preview file - returns blob URL for image/PDF preview */
+async function previewFile(file, onError) {
+  try {
+    const res = await fetch(`${API_URL}${file.download_url}`, { headers: auth() });
+    if (!res.ok) {
+      let msg = "Unable to preview file";
+      try { msg = (await res.json()).message || msg; } catch {}
+      onError(msg);
+      return null;
+    }
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  } catch {
+    onError("Unable to preview file. Check your connection.");
+    return null;
+  }
+}
+
+/* Check if file type supports preview */
+function canPreview(mime) {
+  return mime && (
+    mime.startsWith('image/') ||
+    mime === 'application/pdf' ||
+    mime === 'text/plain' ||
+    mime === 'text/html'
+  );
+}
+
 function DetailModal({ item, onClose, onReviewed }) {
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState("");
   const [reviewComment, setReviewComment] = useState("");
   const [reviewing, setReviewing] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewFile, setPreviewFile] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,9 +139,22 @@ function DetailModal({ item, onClose, onReviewed }) {
                 {(v.files || []).length ? (
                   <div className="quick-actions">
                     {v.files.map(f => (
-                      <button key={f.id} onClick={() => downloadFile(f, setError)}>
-                        {f.name} {f.size ? `(${formatBytes(f.size)})` : ""}
-                      </button>
+                      <div key={f.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {canPreview(f.mime) && (
+                          <button onClick={async () => {
+                            const url = await previewFile(f, setError);
+                            if (url) {
+                              setPreviewUrl(url);
+                              setPreviewFile(f);
+                            }
+                          }}>
+                            👁 Preview {f.name}
+                          </button>
+                        )}
+                        <button onClick={() => downloadFile(f, setError)}>
+                          ⬇ Download {f.name} {f.size ? `(${formatBytes(f.size)})` : ""}
+                        </button>
+                      </div>
                     ))}
                   </div>
                 ) : <small>No files attached to this version.</small>}
@@ -120,6 +163,32 @@ function DetailModal({ item, onClose, onReviewed }) {
             </div>
           ))}
         </section>
+
+        {/* File Preview Modal */}
+        {previewUrl && previewFile && (
+          <div className="review-modal" style={{ zIndex: 2000 }} onClick={(e) => { if (e.target === e.currentTarget) { setPreviewUrl(null); setPreviewFile(null); } }}>
+            <div className="panel" style={{ maxWidth: '90vw', maxHeight: '90vh', overflow: 'auto' }}>
+              <div className="panel-head">
+                <div>
+                  <span className="section-kicker">FILE PREVIEW</span>
+                  <h3>{previewFile.name}</h3>
+                </div>
+                <button onClick={() => { setPreviewUrl(null); setPreviewFile(null); }}>Close</button>
+              </div>
+              {previewFile.mime?.startsWith('image/') ? (
+                <img src={previewUrl} alt={previewFile.name} style={{ maxWidth: '100%', height: 'auto' }} />
+              ) : previewFile.mime === 'application/pdf' ? (
+                <iframe src={previewUrl} style={{ width: '100%', height: '70vh', border: 'none' }} />
+              ) : previewFile.mime?.startsWith('text/') ? (
+                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '70vh', overflow: 'auto' }}>
+                  {previewFile.name}
+                </pre>
+              ) : (
+                <p>Preview not available for this file type. Please download to view.</p>
+              )}
+            </div>
+          </div>
+        )}
 
         <section className="panel">
           <div className="panel-head"><div><span className="section-kicker">PROGRESS</span><h3>Student progress</h3></div></div>

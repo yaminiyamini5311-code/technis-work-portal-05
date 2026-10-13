@@ -100,7 +100,25 @@ router.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }), async (r
       );
       
       console.log("[CEO AUTH] ✓ CEO login successful");
-      
+
+      // Log CEO login to audit logs (non-blocking)
+      setImmediate(async () => {
+        try {
+          await writeAudit(req.db, {
+            actorId: "ceo",
+            actorRole: "ceo",
+            actorEmail: CEO_EMAIL,
+            actorName: CEO_NAME,
+            action: "login",
+            entityType: "user",
+            entityId: "ceo",
+            newValue: { role: "ceo", email: CEO_EMAIL }
+          });
+        } catch (e) {
+          console.error("[Audit] Failed to log CEO login:", e.message);
+        }
+      });
+
       return res.status(200).json({
         success: true,
         message: "CEO login successful",
@@ -181,7 +199,25 @@ router.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }), async (r
     const token = jwt.sign({ id: userId, role }, getSecret(), { expiresIn: "1d" });
 
     console.log("[AUTH] Login successful:", role);
-    
+
+    // Log user login to audit logs (non-blocking)
+    setImmediate(async () => {
+      try {
+        await writeAudit(db, {
+          actorId: userId,
+          actorRole: role,
+          actorEmail: user.email,
+          actorName: user.name,
+          action: "login",
+          entityType: "user",
+          entityId: userId,
+          newValue: { role, email: user.email }
+        });
+      } catch (e) {
+        console.error("[Audit] Failed to log user login:", e.message);
+      }
+    });
+
     return res.status(200).json({
       success: true,
       message: "Login successful",

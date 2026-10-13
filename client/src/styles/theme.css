@@ -475,8 +475,26 @@
   border-color: #E6E6E6 !important;
 }
 
+.role-layout .notification-item strong {
+  color: #111827 !important;
+  font-weight: 600;
+}
+
+.role-layout .notification-item small {
+  color: #4B5563 !important;
+  opacity: 1 !important;
+}
+
 .role-layout .notification-item:hover {
   background: #F9FAFB !important;
+}
+
+.role-layout .notification-item.read strong {
+  color: #6B7280 !important;
+}
+
+.role-layout .notification-item.read small {
+  color: #9CA3AF !important;
 }
 
 /* Notification Popup - Student Portal (Dark Theme) */
@@ -490,8 +508,54 @@
   border-color: var(--border-light) !important;
 }
 
+.student-layout .notification-item strong {
+  color: var(--text-primary) !important;
+  font-weight: 600;
+}
+
+.student-layout .notification-item small {
+  color: var(--text-secondary) !important;
+  opacity: 1 !important;
+}
+
 .student-layout .notification-item:hover {
   background: var(--surface-hover) !important;
+}
+
+.student-layout .notification-item.read strong {
+  color: var(--text-muted) !important;
+}
+
+.student-layout .notification-item.read small {
+  color: var(--text-subtle) !important;
+}
+
+/* Notification dropdown positioning - prevent clipping on mobile */
+.notification-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 320px;
+  max-width: 400px;
+  max-height: 500px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+@media (max-width: 480px) {
+  .notification-pop {
+    right: -50%;
+    min-width: 280px;
+    max-width: 320px;
+  }
+}
+
+@media (max-width: 375px) {
+  .notification-pop {
+    right: -80%;
+    min-width: 260px;
+    max-width: 300px;
+  }
 }
 
 /* Empty States - Student Portal */
