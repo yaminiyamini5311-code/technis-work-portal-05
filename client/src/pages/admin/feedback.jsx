@@ -92,9 +92,9 @@ export default function Feedback() {
       )}
 
       <form className="panel form-grid-admin" onSubmit={submit} autoComplete="off">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label htmlFor="feedback-student" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Student <span style={{ color: '#FA9A02' }}>*</span>
+        <div className="field">
+          <label htmlFor="feedback-student" className="field-label">
+            Student <span className="req">*</span>
           </label>
           <select
             id="feedback-student"
@@ -111,8 +111,8 @@ export default function Feedback() {
           </select>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label htmlFor="feedback-score" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div className="field">
+          <label htmlFor="feedback-score" className="field-label">
             Score (optional)
           </label>
           <input
@@ -128,9 +128,9 @@ export default function Feedback() {
           />
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label htmlFor="feedback-strengths" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Strengths <span style={{ color: '#FA9A02' }}>*</span>
+        <div className="field">
+          <label htmlFor="feedback-strengths" className="field-label">
+            Strengths <span className="req">*</span>
           </label>
           <input
             id="feedback-strengths"
@@ -143,9 +143,9 @@ export default function Feedback() {
           />
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label htmlFor="feedback-improvements" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Improvement areas <span style={{ color: '#FA9A02' }}>*</span>
+        <div className="field">
+          <label htmlFor="feedback-improvements" className="field-label">
+            Improvement areas <span className="req">*</span>
           </label>
           <input
             id="feedback-improvements"
@@ -158,9 +158,9 @@ export default function Feedback() {
           />
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label htmlFor="feedback-text" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Feedback <span style={{ color: '#FA9A02' }}>*</span>
+        <div className="field">
+          <label htmlFor="feedback-text" className="field-label">
+            Feedback <span className="req">*</span>
           </label>
           <textarea
             id="feedback-text"

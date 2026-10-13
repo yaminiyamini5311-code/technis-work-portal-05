@@ -47,6 +47,22 @@
   transform: none !important;
 }
 
+/* Submit/CTA Buttons - Student Portal (amber fill, near-black text).
+   The generic rule above paints .gold-btn near-black (#0C120C), which is
+   invisible on the dark task cards (~1.1:1). Amber restores contrast
+   (~9.6:1) and matches the "gold" intent on dark surfaces. */
+.student-layout .gold-btn {
+  background: var(--accent, #FFA51A) !important;
+  color: #0C120C !important;
+  border: 1px solid var(--accent, #FFA51A) !important;
+}
+
+.student-layout .gold-btn:hover:not(:disabled) {
+  background: #FFC24D !important;
+  color: #0C120C !important;
+  border-color: #FFC24D !important;
+}
+
 /* Primary Buttons (dark background, light text) - Admin/Manager Portal */
 .role-layout .button-primary,
 .role-layout .gold-btn,
@@ -89,9 +105,9 @@
 }
 
 /* Primary Buttons - Login Page (Light Theme) */
-body:not(.student-layout):not(.role-layout) .button-primary,
-body:not(.student-layout):not(.role-layout) .gold-btn,
-body:not(.student-layout):not(.role-layout) .login-submit {
+.login-page .button-primary,
+.login-page .gold-btn,
+.login-page .login-submit {
   background: #0C120C !important;
   color: #FFFFFF !important;
   border: 1px solid #0C120C !important;
@@ -105,9 +121,9 @@ body:not(.student-layout):not(.role-layout) .login-submit {
   transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
-body:not(.student-layout):not(.role-layout) .button-primary:hover:not(:disabled),
-body:not(.student-layout):not(.role-layout) .gold-btn:hover:not(:disabled),
-body:not(.student-layout):not(.role-layout) .login-submit:hover:not(:disabled) {
+.login-page .button-primary:hover:not(:disabled),
+.login-page .gold-btn:hover:not(:disabled),
+.login-page .login-submit:hover:not(:disabled) {
   background: #182018 !important;
   color: #FFFFFF !important;
   transform: translateY(-1px);
@@ -195,10 +211,10 @@ body:not(.student-layout):not(.role-layout) .login-submit:hover:not(:disabled) {
 }
 
 /* Secondary Buttons - Login Page (Light Theme) */
-body:not(.student-layout):not(.role-layout) .button-secondary,
-body:not(.student-layout):not(.role-layout) .refresh-button,
-body:not(.student-layout):not(.role-layout) .refresh-btn,
-body:not(.student-layout):not(.role-layout) .back-button {
+.login-page .button-secondary,
+.login-page .refresh-button,
+.login-page .refresh-btn,
+.login-page .back-button {
   background: #FFFFFF !important;
   color: #111827 !important;
   border: 1px solid #D1D5DB !important;
@@ -211,10 +227,10 @@ body:not(.student-layout):not(.role-layout) .back-button {
   transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
-body:not(.student-layout):not(.role-layout) .button-secondary:hover:not(:disabled),
-body:not(.student-layout):not(.role-layout) .refresh-button:hover:not(:disabled),
-body:not(.student-layout):not(.role-layout) .refresh_btn:hover:not(:disabled),
-body:not(.student-layout):not(.role-layout) .back-button:hover:not(:disabled) {
+.login-page .button-secondary:hover:not(:disabled),
+.login-page .refresh-button:hover:not(:disabled),
+.login-page .refresh_btn:hover:not(:disabled),
+.login-page .back-button:hover:not(:disabled) {
   background: #F9FAFB !important;
   color: #111827 !important;
   border-color: #FA9A02 !important;
@@ -267,7 +283,7 @@ body:not(.student-layout):not(.role-layout) .back-button:hover:not(:disabled) {
 }
 
 /* Accent Buttons (orange) - Login Page (Light Theme) */
-body:not(.student-layout):not(.role-layout) .button-accent {
+.login-page .button-accent {
   background: var(--primary-color) !important;
   color: var(--surface-dark) !important;
   border: 1px solid var(--primary-color) !important;
@@ -280,7 +296,7 @@ body:not(.student-layout):not(.role-layout) .button-accent {
   transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
-body:not(.student-layout):not(.role-layout) .button-accent:hover:not(:disabled) {
+.login-page .button-accent:hover:not(:disabled) {
   background: var(--surface-dark) !important;
   color: var(--text-on-dark) !important;
   border-color: var(--surface-dark) !important;
@@ -327,7 +343,7 @@ body:not(.student-layout):not(.role-layout) .button-accent:hover:not(:disabled) 
 }
 
 /* Upload/File Buttons - Login Page (Light Theme) */
-body:not(.student-layout):not(.role-layout) .upload-button {
+.login-page .upload-button {
   background: #FFFFFF !important;
   color: #111827 !important;
   border: 1px solid #D1D5DB !important;
@@ -339,7 +355,7 @@ body:not(.student-layout):not(.role-layout) .upload-button {
   transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
-body:not(.student-layout):not(.role-layout) .upload-button:hover {
+.login-page .upload-button:hover {
   background: #F9FAFB !important;
   color: #111827 !important;
   border-color: #FA9A02 !important;
@@ -396,7 +412,7 @@ body:not(.student-layout):not(.role-layout) .upload-button:hover {
 }
 
 /* Chart Tab Buttons - Login Page (Light Theme) */
-body:not(.student-layout):not(.role-layout) .chart-tabs button {
+.login-page .chart-tabs button {
   color: #6B7280 !important;
   font-weight: 800 !important;
   padding: 9px 12px;
@@ -407,13 +423,13 @@ body:not(.student-layout):not(.role-layout) .chart-tabs button {
   transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
-body:not(.student-layout):not(.role-layout) .chart-tabs button.active {
+.login-page .chart-tabs button.active {
   background: #0C120C !important;
   color: #FFFFFF !important;
   font-weight: 800 !important;
 }
 
-body:not(.student-layout):not(.role-layout) .chart-tabs button:hover:not(.active) {
+.login-page .chart-tabs button:hover:not(.active) {
   background: rgba(250, 154, 2, 0.1) !important;
   color: #111827 !important;
 }
@@ -459,8 +475,8 @@ body:not(.student-layout):not(.role-layout) .chart-tabs button:hover:not(.active
 }
 
 /* Quick Action Links/Buttons - Login Page (Light Theme) */
-body:not(.student-layout):not(.role-layout) .quick-actions a,
-body:not(.student-layout):not(.role-layout) .quick-actions button {
+.login-page .quick-actions a,
+.login-page .quick-actions button {
   background: #0C120C !important;
   color: #FFFFFF !important;
   font-weight: 700 !important;
@@ -471,8 +487,8 @@ body:not(.student-layout):not(.role-layout) .quick-actions button {
   transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
-body:not(.student-layout):not(.role-layout) .quick-actions a:hover,
-body:not(.student-layout):not(.role-layout) .quick-actions button:hover {
+.login-page .quick-actions a:hover,
+.login-page .quick-actions button:hover {
   background: #182018 !important;
   color: #FFFFFF !important;
   transform: translateY(-1px);
@@ -513,7 +529,7 @@ body:not(.student-layout):not(.role-layout) .quick-actions button:hover {
 }
 
 /* Panel/Form Buttons - Login Page (Light Theme) */
-body:not(.student-layout):not(.role-layout) .panel-head button {
+.login-page .panel-head button {
   background: #FFFFFF !important;
   color: #111827 !important;
   border: 1px solid #D1D5DB !important;
@@ -523,7 +539,7 @@ body:not(.student-layout):not(.role-layout) .panel-head button {
   border-radius: 8px;
 }
 
-body:not(.student-layout):not(.role-layout) .panel-head button:hover {
+.login-page .panel-head button:hover {
   background: #F9FAFB !important;
   color: #111827 !important;
   border-color: #FA9A02 !important;
@@ -582,7 +598,7 @@ body:not(.student-layout):not(.role-layout) .panel-head button:hover {
 }
 
 /* Password Show/Hide Button - Login Page (Light Theme) */
-body:not(.student-layout):not(.role-layout) .password-field button {
+.login-page .password-field button {
   background: #F3F4F6 !important;
   color: #111827 !important;
   font-weight: 800 !important;
@@ -592,7 +608,7 @@ body:not(.student-layout):not(.role-layout) .password-field button {
   border-radius: 6px;
 }
 
-body:not(.student-layout):not(.role-layout) .password-field button:hover {
+.login-page .password-field button:hover {
   background: #E5E7EB !important;
   color: #111827 !important;
   border-color: #FA9A02 !important;
@@ -633,7 +649,7 @@ body:not(.student-layout):not(.role-layout) .password-field button:hover {
 }
 
 /* Submission Actions - Login Page (Light Theme) */
-body:not(.student-layout):not(.role-layout) .submission-actions button {
+.login-page .submission-actions button {
   background: #FFFFFF !important;
   color: #111827 !important;
   border: 1px solid #D1D5DB !important;
@@ -643,7 +659,7 @@ body:not(.student-layout):not(.role-layout) .submission-actions button {
   border-radius: 8px;
 }
 
-body:not(.student-layout):not(.role-layout) .submission-actions button:hover {
+.login-page .submission-actions button:hover {
   background: #F9FAFB !important;
   color: #111827 !important;
   border-color: #FA9A02 !important;
@@ -692,9 +708,9 @@ body:not(.student-layout):not(.role-layout) .submission-actions button:hover {
 }
 
 /* Logout Buttons - Login Page (Light Theme) */
-body:not(.student-layout):not(.role-layout) .student-logout,
-body:not(.student-layout):not(.role-layout) .role-logout,
-body:not(.student-layout):not(.role-layout) .navbar-logout {
+.login-page .student-logout,
+.login-page .role-logout,
+.login-page .navbar-logout {
   background: #FFFFFF !important;
   color: #111827 !important;
   border: 1px solid #D1D5DB !important;
@@ -705,9 +721,9 @@ body:not(.student-layout):not(.role-layout) .navbar-logout {
   transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
-body:not(.student-layout):not(.role-layout) .student-logout:hover,
-body:not(.student-layout):not(.role-layout) .role-logout:hover,
-body:not(.student-layout):not(.role-layout) .navbar-logout:hover {
+.login-page .student-logout:hover,
+.login-page .role-logout:hover,
+.login-page .navbar-logout:hover {
   background: #F9FAFB !important;
   color: #FA9A02 !important;
   border-color: #FA9A02 !important;
@@ -738,12 +754,16 @@ body:not(.student-layout):not(.role-layout) .navbar-logout:hover {
   transform: rotate(90deg);
 }
 
-/* Close/Cancel Buttons - Admin/Manager Portal */
+/* Close/Cancel Buttons - Admin/Manager Portal
+   NOTE: the nav drawer itself is always dark (see Navbar.css
+   .navbar-menu gradient), so the close button inside it must stay
+   light-on-dark. An earlier revision forced dark text here, which
+   rendered black-on-dark (invisible) in every role layout. */
 .role-layout .mobile-close-button,
 .role-layout .navbar-close {
-  background: transparent !important;
-  color: #111827 !important;
-  border: 1px solid #D1D5DB !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
   font-size: 24px !important;
   width: 40px;
   height: 40px;
@@ -756,15 +776,15 @@ body:not(.student-layout):not(.role-layout) .navbar-logout:hover {
 
 .role-layout .mobile-close-button:hover,
 .role-layout .navbar-close:hover {
-  background: #F9FAFB !important;
+  background: rgba(255, 255, 255, 0.12) !important;
   color: #FA9A02 !important;
   border-color: #FA9A02 !important;
   transform: rotate(90deg);
 }
 
 /* Close/Cancel Buttons - Login Page (Light Theme) */
-body:not(.student-layout):not(.role-layout) .mobile-close-button,
-body:not(.student-layout):not(.role-layout) .navbar-close {
+.login-page .mobile-close-button,
+.login-page .navbar-close {
   background: transparent !important;
   color: #111827 !important;
   border: 1px solid #D1D5DB !important;
@@ -778,8 +798,8 @@ body:not(.student-layout):not(.role-layout) .navbar-close {
   transition: var(--anim-duration-fast) var(--anim-easing-standard);
 }
 
-body:not(.student-layout):not(.role-layout) .mobile-close-button:hover,
-body:not(.student-layout):not(.role-layout) .navbar-close:hover {
+.login-page .mobile-close-button:hover,
+.login-page .navbar-close:hover {
   background: #F9FAFB !important;
   color: #FA9A02 !important;
   border-color: #FA9A02 !important;

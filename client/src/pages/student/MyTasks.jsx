@@ -71,11 +71,32 @@ export default function MyTasks() {
   };
 
   const submitTask = async (task) => {
+    if (busy) return; // prevent accidental duplicate submissions on double-click
     const files = selectedFiles[task.id] || [];
     const comment = String(comments[task.id] || "").trim();
     if (!files.length && !comment) {
       setError("Add at least one file or a submission comment before submitting.");
       return;
+    }
+    // Client-side file validation mirrors the server (multer) rules so the
+    // student gets instant feedback instead of a failed upload.
+    const allowedExt = new Set([".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".png", ".jpg", ".jpeg"]);
+    const maxFiles = 5;
+    const maxBytes = 10 * 1024 * 1024;
+    if (files.length > maxFiles) {
+      setError(`Select at most ${maxFiles} files per submission.`);
+      return;
+    }
+    for (const f of files) {
+      const ext = (f.name.match(/\.[^.]+$/) || [""])[0].toLowerCase();
+      if (!allowedExt.has(ext)) {
+        setError(`Unsupported file type: ${f.name}. Allowed: PDF, DOC, PPT, XLS, ZIP, PNG, JPG.`);
+        return;
+      }
+      if (f.size > maxBytes) {
+        setError(`File too large: ${f.name} (max 10 MB each).`);
+        return;
+      }
     }
     try {
       setBusy(task.id);
@@ -115,10 +136,9 @@ export default function MyTasks() {
                 padding: '8px 12px',
                 borderRadius: '8px',
                 border: '1px solid rgba(255,255,255,0.28)',
-                background: 'rgba(255,255,255,0.08)',
+                background: 'rgba(255,255,255,0.15)',
                 color: '#F5F8FF',
-                fontSize: '13px',
-                backdropFilter: 'blur(8px)'
+                fontSize: '13px'
               }}
             >
               <option value="">All Domains</option>

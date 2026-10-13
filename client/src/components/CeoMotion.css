@@ -106,8 +106,9 @@
   to   { opacity: 1; transform: none; }
 }
 
-/* Sidebar / navbar slides in from the left, like the reference's panel. */
-.role-layout.ceo-motion-ready .navbar-menu {
+/* Sidebar / navbar slides in from the left, like the reference's panel.
+   Only animate when the menu is actually open (has .open class). */
+.role-layout.ceo-motion-ready .navbar-menu.open {
   animation: ceo-slide-left var(--m-slow) var(--m-ease) both;
 }
 
@@ -139,14 +140,23 @@
 }
 
 /* ── Page transitions ────────────────────────────────────────────────── */
-/* Re-keyed on route change by RoleLayout remounting the content wrapper. */
+/* Reference film: scattered tilted cards assemble into a flat dashboard.
+   The content wrapper enters with a shallow 3D tilt that flattens as it
+   rises — perspective lives on the parent so the motion stays composited.
+   Re-keyed on route change by RoleLayout remounting the content wrapper. */
+.role-layout.ceo-dark .role-main {
+  perspective: 1400px;
+}
+
 @keyframes ceo-page-in {
-  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  from { opacity: 0; transform: translate3d(0, 26px, -60px) rotateX(7deg); }
   to   { opacity: 1; transform: none; }
 }
 
 .role-layout.ceo-motion-ready .role-content {
   animation: ceo-page-in var(--m-slow) var(--m-ease) both;
+  transform-origin: 50% 0;
+  will-change: transform, opacity;
 }
 
 /* ── Reveal variants (driven by useCeoReveal) ────────────────────────── */
@@ -160,9 +170,10 @@
   to   { opacity: 1; transform: none; }
 }
 
-/* Emphasis pop for stat tiles — the reference's node "scale-in". */
+/* Emphasis pop for stat tiles — the reference's node "scale-in".
+   Tiles assemble with a shallow tilt that flattens, like cards settling. */
 @keyframes ceo-pop {
-  from { opacity: 0; transform: translate3d(0, var(--d-card), 0) scale(0.96); }
+  from { opacity: 0; transform: translate3d(0, var(--d-card), -30px) scale(0.96) rotateX(4deg); }
   to   { opacity: 1; transform: none; }
 }
 
@@ -367,12 +378,244 @@
   border: 1px solid var(--ceo-border) !important;
 }
 
+/* ── Reference film section (Screen Recording 2026-10-13, 48s) ────────
+   Observed motion language in the property-dashboard promo:
+   1. Tilted floating cards assemble into a flat dashboard (see ceo-page-in
+      / ceo-pop above — shallow rotateX that flattens on entry).
+   2. Stat numbers count up as tiles land (see .ceo-count below + the
+      useCountUp hook in AdminDashboard.jsx; tabular figures stop jitter).
+   3. Line chart draws left→right with popping dots and a travelling
+      dashed cursor (see .chart-cursor + dot stagger below).
+   4. Pill tabs slide a highlight between options (see .chart-slider).
+   5. Range/capacity meters sweep then shimmer (see .capacity shimmer).
+   6. Map-pin style rows pop in staggered, selected row glows
+      (see .ceo-pin-pop for pending/submission rows already revealed
+      through .ceo-r-row — extra emphasis, same tokens).
+   7. Dropdowns/overlays unfold from their anchor (see .notification-pop).
+   Everything stays transform/opacity; the count-up writes textContent only. */
+
+/* Count-up figures hold a fixed width so ticking digits never shift layout. */
+.role-layout.ceo-dark .ceo-count,
+.role-layout.ceo-dark .stat-count {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Chart draw: replay-safe (AdminDashboard keys the svg on period change),
+   dots cascade along the draw direction like the reference's travelling tip. */
+.role-layout.ceo-dark .chart-shell svg {
+  overflow: visible;
+}
+.role-layout.ceo-dark .chart-dot {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.role-layout.ceo-dark .chart-dot:nth-of-type(1)  { animation-delay: 0.45s; }
+.role-layout.ceo-dark .chart-dot:nth-of-type(2)  { animation-delay: 0.53s; }
+.role-layout.ceo-dark .chart-dot:nth-of-type(3)  { animation-delay: 0.61s; }
+.role-layout.ceo-dark .chart-dot:nth-of-type(4)  { animation-delay: 0.69s; }
+.role-layout.ceo-dark .chart-dot:nth-of-type(5)  { animation-delay: 0.77s; }
+.role-layout.ceo-dark .chart-dot:nth-of-type(6)  { animation-delay: 0.85s; }
+.role-layout.ceo-dark .chart-dot:nth-of-type(7)  { animation-delay: 0.93s; }
+.role-layout.ceo-dark .chart-dot:nth-of-type(8)  { animation-delay: 1.01s; }
+.role-layout.ceo-dark .chart-dot:nth-of-type(9)  { animation-delay: 1.09s; }
+.role-layout.ceo-dark .chart-dot:nth-of-type(10) { animation-delay: 1.17s; }
+.role-layout.ceo-dark .chart-dot:nth-of-type(n+11) { animation-delay: 1.25s; }
+
+/* Peak callout chip: the reference's tooltip bubble, fed by the real max. */
+.role-layout.ceo-dark .chart-callout {
+  animation: ceo-callout var(--m-base) var(--m-ease-out) 1.05s both;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+@keyframes ceo-callout {
+  from { opacity: 0; transform: translateY(6px) scale(0.9); }
+  to   { opacity: 1; transform: none; }
+}
+
+.role-layout.ceo-dark .chart-callout-box {
+  fill: rgba(8, 11, 20, 0.92);
+  stroke: var(--ceo-teal);
+  stroke-width: 1.5;
+}
+
+.role-layout.ceo-dark .chart-callout-text {
+  fill: var(--ceo-text);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+/* Travelling dashed cursor: sweeps the chart once, left→right, then fades.
+   The line sits at the chart's left pad (x=30) and travels the 700-unit
+   plot width (760 viewBox minus pads); SVG user units scale with the
+   viewBox, so this stays exact at every viewport size. */
+.role-layout.ceo-dark .chart-cursor {
+  stroke: var(--ceo-teal);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 5;
+  opacity: 0;
+  animation: ceo-cursor-sweep 2.4s var(--m-ease) 0.3s both;
+}
+
+@keyframes ceo-cursor-sweep {
+  0%   { opacity: 0; transform: translateX(0); }
+  12%  { opacity: 0.9; }
+  82%  { opacity: 0.9; transform: translateX(700px); }
+  100% { opacity: 0; transform: translateX(700px); }
+}
+
+/* Pill-tab sliding highlight: the active period pill glides between
+   week/month/year like the reference's For Sale selector. The span is
+   rendered by AdminDashboard; :has() positions it without any JS.
+   NOTE: the slider span itself is :nth-child(1), so the three buttons are
+   children 2/3/4 — the selectors below are offset accordingly. */
+.role-layout.ceo-dark .chart-tabs {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  isolation: isolate;
+}
+.role-layout.ceo-dark .chart-tabs button {
+  position: relative;
+  z-index: 1;
+}
+.role-layout.ceo-dark .chart-tabs .chart-slider {
+  display: block;
+  position: absolute;
+  z-index: 0;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc((100% - 8px) / 3);
+  border-radius: 7px;
+  background: rgba(124, 108, 255, 0.22);
+  border: 1px solid rgba(124, 108, 255, 0.45);
+  transition: transform var(--m-base) var(--m-ease);
+  pointer-events: none;
+}
+.role-layout.ceo-dark .chart-tabs:has(button:nth-child(3).active) .chart-slider {
+  transform: translateX(100%);
+}
+.role-layout.ceo-dark .chart-tabs:has(button:nth-child(4).active) .chart-slider {
+  transform: translateX(200%);
+}
+.role-layout.ceo-dark .chart-tabs button.active {
+  animation: ceo-pill-settle var(--m-fast) var(--m-ease) both;
+}
+
+@keyframes ceo-pill-settle {
+  from { transform: scale(0.94); }
+  to   { transform: scale(1); }
+}
+
+/* Capacity meter: sweep (existing ceo-sweep) plus a one-pass shimmer that
+   travels the filled bar, echoing the reference's slider fill. */
+.role-layout.ceo-dark .capacity {
+  position: relative;
+  overflow: hidden;
+}
+.role-layout.ceo-dark .capacity i {
+  position: relative;
+  overflow: hidden;
+}
+.role-layout.ceo-dark .capacity i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.45) 50%, transparent 80%);
+  transform: translateX(-100%);
+  animation: ceo-shimmer 1.6s var(--m-ease) 0.7s both;
+}
+
+@keyframes ceo-shimmer {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+/* Pin-pop emphasis for queue rows (pending approvals, submitted work):
+   rows already cascade via .ceo-r-row; this adds the reference's
+   map-pin scale settle on top of the rise, using the same stagger token.
+   Deliberately the independent `scale` property (not `transform`): the
+   rise animation owns `transform`, and two animations cannot share it —
+   the later would replace the earlier. `scale` composes with it, survives
+   the production minifier (verified in the built bundle), and is supported
+   by all modern browsers. Only the `translate` property is dropped by the
+   minifier (see the loader wave note) and is avoided everywhere. */
+.role-layout.ceo-motion-ready .ceo-r-row.ceo-in {
+  animation:
+    ceo-rise-row var(--m-base) var(--m-ease) both,
+    ceo-pin-settle var(--m-base) var(--m-ease-out) both;
+  animation-delay:
+    calc(var(--ceo-i, 0) * var(--m-step)),
+    calc(var(--ceo-i, 0) * var(--m-step));
+}
+
+@keyframes ceo-pin-settle {
+  from { scale: 0.985; }
+  to   { scale: 1; }
+}
+
+/* Overlay unfold: notification/bell popover grows from its top-right
+   anchor like the reference's search dropdown. */
+.role-layout.ceo-dark .notification-pop {
+  transform-origin: top right;
+  animation: ceo-unfold var(--m-base) var(--m-ease) both;
+}
+
+@keyframes ceo-unfold {
+  from { opacity: 0; transform: translate3d(0, -8px, 0) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Search-field focus glow + icon nudge, mirroring the reference's
+   search-bar emphasis. */
+.role-layout.ceo-dark .table-wrap input:focus,
+.role-layout.ceo-dark .audit-filters input:focus {
+  animation: ceo-focus-glow var(--m-fast) var(--m-ease) both;
+}
+
+@keyframes ceo-focus-glow {
+  from { box-shadow: 0 0 0 0 rgba(124, 108, 255, 0); }
+  to   { box-shadow: 0 0 0 3px rgba(124, 108, 255, 0.16); }
+}
+
+/* Generic donut-ring draw, for any future ring chart in the CEO scope.
+   Staged like the reference's 80% Transactions ring. */
+.role-layout.ceo-dark .donut-ring {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: ceo-donut-draw var(--m-slow) var(--m-ease) 0.2s forwards;
+}
+
+@keyframes ceo-donut-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Outside the CEO workspace the slider span stays out of layout. */
+.chart-tabs .chart-slider { display: none; }
+
+/* Small screens: flatten the 3D assembly so entry stays cheap and exact. */
+@media (max-width: 800px) {
+  @keyframes ceo-page-in {
+    from { opacity: 0; transform: translate3d(0, 14px, 0); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes ceo-pop {
+    from { opacity: 0; transform: translate3d(0, var(--d-card), 0) scale(0.97); }
+    to   { opacity: 1; transform: none; }
+  }
+  .role-layout.ceo-dark .role-main { perspective: none; }
+  .role-layout.ceo-dark .chart-cursor { animation-duration: 1.6s; }
+}
+
 /* ── Reduced motion: keep the look, drop the movement ────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .role-layout.ceo-dark::after { animation: none; }
 
   .role-layout.ceo-motion-ready .role-topbar,
-  .role-layout.ceo-motion-ready .navbar-menu,
+  .role-layout.ceo-motion-ready .navbar-menu.open,
   .role-layout.ceo-motion-ready .navbar-brand,
   .role-layout.ceo-motion-ready .navbar-profile,
   .role-layout.ceo-motion-ready .role-content,
@@ -385,7 +628,13 @@
   .role-layout.ceo-dark .chart-line,
   .role-layout.ceo-dark .chart-area,
   .role-layout.ceo-dark .chart-dot,
+  .role-layout.ceo-dark .chart-cursor,
+  .role-layout.ceo-dark .chart-callout,
+  .role-layout.ceo-dark .chart-slider,
   .role-layout.ceo-dark .capacity i,
+  .role-layout.ceo-dark .capacity i::after,
+  .role-layout.ceo-dark .donut-ring,
+  .role-layout.ceo-dark .notification-pop,
   .role-layout.ceo-dark .portal-loading,
   .role-layout.ceo-dark .loader-dot,
   .role-layout.ceo-dark .empty-state {

@@ -18,8 +18,10 @@ import { useEffect } from "react";
  */
 
 // Variant groups: selector first match wins, so order matters (specific
-// containers before generic cards).
-const GROUPS = [
+// containers before generic cards). The CEO portal uses the defaults;
+// the manager portal passes its own config (same class machinery, scoped
+// by `.manager-motion` in ManagerMotion.css instead of `.ceo-dark`).
+const DEFAULT_GROUPS = [
   { variant: "row",    sel: ".pending-registration-item, .submission-row, .list-row, .audit-table tbody tr, .table-wrap tbody tr" },
   { variant: "tile",   sel: ".admin-stat, .performance-card" },
   { variant: "head",   sel: ".simple-head, .audit-header, .panel-head, .section-kicker, .page-label, .profile-identity-card" },
@@ -28,7 +30,7 @@ const GROUPS = [
 
 // Containers whose children cascade in with a stagger, mirroring the way the
 // reference's ranking list and stat row build one item after another.
-const STAGGER_PARENTS = [
+const DEFAULT_STAGGER_PARENTS = [
   ".admin-stat-grid",
   ".pending-registrations-list",
   ".submission-list",
@@ -39,19 +41,40 @@ const STAGGER_PARENTS = [
   ".quick-actions",
 ];
 
+/* Manager-portal variant: same reveal machinery, matched to the manager's
+   light-theme markup (manager stats, monitor rows, task tables). */
+export const MANAGER_REVEAL_CONFIG = {
+  groups: [
+    { variant: "row",   sel: ".submission-manager, .manager-stats + .panel tbody tr, .table-wrap tbody tr, .activity-admin" },
+    { variant: "tile",  sel: ".admin-stat, .manager-stats > div, .performance-card" },
+    { variant: "head",  sel: ".simple-head, .panel-head, .section-kicker" },
+    { variant: "panel", sel: ".panel, .summary-card, .mission-card, .task-card, .detail-card" },
+  ],
+  staggerParents: [
+    ".admin-stat-grid",
+    ".manager-stats",
+    ".submission-list",
+    ".table-wrap tbody",
+    ".quick-actions",
+  ],
+};
+
 const MAX_STAGGER = 10;
 
-function classify(el) {
-  for (const g of GROUPS) {
+function classify(groups, el) {
+  for (const g of groups) {
     if (el.matches(g.sel)) return g.variant;
   }
   return "panel";
 }
 
-export default function useCeoReveal(rootRef) {
+export default function useCeoReveal(rootRef, config) {
   useEffect(() => {
     const root = rootRef?.current;
     if (!root) return undefined;
+
+    const groups = config?.groups || DEFAULT_GROUPS;
+    const staggerParents = config?.staggerParents || DEFAULT_STAGGER_PARENTS;
 
     const reduced =
       typeof window.matchMedia === "function" &&
@@ -86,7 +109,7 @@ export default function useCeoReveal(rootRef) {
 
     const collect = () => {
       // Stagger indices are assigned once per parent, before observation.
-      for (const parentSel of STAGGER_PARENTS) {
+      for (const parentSel of staggerParents) {
         root.querySelectorAll(parentSel).forEach((parent) => {
           Array.from(parent.children).forEach((child, i) => {
             child.style.setProperty("--ceo-i", String(Math.min(i, MAX_STAGGER)));
@@ -95,14 +118,14 @@ export default function useCeoReveal(rootRef) {
       }
 
       const targets = new Set();
-      for (const g of GROUPS) {
+      for (const g of groups) {
         root.querySelectorAll(g.sel).forEach((el) => targets.add(el));
       }
 
       targets.forEach((el) => {
         if (seen.has(el)) return;
         seen.add(el);
-        el.classList.add(`ceo-r-${classify(el)}`);
+        el.classList.add(`ceo-r-${classify(groups, el)}`);
         // Already on screen -> reveal now (stagger still applies via CSS delay).
         if (revealIfVisible(el)) return;
         io?.observe(el);
@@ -142,5 +165,5 @@ export default function useCeoReveal(rootRef) {
       io.disconnect();
       root.classList.remove("ceo-motion-ready");
     };
-  }, [rootRef]);
+  }, [rootRef, config]);
 }

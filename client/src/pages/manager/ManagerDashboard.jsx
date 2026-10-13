@@ -1,9 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
+import { StatNumber } from "../../components/useCountUp";
 import "../admin/AdminDashboard.css";
 import "../../styles/admin.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
+
+async function downloadSubmissionFile(file, onError) {
+  try {
+    const res = await fetch(`${API_URL}${file.download_url}`, { headers: auth() });
+    if (!res.ok) {
+      let msg = "Unable to download file";
+      try { msg = (await res.json()).message || msg; } catch {}
+      onError(msg);
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = file.name || "submission-file";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch {
+    onError("Unable to download file. Check your connection.");
+  }
+}
 
 const PROGRAMS = [
   { value: "techins 60", label: "Techins 60" },
@@ -159,7 +183,7 @@ export default function ManagerDashboard() {
               ["Today's Activity", stats?.activitiesToday || 0, "06"]
             ].map(([label, value, no]) => (
               <div className="admin-stat" key={label}>
-                <small>{no}</small><span>{label}</span><strong>{value}</strong>
+                <small>{no}</small><span>{label}</span><StatNumber value={value} />
               </div>
             ))}
           </div>
@@ -298,6 +322,15 @@ export default function ManagerDashboard() {
                         <strong>Version {subList[0].version}</strong>
                         <small>{subList[0].submission_code} · {new Date(subList[0].submitted_at).toLocaleString()}</small>
                         <p>{subList[0].comment || "No submission comment."}</p>
+                        {(subList[0].files || []).length ? (
+                          <div className="quick-actions">
+                            {subList[0].files.map(f => (
+                              <button key={f.id} onClick={() => downloadSubmissionFile(f, setError)}>
+                                {f.name}{f.size ? ` (${f.size < 1024 ? `${f.size} B` : `${(f.size / 1024).toFixed(1)} KB`})` : ""}
+                              </button>
+                            ))}
+                          </div>
+                        ) : <small>No files attached to this version.</small>}
                       </div>
                       <span className="pill completed">{subList[0].status}</span>
                     </div>

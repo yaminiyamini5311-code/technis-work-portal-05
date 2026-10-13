@@ -39,8 +39,7 @@
     align-items: center;
     gap: 12px;
     padding: 12px 16px;
-    background: rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.15);
     border: 1px solid rgba(255, 255, 255, 0.28);
     border-radius: 14px;
     box-shadow: var(--shadow-sm);
@@ -80,8 +79,7 @@
 
 .activity-form-card,
 .activity-history-card {
-    background: rgba(10, 18, 40, 0.72);
-    backdrop-filter: blur(8px);
+    background: rgba(10, 18, 40, 0.82);
     border: 1px solid rgba(250, 154, 2, 0.25);
     border-radius: 18px;
     padding: 24px;

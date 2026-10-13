@@ -1,10 +1,17 @@
+/* Shared CEO page container metrics: same max-width and no extra padding
+   as .admin-simple on every other page (role-content provides the 28px
+   gutters). Previously 1400px + 2rem padding misaligned this page. */
 .audit-logs-page {
-  padding: 2rem;
-  max-width: 1400px;
+  padding: 0;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
+/* The audit header scrolls with the page like every other CEO page header
+   (sticky on none of them) — consistent behavior, never clipped by
+   sticky positioning. Keep it in normal flow. */
 .audit-header {
+  position: static;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -35,22 +42,26 @@
   margin: 0;
 }
 
+/* Refresh uses the shared secondary variant (white button, dark text),
+   identical to every other CEO page. The gradient primary is reserved
+   for the Search submit action. */
 .btn-refresh {
   padding: 0.625rem 1.25rem;
-  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
-  color: white;
-  border: none;
+  background: #FFFFFF;
+  color: #111827;
+  border: 1px solid #D1D5DB;
   border-radius: 0.5rem;
   font-weight: 600;
   font-size: 0.875rem;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
 }
 
 .btn-refresh:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+  border-color: #FA9A02;
+  background: #F9FAFB;
+  box-shadow: 0 2px 8px rgba(250, 154, 2, 0.2);
 }
 
 .btn-refresh:disabled {
@@ -431,4 +442,223 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ── CEO Dark Theme Overrides ───────────────────────────────────────────
+   The Audit Logs page uses light theme colors by default. When viewed in the
+   CEO portal (which has .ceo-dark class), we need to override all colors to
+   ensure readability on the dark background. */
+.role-layout.ceo-dark .audit-eyebrow {
+  color: var(--ceo-text-mute) !important;
+}
+
+.role-layout.ceo-dark .audit-header h2 {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .audit-header p {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .btn-refresh {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--ceo-text) !important;
+  border: 1px solid var(--ceo-border-strong, rgba(255, 255, 255, 0.14)) !important;
+}
+
+.role-layout.ceo-dark .btn-refresh:hover:not(:disabled) {
+  background: rgba(124, 108, 255, 0.16) !important;
+  border-color: rgba(124, 108, 255, 0.5) !important;
+}
+
+.role-layout.ceo-dark .audit-error {
+  background: rgba(242, 85, 122, 0.12) !important;
+  border-color: rgba(242, 85, 122, 0.36) !important;
+  color: #ffd9e2 !important;
+}
+
+/* Tabs - CEO dark theme */
+.role-layout.ceo-dark .audit-tabs button {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--ceo-border) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .audit-tabs button:hover {
+  border-color: var(--ceo-violet) !important;
+  color: var(--ceo-violet) !important;
+  background: rgba(124, 108, 255, 0.12) !important;
+}
+
+.role-layout.ceo-dark .audit-tabs button.active {
+  background: linear-gradient(135deg, var(--ceo-violet), #5b4bdb) !important;
+  color: #ffffff !important;
+  border-color: var(--ceo-violet) !important;
+}
+
+/* Filters - CEO dark theme */
+.role-layout.ceo-dark .audit-filters {
+  background: var(--ceo-surface) !important;
+  border-color: var(--ceo-border) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.46) !important;
+}
+
+.role-layout.ceo-dark .audit-search-form input {
+  background: rgba(255, 255, 255, 0.045) !important;
+  color: var(--ceo-text) !important;
+  border-color: var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark .audit-search-form input::placeholder {
+  color: var(--ceo-placeholder, #9aa6c2) !important;
+  opacity: 1;
+}
+
+.role-layout.ceo-dark .audit-search-form input:focus {
+  border-color: var(--ceo-violet) !important;
+  box-shadow: 0 0 0 3px rgba(124, 108, 255, 0.16) !important;
+}
+
+.role-layout.ceo-dark .audit-search-form button {
+  background: linear-gradient(135deg, var(--ceo-violet), #5b4bdb) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+}
+
+.role-layout.ceo-dark .audit-search-form button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #8b7bfa, #6b5bf0) !important;
+}
+
+.role-layout.ceo-dark .audit-filter-row select,
+.role-layout.ceo-dark .audit-filter-row input[type="date"] {
+  background: rgba(255, 255, 255, 0.045) !important;
+  color: var(--ceo-text) !important;
+  border-color: var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark .audit-filter-row select:focus,
+.role-layout.ceo-dark .audit-filter-row input[type="date"]:focus {
+  border-color: var(--ceo-violet) !important;
+  box-shadow: 0 0 0 3px rgba(124, 108, 255, 0.16) !important;
+}
+
+.role-layout.ceo-dark .audit-filter-row select option {
+  background: var(--ceo-void-2) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .btn-clear-filters {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--ceo-border) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .btn-clear-filters:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .audit-results-info {
+  color: var(--ceo-text-dim) !important;
+}
+
+/* Table - CEO dark theme */
+.role-layout.ceo-dark .audit-table-container {
+  background: var(--ceo-surface) !important;
+  border-color: var(--ceo-border) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.46) !important;
+}
+
+.role-layout.ceo-dark .audit-table thead {
+  background: rgba(255, 255, 255, 0.035) !important;
+}
+
+.role-layout.ceo-dark .audit-table th {
+  color: var(--ceo-text-mute) !important;
+  border-color: var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark .audit-table td {
+  color: var(--ceo-text) !important;
+  border-color: var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark .audit-table tbody tr:hover {
+  background: rgba(124, 108, 255, 0.08) !important;
+}
+
+.role-layout.ceo-dark .audit-datetime {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .audit-user-name {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .audit-user-email {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .audit-action {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .audit-details {
+  color: var(--ceo-text-dim) !important;
+}
+
+/* Role badges - CEO dark theme */
+.role-layout.ceo-dark .role-admin {
+  background: rgba(30, 64, 175, 0.25) !important;
+  color: #8ab4f8 !important;
+}
+
+.role-layout.ceo-dark .role-ceo {
+  background: rgba(146, 64, 14, 0.25) !important;
+  color: #fcd34d !important;
+}
+
+.role-layout.ceo-dark .role-manager {
+  background: rgba(6, 95, 70, 0.25) !important;
+  color: #6ee7b7 !important;
+}
+
+.role-layout.ceo-dark .role-student {
+  background: rgba(55, 48, 163, 0.25) !important;
+  color: #c4b5fd !important;
+}
+
+.role-layout.ceo-dark .role-other {
+  background: rgba(255, 255, 255, 0.07) !important;
+  color: var(--ceo-text-dim) !important;
+}
+
+/* Empty state - CEO dark theme */
+.role-layout.ceo-dark .audit-empty-state {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .audit-empty-state p {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .audit-empty-state small {
+  color: var(--ceo-text-dim) !important;
+}
+
+/* Pagination - CEO dark theme */
+.role-layout.ceo-dark .audit-pagination button {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--ceo-border) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .audit-pagination button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: var(--ceo-violet) !important;
+  color: var(--ceo-violet) !important;
+}
+
+.role-layout.ceo-dark .audit-pagination span {
+  color: var(--ceo-text-dim) !important;
 }

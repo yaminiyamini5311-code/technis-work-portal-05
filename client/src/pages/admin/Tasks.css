@@ -50,7 +50,7 @@
   align-items: center;
   gap: 15px;
   padding: 20px;
-  background: #FFFFFFFFF;
+  background: #FFFFFF;
   border: 1px solid #D9D9D9;
   border-radius: 14px;
   box-shadow: 0 4px 14px rgba(16, 24, 40, 0.05);
@@ -119,7 +119,7 @@
    ========================================= */
 
 .create-box {
-  background: #FFFFFFFFF;
+  background: #FFFFFF;
   border: 1px solid #D9D9D9;
   border-radius: 14px;
   padding: 26px;
@@ -181,7 +181,7 @@
   border: 1px solid #d0d5dd;
   border-radius: 9px;
 
-  background: #FFFFFFFFF;
+  background: #FFFFFF;
 
   color: #0C120C;
   font-size: 14px;
@@ -229,7 +229,7 @@
   padding: 12px 22px;
 
   background: #0C120C;
-  color: #FFFFFFFFF;
+  color: #FFFFFF;
 
   font-size: 14px;
   font-weight: 600;
@@ -258,7 +258,7 @@
    ========================================= */
 
 .table-card {
-  background: #FFFFFFFFF;
+  background: #FFFFFF;
   border: 1px solid #D9D9D9;
   border-radius: 14px;
   overflow: hidden;
@@ -298,7 +298,7 @@
   border: 1px solid #d0d5dd;
   border-radius: 8px;
 
-  background: #FFFFFFFFF;
+  background: #FFFFFF;
   color: #303430;
 
   font-size: 13px;
@@ -600,4 +600,199 @@ tbody tr:last-child td {
   .table-header {
     padding: 18px;
   }
+}
+
+/* ── CEO Dark Theme Overrides ─────────────────────────────────────────── */
+.role-layout.ceo-dark .admin-page {
+  background: transparent !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .page-header h1 {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .page-header p {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .task-stat-card {
+  background: var(--ceo-surface) !important;
+  border-color: var(--ceo-border) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.46) !important;
+}
+
+.role-layout.ceo-dark .task-stat-card span:not(.stat-icon) {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .task-stat-card strong {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .stat-icon {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .error-message {
+  background: rgba(242, 85, 122, 0.12) !important;
+  border-color: rgba(242, 85, 122, 0.36) !important;
+  color: #ffd9e2 !important;
+}
+
+.role-layout.ceo-dark .success-message {
+  background: rgba(53, 208, 127, 0.12) !important;
+  border-color: rgba(53, 208, 127, 0.34) !important;
+  color: #d6ffe9 !important;
+}
+
+.role-layout.ceo-dark .create-box {
+  background: var(--ceo-surface) !important;
+  border-color: var(--ceo-border) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.46) !important;
+}
+
+.role-layout.ceo-dark .section-heading h2 {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .section-heading p {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .form-group label {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .form-group input,
+.role-layout.ceo-dark .form-group select,
+.role-layout.ceo-dark .form-group textarea {
+  background: rgba(255, 255, 255, 0.045) !important;
+  color: var(--ceo-text) !important;
+  border-color: var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark .form-group input::placeholder,
+.role-layout.ceo-dark .form-group textarea::placeholder {
+  color: var(--ceo-text-mute) !important;
+}
+
+.role-layout.ceo-dark .form-group input:focus,
+.role-layout.ceo-dark .form-group select:focus,
+.role-layout.ceo-dark .form-group textarea:focus {
+  border-color: var(--ceo-violet) !important;
+  box-shadow: 0 0 0 3px rgba(124, 108, 255, 0.16) !important;
+}
+
+.role-layout.ceo-dark .form-group select option {
+  background: var(--ceo-void-2) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .create-task-btn {
+  background: linear-gradient(135deg, var(--ceo-violet), #5b4bdb) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+}
+
+.role-layout.ceo-dark .create-task-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #8b7bfa, #6b5bf0) !important;
+}
+
+.role-layout.ceo-dark .table-card {
+  background: var(--ceo-surface) !important;
+  border-color: var(--ceo-border) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.46) !important;
+}
+
+.role-layout.ceo-dark .table-header {
+  border-color: var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark .table-header h2 {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .table-header p {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .refresh-btn {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--ceo-border) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .refresh-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: var(--ceo-violet) !important;
+  color: var(--ceo-violet) !important;
+}
+
+.role-layout.ceo-dark thead {
+  background: rgba(255, 255, 255, 0.035) !important;
+}
+
+.role-layout.ceo-dark th {
+  color: var(--ceo-text-mute) !important;
+  border-color: var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark td {
+  color: var(--ceo-text) !important;
+  border-color: var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark tbody tr:hover {
+  background: rgba(124, 108, 255, 0.08) !important;
+}
+
+.role-layout.ceo-dark .task-title {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .student-avatar {
+  background: linear-gradient(135deg, rgba(124, 108, 255, 0.4), rgba(47, 212, 196, 0.3)) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .student-cell span {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .description-cell {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .status.pending {
+  background: rgba(245, 165, 36, 0.16) !important;
+  color: var(--ceo-amber) !important;
+}
+
+.role-layout.ceo-dark .status.in-progress {
+  background: rgba(47, 212, 196, 0.16) !important;
+  color: var(--ceo-teal) !important;
+}
+
+.role-layout.ceo-dark .status.completed {
+  background: rgba(53, 208, 127, 0.16) !important;
+  color: var(--ceo-green) !important;
+}
+
+.role-layout.ceo-dark .table-state h3 {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .table-state p {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .empty-icon {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.role-layout.ceo-dark .loader {
+  border-color: var(--ceo-border) !important;
+  border-top-color: var(--ceo-violet) !important;
 }

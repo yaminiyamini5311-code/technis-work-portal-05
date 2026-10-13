@@ -178,3 +178,93 @@
   }
 
 }
+
+/* ── CEO Dark Theme Overrides ─────────────────────────────────────────── */
+.role-layout.ceo-dark .performance-page {
+  background: transparent !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .performance-header h1 {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .performance-header p {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .back-btn {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--ceo-border) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .back-btn:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: var(--ceo-violet) !important;
+  color: var(--ceo-violet) !important;
+}
+
+.role-layout.ceo-dark .main-progress,
+.role-layout.ceo-dark .score-box {
+  background: var(--ceo-surface) !important;
+  border-color: var(--ceo-border) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.46) !important;
+}
+
+.role-layout.ceo-dark .main-progress span,
+.role-layout.ceo-dark .score-box span {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .main-progress strong,
+.role-layout.ceo-dark .score-box strong {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .big-progress {
+  background: rgba(255, 255, 255, 0.07) !important;
+}
+
+.role-layout.ceo-dark .big-progress div {
+  background: linear-gradient(90deg, var(--ceo-violet), var(--ceo-teal)) !important;
+}
+
+.role-layout.ceo-dark .score-box small {
+  color: var(--ceo-text-mute) !important;
+}
+
+.role-layout.ceo-dark .performance-card {
+  background: var(--ceo-surface) !important;
+  border-color: var(--ceo-border) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.46) !important;
+}
+
+.role-layout.ceo-dark .performance-title h2 {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .performance-card li {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .empty-text {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .mission-number {
+  color: var(--ceo-amber) !important;
+}
+
+.role-layout.ceo-dark .mission-number + p {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .feedback-box {
+  background: rgba(255, 255, 255, 0.03) !important;
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .performance-error {
+  color: var(--ceo-rose) !important;
+}

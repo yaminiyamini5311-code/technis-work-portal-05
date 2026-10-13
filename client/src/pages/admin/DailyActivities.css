@@ -34,7 +34,7 @@
 .activities-container {
   margin-top: 28px;
   padding: 24px;
-  background: #FFFFFFFFF;
+  background: #FFFFFF;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
@@ -48,7 +48,7 @@
   position: relative;
   padding: 20px;
   margin-bottom: 16px;
-  background: #FFFFFFFFF;
+  background: #FFFFFF;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   transition:
@@ -165,4 +165,56 @@
   .activities-container {
     padding: 14px;
   }
+}
+
+/* ── CEO Dark Theme Overrides ─────────────────────────────────────────── */
+.role-layout.ceo-dark .daily-activities-page {
+  background: transparent !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .daily-activities-page h1 {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .daily-activities-page > p {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .activities-container {
+  background: var(--ceo-surface) !important;
+  border-color: var(--ceo-border) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.46) !important;
+}
+
+.role-layout.ceo-dark .activity-item {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark .activity-item:hover {
+  border-color: var(--ceo-border-strong) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.role-layout.ceo-dark .activity-item h3 {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .activity-item p {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .activity-item p strong {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .loading {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .empty-message {
+  background: rgba(255, 255, 255, 0.025) !important;
+  border-color: var(--ceo-border) !important;
+  color: var(--ceo-text-dim) !important;
 }

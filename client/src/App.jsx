@@ -24,6 +24,8 @@ import Feedback from "./pages/admin/feedback";
 import AdminPerformance from "./pages/admin/performance";
 import AuditLogs from "./pages/admin/AuditLogs";
 import AdminProfile from "./pages/admin/Profile";
+import AdminSubmissions from "./pages/admin/Submissions";
+import ManagerSubmissions from "./pages/manager/Submissions";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -48,15 +50,22 @@ export default function App() {
   // Restore auth on load: verify the stored token with /me before
   // route guards decide. Clears stale tokens (expired, server restart
   // with rotated secret, deactivated account).
+  // Note: in dev React StrictMode mounts this effect twice, so /me fires
+  // twice — the first request is aborted on cleanup and its response is
+  // ignored, so only one response ever takes effect. No infinite loop:
+  // the effect has no state deps and runs once per mount.
   useEffect(() => {
     let cancelled = false;
+    const ctrl = new AbortController();
     (async () => {
       const token = localStorage.getItem("token");
       if (!token) { setAuthChecked(true); return; }
       try {
         const res = await fetch(`${API_URL}/api/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
+          signal: ctrl.signal
         });
+        if (cancelled) return;
         if (res.ok) {
           const data = await res.json();
           if (data?.user) {
@@ -70,12 +79,13 @@ export default function App() {
           localStorage.removeItem("role");
         }
       } catch {
-        // Network error: keep the token, retry on next navigation
+        // Aborted (StrictMode remount) or network error: keep the token,
+        // retry on next navigation
       } finally {
         if (!cancelled) setAuthChecked(true);
       }
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; ctrl.abort(); };
   }, []);
 
   return (
@@ -109,6 +119,7 @@ export default function App() {
           <Route path="/manager/students" element={<Students />} />
           <Route path="/manager/tasks" element={<AdminTasks />} />
           <Route path="/manager/missions" element={<AdminMissions />} />
+          <Route path="/manager/submissions" element={<ManagerSubmissions />} />
           <Route path="/manager/daily-activities" element={<DailyActivities />} />
           <Route path="/manager/performance" element={<AdminPerformance />} />
           <Route path="/manager/feedback" element={<Feedback />} />
@@ -119,6 +130,7 @@ export default function App() {
           <Route path="/admin/students" element={<Students />} />
           <Route path="/admin/tasks" element={<AdminTasks />} />
           <Route path="/admin/missions" element={<AdminMissions />} />
+          <Route path="/admin/submissions" element={<AdminSubmissions />} />
           <Route path="/admin/daily-activities" element={<DailyActivities />} />
           <Route path="/admin/performance" element={<AdminPerformance />} />
           <Route path="/admin/feedback" element={<Feedback />} />

@@ -31,9 +31,15 @@
 /* Outward wave: expands from the center behind logo + hexagon until it
    covers the viewport. 160vmax diameter (80vmax radius) always exceeds the
    half-diagonal (<=70.8vmax), so corners are covered on any aspect ratio.
-   Blue wash from the loader palette keeps the white hexagon + logo readable. */
+   Blue wash from the loader palette keeps the white hexagon + logo readable.
+   Centering uses negative margins, NOT the individual `translate` property:
+   the production minifier (LightningCSS via vite build) drops `translate`
+   from the built bundle while keeping the `transform: scale()` keyframes,
+   which pinned the circle's top-left corner at viewport center and pushed
+   the visible glow off-screen on the deployed site only. Margins compose
+   with the scale keyframes untouched and survive minification. */
 .tl__wave{position:absolute;left:50%;top:50%;width:160vmax;height:160vmax;
-  translate:-50% -50%;transform:scale(0);opacity:0;border-radius:50%;pointer-events:none;
+  margin-left:-80vmax;margin-top:-80vmax;transform:scale(0);transform-origin:center;opacity:0;border-radius:50%;pointer-events:none;
   background:radial-gradient(circle,rgba(47,157,255,.34) 0%,rgba(47,157,255,.20) 45%,rgba(47,157,255,0) 70%);
   animation:tl-wave var(--tl-wave) ease-out var(--tl-base) both}
 .tl__wave--ring{background:transparent;border:2px solid rgba(160,225,255,.55);

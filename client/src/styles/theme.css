@@ -300,7 +300,6 @@
 .student-layout .feedback-box,
 .student-layout .upload-box {
   background: var(--space-surface) !important;
-  backdrop-filter: blur(8px);
   border-color: var(--space-border) !important;
   color: var(--text-primary-dark) !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
@@ -327,7 +326,6 @@
 /* Headers and Topbars - Student Portal */
 .student-header {
   background: rgba(12, 18, 12, 0.92) !important;
-  backdrop-filter: blur(12px);
   border-color: var(--space-border) !important;
   color: var(--text-primary-dark) !important;
 }
@@ -392,16 +390,16 @@
 }
 
 /* Input Fields - Login Page (Light Theme) */
-body:not(.student-layout):not(.role-layout) input,
-body:not(.student-layout):not(.role-layout) textarea,
-body:not(.student-layout):not(.role-layout) select {
+.login-page input,
+.login-page textarea,
+.login-page select {
   background: #FFFFFF !important;
   color: #111827 !important;
   border: 1px solid #D1D5DB !important;
 }
 
-body:not(.student-layout):not(.role-layout) input::placeholder,
-body:not(.student-layout):not(.role-layout) textarea::placeholder {
+.login-page input::placeholder,
+.login-page textarea::placeholder {
   color: #6B7280 !important;
   opacity: 1;
 }

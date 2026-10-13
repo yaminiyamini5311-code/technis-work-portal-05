@@ -1,16 +1,26 @@
 /* =========================================================
    TECHINS WORK PORTAL — Navbar with Hamburger Menu
+   Layout contract (shared by CEO/Manager/Student headers):
+   - :root --sidebar-width / --header-height are the single source of
+     truth; layouts consume them, nothing hardcodes offsets per page.
+   - The hamburger is an in-flow header item (first child), never a
+     floating fixed button, so a closed drawer leaves no gap.
+   - The drawer is an overlay (fixed, translateX) with a backdrop; page
+     content always keeps full width underneath.
    ========================================================= */
+:root {
+  --sidebar-width: 290px;
+  --header-height: 78px;
+}
 
-/* Hamburger Button */
+/* Hamburger Button - in-header, ALWAYS visible with high contrast */
 .navbar-hamburger {
-  position: fixed;
-  top: 14px;
-  left: 14px;
-  width: 46px;
-  height: 46px;
-  min-width: 44px;
-  min-height: 44px;
+  position: static;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -18,24 +28,35 @@
   gap: 5px;
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 11px;
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.15);
   box-shadow: 0 8px 24px rgba(12, 18, 12, 0.12);
-  z-index: 70;
   cursor: pointer;
   padding: 0;
   transition: all 0.25s ease;
   opacity: 1 !important;
   visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+/* Guard: the student button system paints every button dark; the
+   hamburger must keep its translucent header treatment instead. */
+.student-layout .navbar-hamburger {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  box-shadow: 0 8px 24px rgba(12, 18, 12, 0.12) !important;
+  min-height: 42px;
+  padding: 0;
 }
 
 .navbar-hamburger span {
-  display: block;
+  display: block !important;
   width: 22px;
   height: 2.5px;
-  background: #F5F8FF;
+  background: #F5F8FF !important;
   border-radius: 3px;
   transition: all 0.3s ease;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .navbar-hamburger:hover {
@@ -59,7 +80,7 @@
   transform: translateY(0);
 }
 
-/* RoleLayout overrides for light theme - higher contrast */
+/* RoleLayout overrides for light theme - DARK bars on white background */
 .role-layout .navbar-hamburger {
   border: 1px solid #D1D5DB;
   background: #FFFFFF;
@@ -67,7 +88,8 @@
 }
 
 .role-layout .navbar-hamburger span {
-  background: #0B1220;
+  background: #0B1220 !important;
+  opacity: 1 !important;
 }
 
 .role-layout .navbar-hamburger:hover {
@@ -84,8 +106,7 @@
 .navbar-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(12, 18, 12, 0.65);
-  backdrop-filter: blur(4px);
+  background: rgba(12, 18, 12, 0.75);
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.3s ease, visibility 0.3s ease;
@@ -103,7 +124,7 @@
   top: 0;
   left: 0;
   bottom: 0;
-  width: min(290px, 85vw);
+  width: min(var(--sidebar-width, 290px), 85vw);
   background: linear-gradient(180deg, #0C120C 0%, #0A0F0A 100%);
   color: #FFFFFF;
   padding: 22px 18px 24px;
@@ -352,13 +373,17 @@
 
 /* Mobile Responsiveness */
 @media (max-width: 520px) {
+  :root {
+    --header-height: 68px;
+  }
+
   .navbar-hamburger {
-    top: 12px;
-    left: 12px;
     width: 40px;
     height: 40px;
+    min-width: 40px;
+    min-height: 40px;
   }
-  
+
   .navbar-hamburger span {
     width: 18px;
   }

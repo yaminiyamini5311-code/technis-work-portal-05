@@ -71,6 +71,16 @@
 
 .role-layout.ceo-dark > * { position: relative; z-index: 1; }
 
+/* Fixed layers must stay out of the flex flow. The rule above flattens
+   `position: fixed` on the drawer, backdrop and starfield into in-flow
+   flex items (specificity 0,2,0 beats Navbar.css 0,1,0): the closed drawer
+   still reserves ~242px via flex-shrink and pushes the header + content
+   right — the "sidebar closed but space reserved" gap. These guards
+   restore overlay behavior with higher specificity (0,3,0). */
+.role-layout.ceo-dark > .navbar-backdrop { position: fixed; z-index: 80; }
+.role-layout.ceo-dark > .navbar-menu { position: fixed; z-index: 90; }
+.role-layout.ceo-dark > .ceo-stars { position: fixed; z-index: 0; }
+
 /* ── Chrome ───────────────────────────────────────────────────────────── */
 /* Frosted blur is pointless over an opaque dark canvas and costs a full
    backdrop sample on every frame, so it is dropped inside the CEO scope.
@@ -86,6 +96,29 @@
 .role-layout.ceo-dark .mission-card,
 .role-layout.ceo-dark .summary-card {
   backdrop-filter: none;
+}
+
+/* CEO Portal - hamburger with WHITE bars on dark background
+   IMPORTANT: Higher specificity than .role-layout to override light theme */
+.role-layout.ceo-dark .navbar-hamburger {
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 24px rgba(12, 18, 12, 0.12) !important;
+}
+
+.role-layout.ceo-dark .navbar-hamburger span {
+  background: #F5F8FF !important;
+  opacity: 1 !important;
+}
+
+.role-layout.ceo-dark .navbar-hamburger:hover {
+  border-color: rgba(250, 154, 2, 0.6) !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 12px 28px rgba(250, 154, 2, 0.3) !important;
+}
+
+.role-layout.ceo-dark .navbar-hamburger:hover span {
+  background: #FA9A02 !important;
 }
 
 .role-layout.ceo-dark .role-topbar {
@@ -254,15 +287,73 @@
   color: var(--ceo-text) !important;
   border: 1px solid var(--ceo-border) !important;
   border-radius: 10px !important;
+  /* Dark native widgets (select arrows, date pickers, spinners) and dark
+     form-control rendering. Beats theme.css `.role-layout input`
+     color-scheme:light on specificity (0,2,1 vs 0,1,1). */
+  color-scheme: dark;
 }
+/* Placeholder token: --ceo-text-mute (#6b7691) measured ~4.1:1 on the
+   input surface — below AA. This lighter mute clears 4.5:1 (≈7:1). */
+.role-layout.ceo-dark { --ceo-placeholder: #9aa6c2; }
 .role-layout.ceo-dark input::placeholder,
-.role-layout.ceo-dark textarea::placeholder { color: var(--ceo-text-mute) !important; }
+.role-layout.ceo-dark textarea::placeholder { color: var(--ceo-placeholder) !important; opacity: 1; }
+/* Empty date fields render `mm/dd/yyyy` via -webkit-datetime-edit: keep
+   it at placeholder contrast, filled dates at full text contrast. */
+.role-layout.ceo-dark input[type="date"] { color: var(--ceo-text) !important; }
+.role-layout.ceo-dark input[type="date"]::-webkit-datetime-edit { color: inherit; }
+.role-layout.ceo-dark input[type="date"]:invalid::-webkit-datetime-edit { color: var(--ceo-placeholder); }
+.role-layout.ceo-dark input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.75; cursor: pointer; }
 .role-layout.ceo-dark input:focus,
 .role-layout.ceo-dark textarea:focus,
 .role-layout.ceo-dark select:focus {
   border-color: var(--ceo-violet) !important;
   box-shadow: 0 0 0 3px rgba(124, 108, 255, 0.16) !important;
   outline: none;
+}
+
+/* Native dropdown options + date-picker indicators follow the dark
+   surface. Without this, option text renders dark-on-dark or
+   white-on-white depending on the OS widget. */
+.role-layout.ceo-dark select option {
+  background: var(--ceo-void-2) !important;
+  color: var(--ceo-text) !important;
+}
+.role-layout.ceo-dark select,
+.role-layout.ceo-dark input[type="date"] {
+  color-scheme: dark;
+}
+
+/* Submissions pages: search / filter / sort controls inside .chart-tabs
+   and .chart-head share the dark input treatment. */
+.role-layout.ceo-dark .chart-tabs input,
+.role-layout.ceo-dark .chart-tabs select,
+.role-layout.ceo-dark .chart-head input,
+.role-layout.ceo-dark .chart-head select {
+  background: rgba(255, 255, 255, 0.045) !important;
+  color: var(--ceo-text) !important;
+  border: 1px solid var(--ceo-border) !important;
+}
+.role-layout.ceo-dark .chart-tabs input::placeholder,
+.role-layout.ceo-dark .chart-head input::placeholder {
+  color: var(--ceo-placeholder, #9aa6c2) !important;
+  opacity: 1;
+}
+
+/* Submission rows are buttons/divs (not table cells), so the table
+   overrides above do not reach their text. Keep every text node light. */
+.role-layout.ceo-dark .submission-row strong,
+.role-layout.ceo-dark .submission-row p {
+  color: var(--ceo-text) !important;
+}
+.role-layout.ceo-dark .submission-row small {
+  color: var(--ceo-text-dim) !important;
+}
+.role-layout.ceo-dark .review-modal p,
+.role-layout.ceo-dark .review-modal strong {
+  color: var(--ceo-text) !important;
+}
+.role-layout.ceo-dark .review-modal small {
+  color: var(--ceo-text-dim) !important;
 }
 
 /* ── Buttons ──────────────────────────────────────────────────────────── */
@@ -304,15 +395,66 @@
 .role-layout.ceo-dark .chart-area { fill: rgba(47, 212, 196, 0.12); }
 .role-layout.ceo-dark .chart-dot { fill: var(--ceo-teal); }
 .role-layout.ceo-dark .chart-labels { color: var(--ceo-text-mute) !important; }
+/* The pill container itself must go dark: translucent inputs over the
+   light #f3f5f8 base rendered as one merged white bar (submissions
+   filter row). */
+.role-layout.ceo-dark .chart-tabs {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid var(--ceo-border) !important;
+}
+.role-layout.ceo-dark .chart-tabs button { color: var(--ceo-text-dim) !important; }
+.role-layout.ceo-dark .chart-tabs button:hover:not(.active) {
+  background: rgba(124, 108, 255, 0.12) !important;
+  color: var(--ceo-text) !important;
+}
 .role-layout.ceo-dark .chart-tabs button.active {
   background: rgba(124, 108, 255, 0.2) !important;
   color: var(--ceo-text) !important;
   border-color: rgba(124, 108, 255, 0.45) !important;
 }
 
+/* Dashboard icon tiles: translucent tile + violet glyph (TechinsIcon
+   inherits currentColor). The old white tile + white glyph was invisible. */
+.role-layout.ceo-dark .section-icon {
+  background: rgba(124, 108, 255, 0.14) !important;
+  border: 1px solid rgba(124, 108, 255, 0.4) !important;
+  color: var(--ceo-violet) !important;
+  border-radius: 12px;
+}
+/* Shared icon + heading row so capacity and quick-actions panels align
+   identically (icon beside the heading, never stacked). */
+.role-layout.ceo-dark .icon-head,
+.icon-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.icon-head > div:last-child { min-width: 0; }
+.icon-head h3 { margin: 0 0 4px; }
+.icon-head p { margin: 0; }
+
 /* Capacity meter */
 .role-layout.ceo-dark .capacity { background: rgba(255, 255, 255, 0.07) !important; }
 .role-layout.ceo-dark .capacity i { background: linear-gradient(90deg, var(--ceo-violet), var(--ceo-teal)) !important; }
+/* "Available slots" text + count pill: light text on a violet pill. The
+   old dark-on-dark pill was invisible. */
+.role-layout.ceo-dark .capacity-meta { color: var(--ceo-text-dim) !important; }
+.role-layout.ceo-dark .capacity-meta span { color: var(--ceo-text-dim) !important; }
+.role-layout.ceo-dark .capacity-meta strong {
+  background: rgba(124, 108, 255, 0.2) !important;
+  color: var(--ceo-text) !important;
+  border: 1px solid rgba(124, 108, 255, 0.45) !important;
+  border-radius: 20px;
+  padding: 3px 12px;
+  font-size: 12px;
+}
+/* Quick-action links: lift off the card with a stronger border. The old
+   near-black fill was indistinguishable from the card. */
+.role-layout.ceo-dark .quick-actions a {
+  background: rgba(124, 108, 255, 0.1) !important;
+  border-color: rgba(124, 108, 255, 0.35) !important;
+}
 
 /* ── Motion ───────────────────────────────────────────────────────────── */
 /* NOTE: entrance animation was moved out of this file. `.page-enter`,
@@ -344,6 +486,21 @@
   border: 1px solid var(--ceo-border) !important;
   color: var(--ceo-text-dim) !important;
 }
+
+/* Loading / error states render directly on the dark canvas (not on a
+   panel): light heading, readable message, visible retry. The base
+   `.portal-loading p` uses a light-theme token and was nearly invisible. */
+.role-layout.ceo-dark .portal-loading h2,
+.role-layout.ceo-dark .portal-error h2 {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .portal-loading p,
+.role-layout.ceo-dark .portal-error p {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .portal-loading .error-icon { color: var(--ceo-amber) !important; }
 
 .role-layout.ceo-dark .error-msg,
 .role-layout.ceo-dark .task-alert {

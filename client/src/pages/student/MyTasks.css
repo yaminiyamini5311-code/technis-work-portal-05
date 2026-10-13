@@ -66,8 +66,7 @@
 }
 
 .summary-card {
-    background: rgba(10,18,40,0.72);
-    backdrop-filter: blur(8px);
+    background: rgba(10,18,40,0.82);
     border: 1px solid rgba(250,154,2,0.25);
     border-radius: 16px;
     padding: 22px;
@@ -117,8 +116,7 @@
 }
 
 .overall-progress {
-    background: rgba(10,18,40,0.72);
-    backdrop-filter: blur(8px);
+    background: rgba(10,18,40,0.82);
     border: 1px solid rgba(250,154,2,0.25);
     border-radius: 16px;
     padding: 25px;
@@ -177,8 +175,7 @@
 
 .loading-box,
 .empty-state {
-    background: rgba(10,18,40,0.72);
-    backdrop-filter: blur(8px);
+    background: rgba(10,18,40,0.82);
     border: 1px solid rgba(250,154,2,0.25);
     border-radius: 16px;
     padding: 60px 25px;
@@ -258,8 +255,7 @@
 }
 
 .task-card {
-    background: rgba(10,18,40,0.72);
-    backdrop-filter: blur(8px);
+    background: rgba(10,18,40,0.82);
     border: 1px solid rgba(250,154,2,0.25);
     border-radius: 16px;
     padding: 24px;
@@ -535,7 +531,7 @@
 }
 
 .priority.high {
-    color: #0C120C;
+    color: #F87171;
 }
 
 .priority.medium {
@@ -543,7 +539,7 @@
 }
 
 .priority.low {
-    color: #0C120C;
+    color: #34D399;
 }
 
 .task-actions {
@@ -562,12 +558,14 @@
 }
 
 .action-complete {
-    background: #0C120C;
-    color: white;
+    background: rgba(255, 255, 255, 0.08);
+    color: #F5F8FF;
+    border: 1px solid rgba(255, 255, 255, 0.25);
 }
 
 .action-complete:hover {
-    background: #0C120C;
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 194, 77, 0.6);
 }
 
 /* ── "Start Task" button ────────────────────────────────────────────────
@@ -616,26 +614,30 @@
 }
 
 .completed-label {
-    color: #0C120C;
+    color: #F5F8FF;
     font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .feedback-box {
     margin-top: 18px;
     padding: 15px;
-    background: #F7F7F7;
+    background: rgba(255, 255, 255, 0.06);
     border-radius: 10px;
-    border-left: 4px solid #0C120C;
+    border: 1px solid rgba(250, 154, 2, 0.25);
+    border-left: 4px solid #FFA51A;
 }
 
 .feedback-box strong {
     font-size: 13px;
-    color: #FFFFFF;
+    color: #F5F8FF;
 }
 
 .feedback-box p {
     margin: 6px 0 0;
-    color: #C0C0C0;
+    color: #C7D2E8;
 }
 
 @media (max-width: 900px) {

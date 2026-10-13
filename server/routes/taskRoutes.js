@@ -152,24 +152,97 @@ router.get("/students", authenticateToken, authorizeRoles("admin", "manager", "c
   } catch (e) { res.status(500).json({ success: false, message: "Unable to fetch students" }); }
 });
 
-/* ─── GET SUBMISSIONS ───────────────────────────────────────────────────── */
+/* ─── GET SUBMISSIONS ─────────────────────────────────────────────────────
+ * One row per SUBMISSION (not per task): students write the `submissions`
+ * collection via POST /:id/submit, so this is where CEO/managers look.
+ * (The old implementation read `tasks.outcome`, which the submit path
+ * never sets, so real submissions never appeared.)
+ *
+ * Shape stays { success, submissions: [...] } and keeps every field the
+ * dashboards already consume (id, title, student_name, file_count,
+ * outcome, status, workflow_status, outcome_submitted_at), plus detail
+ * fields for the Student Submissions pages (student/task info, files[]
+ * with download_url, assignment progress, review info).
+ */
 router.get("/submissions", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
   try {
     const db = req.db;
-    const subTaskIds = await db.collection("submissions").distinct("task_id");
-    const tasks = await db.collection("tasks").find(
-      { $or: [{ _id: { $in: subTaskIds.map(id => { try { return new ObjectId(id); } catch { return id; } }) } }, { outcome: { $exists: true, $ne: null } }] },
-      { projection: { task_code: 1, title: 1, status: 1, workflow_status: 1, outcome: 1, outcome_submitted_at: 1, assigned_to: 1 } }
-    ).sort({ outcome_submitted_at: -1 }).limit(100).toArray();
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 500);
+    const filter = {};
+    if (req.query.task_id) filter.task_id = String(req.query.task_id);
+    if (req.query.student_id) filter.student_id = String(req.query.student_id);
+    if (req.query.status) filter.status = String(req.query.status);
 
-    const rows = await Promise.all(tasks.map(async t => {
-      const student = await db.collection("users").findOne({ _id: toId(t.assigned_to) }, { projection: { name: 1, email: 1 } });
-      const fileCount = await db.collection("submission_files").countDocuments({ submission_id: { $in: await db.collection("submissions").distinct("_id", { task_id: String(t._id) }).then(ids => ids.map(String)) } });
-      const subCount = await db.collection("submissions").countDocuments({ task_id: String(t._id) });
-      return { id: String(t._id), task_code: t.task_code, title: t.title, status: t.status, workflow_status: t.workflow_status, outcome: t.outcome, outcome_submitted_at: t.outcome_submitted_at, assigned_to: t.assigned_to, student_name: student?.name, student_email: student?.email, file_count: fileCount, submission_count: subCount };
+    const subs = await db.collection("submissions").find(filter).sort({ submitted_at: -1 }).limit(limit).toArray();
+
+    const rows = await Promise.all(subs.map(async s => {
+      const sid = String(s._id);
+      const [task, student, files, assignment, reviewer] = await Promise.all([
+        db.collection("tasks").findOne({ _id: toId(s.task_id) }, { projection: { task_code: 1, title: 1, description: 1, status: 1, workflow_status: 1, feedback: 1, outcome: 1, outcome_submitted_at: 1, priority: 1, due_date: 1 } }),
+        db.collection("users").findOne({ _id: toId(s.student_id) }, { projection: { name: 1, email: 1, phone: 1, program: 1, batch_id: 1, created_at: 1 } }),
+        db.collection("submission_files").find({ submission_id: sid }, { projection: { original_name: 1, size: 1, mime_type: 1, created_at: 1 } }).toArray(),
+        db.collection("task_assignments").findOne({ task_id: String(s.task_id), student_id: String(s.student_id) }, { projection: { progress: 1, status: 1 } }),
+        s.reviewer_id ? db.collection("users").findOne({ _id: toId(s.reviewer_id) }, { projection: { name: 1 } }) : null,
+      ]);
+      let batchName = null;
+      if (student?.batch_id) {
+        const batch = await db.collection("batches").findOne({ _id: toId(student.batch_id) }, { projection: { name: 1 } });
+        batchName = batch?.name || null;
+      }
+      return {
+        id: sid,
+        submission_code: s.submission_code,
+        version: s.version,
+        comment: s.comment || null,
+        status: s.status,
+        submitted_at: s.submitted_at,
+        reviewed_at: s.reviewed_at || null,
+        reviewer_name: reviewer?.name || null,
+        review_comments: s.review_comments || null,
+        task_id: String(s.task_id),
+        task_code: task?.task_code || null,
+        task_title: task?.title || null,
+        title: task?.title || null,
+        task_description: task?.description || null,
+        workflow_status: task?.workflow_status || null,
+        task_feedback: task?.feedback || null,
+        outcome: task?.outcome || null,
+        outcome_submitted_at: task?.outcome_submitted_at || s.submitted_at || null,
+        student_id: String(s.student_id),
+        student_name: student?.name || null,
+        student_email: student?.email || null,
+        student_phone: student?.phone || null,
+        student_program: student?.program || null,
+        batch_name: batchName,
+        file_count: files.length,
+        files: files.map(f => ({ id: String(f._id), name: f.original_name, size: f.size, mime: f.mime_type, download_url: `/api/tasks/files/${String(f._id)}/download` })),
+        assignment_progress: assignment?.progress ?? null,
+        assignment_status: assignment?.status ?? null,
+      };
     }));
     res.json({ success: true, submissions: rows });
   } catch (e) { console.error("GET SUBMISSIONS:", e); res.status(500).json({ success: false, message: "Unable to fetch submissions" }); }
+});
+
+/* ─── DOWNLOAD SUBMISSION FILE ──────────────────────────────────────────
+ * Streams one file from `submission_files` for admin/manager/ceo review.
+ * Files live on local disk: present in local dev; on ephemeral hosting
+ * (Vercel) older files may be gone — that returns an honest 404, and the
+ * database row is left untouched.
+ */
+router.get("/files/:fileId/download", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+    const file = await db.collection("submission_files").findOne({ _id: toId(req.params.fileId) });
+    if (!file) return res.status(404).json({ success: false, message: "File not found" });
+    const sub = await db.collection("submissions").findOne({ _id: toId(file.submission_id) });
+    if (!sub) return res.status(404).json({ success: false, message: "Submission not found" });
+    if (!file.storage_path || !fs.existsSync(file.storage_path)) {
+      return res.status(404).json({ success: false, message: "File is no longer available on the server" });
+    }
+    await writeAudit(db, { actorId: req.user.id, action: "submission_file_downloaded", entityType: "submission_file", entityId: String(file._id), newValue: { submission_id: String(sub._id) } });
+    res.download(file.storage_path, file.original_name || "submission-file");
+  } catch (e) { console.error("DOWNLOAD FILE:", e); res.status(500).json({ success: false, message: "Unable to download file" }); }
 });
 
 /* ─── GET ALL TASKS ─────────────────────────────────────────────────────── */
@@ -597,6 +670,13 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
     if (!assignment && !legacyOwner) return res.status(403).json({ success: false, message: "Access denied" });
     if (["Approved", "Cancelled", "Archived"].includes(task.workflow_status)) return res.status(409).json({ success: false, message: "This task cannot accept a submission" });
 
+    // Reject empty submissions: at least one file or a comment is required
+    // (mirrors the student UI validation so API clients get the same rule).
+    const commentText = String(req.body?.comment || "").trim();
+    if (!(req.files || []).length && !commentText) {
+      return res.status(400).json({ success: false, message: "Add at least one file or a submission comment before submitting." });
+    }
+
     const lastSub = await db.collection("submissions").find({ task_id: String(task._id) }).sort({ version: -1 }).limit(1).toArray();
     const version = (lastSub[0]?.version || 0) + 1;
     const submissionCode = await nextSubmissionCode(db);
@@ -742,8 +822,8 @@ router.get("/:id/submissions", authenticateToken, async (req, res) => {
     const submissions = await db.collection("submissions").find({ task_id: String(task._id) }).sort({ version: -1 }).toArray();
     const rows = await Promise.all(submissions.map(async s => {
       const u = s.reviewer_id ? await db.collection("users").findOne({ _id: toId(s.reviewer_id) }, { projection: { name: 1 } }) : null;
-      const fc = await db.collection("submission_files").countDocuments({ submission_id: String(s._id) });
-      return { ...s, id: String(s._id), reviewer_name: u?.name, file_count: fc };
+      const files = await db.collection("submission_files").find({ submission_id: String(s._id) }, { projection: { original_name: 1, size: 1, mime_type: 1 } }).toArray();
+      return { ...s, id: String(s._id), reviewer_name: u?.name, file_count: files.length, files: files.map(f => ({ id: String(f._id), name: f.original_name, size: f.size, mime: f.mime_type, download_url: `/api/tasks/files/${String(f._id)}/download` })) };
     }));
     res.json({ success: true, submissions: rows });
   } catch (e) { res.status(500).json({ success: false, message: "Unable to fetch submissions" }); }

@@ -70,23 +70,32 @@ export default function NotificationBell() {
 
   const role = String(user.role || "").toLowerCase();
 
-  const load = async () => {
+  const load = async (signal) => {
     try {
       const r = await fetch(`${API_URL}/api/notifications`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        signal
       });
       const d = await r.json();
       if (r.ok) {
         setUnread(d.unread || 0);
         setItems(d.notifications || []);
       }
-    } catch {}
+    } catch {
+      // Aborted on unmount/StrictMode remount, or server unreachable:
+      // the bell simply keeps its previous state. No error UI here by
+      // design — pages own their error states.
+    }
   };
 
+  // Single effect owner with abort + interval cleanup. In dev StrictMode
+  // mounts twice: the first request is aborted on cleanup, so only one
+  // response ever lands. No state deps → no loops.
   useEffect(() => {
-    load();
-    const id = setInterval(load, 20000);
-    return () => clearInterval(id);
+    const ctrl = new AbortController();
+    load(ctrl.signal);
+    const id = setInterval(() => load(ctrl.signal), 20000);
+    return () => { clearInterval(id); ctrl.abort(); };
   }, []);
 
   const markAndNavigate = async (item) => {

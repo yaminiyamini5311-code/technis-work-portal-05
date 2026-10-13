@@ -1,0 +1,123 @@
+/* =========================================================
+   TECHINS — CEO Workspace starfield (subtle, professional)
+   Single fixed layer behind everything. The existing dark navy/black
+   gradients stay untouched; these dots only add depth.
+   Specificity note: `.role-layout.ceo-dark > *` sets z-index:1 on every
+   direct child, so this rule re-asserts z-index:0 with higher specificity.
+   ========================================================= */
+.role-layout.ceo-dark .ceo-stars {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* CEO background logo: the exact login-page asset, once, centered, behind
+   all UI. ~8% opacity + soft glow keeps body text contrast intact (panels
+   are opaque dark surfaces above it). Same fixed/z-index/pointer-events
+   contract as the starfield; mounted once in RoleLayout. */
+.role-layout.ceo-dark > .ceo-logo-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ceo-logo-bg img {
+  width: min(56vmin, 500px);
+  height: auto;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 50%;
+  opacity: 0.09;
+  filter: drop-shadow(0 0 60px rgba(124, 108, 255, 0.35)) drop-shadow(0 0 140px rgba(47, 212, 196, 0.2));
+  animation: ceo-logo-breathe 12s ease-in-out infinite alternate;
+}
+
+@keyframes ceo-logo-breathe {
+  from { opacity: 0.07; transform: scale(1); }
+  to   { opacity: 0.11; transform: scale(1.025); }
+}
+
+.ceo-stars-layer {
+  position: absolute;
+  inset: -72px; /* overscan so drift never exposes an edge */
+  pointer-events: none;
+}
+
+/* Far layer: dense, tiny, dim dots (mostly white, hints of teal/violet). */
+.ceo-stars-far {
+  background-image:
+    radial-gradient(1px 1px at 18px 30px, rgba(255, 255, 255, 0.55) 50%, transparent 51%),
+    radial-gradient(1px 1px at 90px 110px, rgba(158, 197, 255, 0.5) 50%, transparent 51%),
+    radial-gradient(1px 1px at 160px 44px, rgba(255, 255, 255, 0.4) 50%, transparent 51%),
+    radial-gradient(1px 1px at 46px 190px, rgba(255, 255, 255, 0.45) 50%, transparent 51%),
+    radial-gradient(1px 1px at 210px 160px, rgba(196, 181, 253, 0.45) 50%, transparent 51%),
+    radial-gradient(1px 1px at 120px 240px, rgba(255, 255, 255, 0.35) 50%, transparent 51%),
+    radial-gradient(1px 1px at 260px 90px, rgba(153, 246, 228, 0.4) 50%, transparent 51%),
+    radial-gradient(1px 1px at 300px 220px, rgba(255, 255, 255, 0.4) 50%, transparent 51%),
+    radial-gradient(1px 1px at 66px 300px, rgba(255, 255, 255, 0.3) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 240px 300px, rgba(255, 255, 255, 0.5) 50%, transparent 51%),
+    radial-gradient(1px 1px at 330px 30px, rgba(255, 255, 255, 0.35) 50%, transparent 51%),
+    radial-gradient(1px 1px at 140px 330px, rgba(158, 197, 255, 0.35) 50%, transparent 51%),
+    radial-gradient(1px 1px at 200px 200px, rgba(255, 255, 255, 0.4) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 30px 130px, rgba(255, 255, 255, 0.5) 50%, transparent 51%),
+    radial-gradient(1px 1px at 290px 260px, rgba(196, 181, 253, 0.4) 50%, transparent 51%),
+    radial-gradient(1px 1px at 100px 60px, rgba(153, 246, 228, 0.35) 50%, transparent 51%);
+  background-size: 360px 360px;
+  opacity: 0.8;
+  animation:
+    ceo-stars-twinkle 7s ease-in-out infinite alternate,
+    ceo-stars-drift-far 140s linear infinite alternate;
+}
+
+/* Near layer: fewer, slightly larger/soft dots with a faint glow. */
+.ceo-stars-near {
+  background-image:
+    radial-gradient(1.5px 1.5px at 70px 80px, rgba(255, 255, 255, 0.85) 40%, rgba(255, 255, 255, 0.12) 60%, transparent 70%),
+    radial-gradient(1px 1px at 250px 200px, rgba(255, 255, 255, 0.7) 50%, transparent 51%),
+    radial-gradient(2px 2px at 420px 120px, rgba(158, 197, 255, 0.6) 40%, rgba(158, 197, 255, 0.1) 60%, transparent 70%),
+    radial-gradient(1px 1px at 150px 360px, rgba(255, 255, 255, 0.6) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 360px 380px, rgba(196, 181, 253, 0.55) 40%, rgba(196, 181, 253, 0.1) 60%, transparent 70%),
+    radial-gradient(1px 1px at 500px 300px, rgba(255, 255, 255, 0.5) 50%, transparent 51%),
+    radial-gradient(1px 1px at 40px 460px, rgba(153, 246, 228, 0.45) 50%, transparent 51%),
+    radial-gradient(2px 2px at 300px 60px, rgba(255, 255, 255, 0.55) 40%, rgba(255, 255, 255, 0.08) 60%, transparent 70%);
+  background-size: 560px 560px;
+  opacity: 0.65;
+  animation:
+    ceo-stars-twinkle 5s ease-in-out -2.5s infinite alternate,
+    ceo-stars-drift-near 100s linear infinite alternate;
+}
+
+@keyframes ceo-stars-twinkle {
+  from { opacity: 0.45; }
+  to   { opacity: 0.9; }
+}
+
+/* Slow, smooth drift (transform-only, compositor-friendly). Amplitudes are
+   small and the layers overscan, so no edge is ever exposed. */
+@keyframes ceo-stars-drift-far {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-34px, 22px, 0); }
+}
+
+@keyframes ceo-stars-drift-near {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(26px, -30px, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ceo-stars-far,
+  .ceo-stars-near {
+    animation: none;
+    opacity: 0.6;
+  }
+  .ceo-logo-bg img {
+    animation: none;
+    opacity: 0.09;
+  }
+}

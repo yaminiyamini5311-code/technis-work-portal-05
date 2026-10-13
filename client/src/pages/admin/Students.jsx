@@ -192,21 +192,25 @@ export default function Students() {
       <div className="admin-two">
         <form className="panel" onSubmit={create} autoComplete="off">
           <h3>Add Student</h3>
-          <label>Full name
-            <input name="studentName" placeholder="Full name" required autoComplete="off" />
-          </label>
-          <label>Email
-            <input name="studentEmail" type="email" placeholder="Email" required autoComplete="off" />
-          </label>
-          <label>Temporary password
-            <input name="studentPassword" type="password" placeholder="Temporary password" required autoComplete="new-password" />
-          </label>
-          <label>Batch
-            <select name="studentBatch">
+          <div className="field">
+            <label className="field-label" htmlFor="studentName">Full name</label>
+            <input id="studentName" name="studentName" placeholder="Full name" required autoComplete="off" />
+          </div>
+          <div className="field">
+            <label className="field-label" htmlFor="studentEmail">Email</label>
+            <input id="studentEmail" name="studentEmail" type="email" placeholder="Email" required autoComplete="off" />
+          </div>
+          <div className="field">
+            <label className="field-label" htmlFor="studentPassword">Temporary password</label>
+            <input id="studentPassword" name="studentPassword" type="password" placeholder="Temporary password" required autoComplete="new-password" />
+          </div>
+          <div className="field">
+            <label className="field-label" htmlFor="studentBatch">Batch</label>
+            <select id="studentBatch" name="studentBatch">
               <option value="">No batch</option>
               {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
-          </label>
+          </div>
           <button className="gold-btn" type="submit" disabled={submitting || isLimitReached}>
             {submitting ? "Adding…" : "Add Student"}
           </button>
@@ -268,7 +272,7 @@ export default function Students() {
                           </span>
                         </td>
                         <td style={{ padding: "8px" }}>
-                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                          <div className="student-actions">
                             <button onClick={() => setEditTarget(s)}>Edit</button>
                             <button onClick={() => setBatchTarget(s)}>Change Batch</button>
                             {s.batch_id && <button onClick={() => removeFromBatch(s)}>Remove</button>}

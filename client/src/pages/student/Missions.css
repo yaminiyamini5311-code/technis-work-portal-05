@@ -59,8 +59,7 @@
 }
 
 .mission-card {
-    background: rgba(10,18,40,0.72);
-    backdrop-filter: blur(8px);
+    background: rgba(10,18,40,0.82);
     border: 1px solid rgba(250,154,2,0.25);
     border-radius: 18px;
     padding: 24px;
@@ -208,8 +207,7 @@
 }
 
 .empty-missions {
-    background: rgba(10,18,40,0.72);
-    backdrop-filter: blur(8px);
+    background: rgba(10,18,40,0.82);
     border: 1px solid rgba(250,154,2,0.25);
     border-radius: 18px;
     padding: 60px 25px;
@@ -233,8 +231,7 @@
 }
 
 .mission-loading {
-    background: rgba(10,18,40,0.72);
-    backdrop-filter: blur(8px);
+    background: rgba(10,18,40,0.82);
     border: 1px solid rgba(250,154,2,0.25);
     border-radius: 18px;
     padding: 60px;

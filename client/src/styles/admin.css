@@ -48,8 +48,7 @@
 }
 
 .panel {
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.95);
   border: 1px solid #D9D9D9;
   border-radius: 17px;
   padding: 24px;
@@ -109,6 +108,38 @@
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
+}
+
+/* Shared form-field unit: label always above control so grid rows align.
+   Replaces the one-off inline label styles (same visuals). Every field in
+   a .form-grid-admin form — and modal forms — should use one of these. */
+.field,
+.form-grid-admin .field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field-label,
+.form-grid-admin .field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #5F625F;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.field-label .req,
+.form-grid-admin .field-label .req {
+  color: #FA9A02;
+}
+
+.field-hint,
+.form-grid-admin .field-hint {
+  font-size: 10px;
+  color: #5F625F;
+  margin-top: 2px;
 }
 
 .form-grid-admin input,
@@ -394,8 +425,7 @@
 .review-modal {
   position: fixed;
   inset: 0;
-  background: rgba(12, 18, 12, 0.65);
-  backdrop-filter: blur(4px);
+  background: rgba(12, 18, 12, 0.75);
   display: grid;
   place-items: center;
   z-index: 100;
@@ -602,4 +632,281 @@
   .admin-two {
     gap: 12px;
   }
+}
+
+/* Students table row actions: compact 2-column grid keeps every action
+   (Edit / Change Batch / Remove / Deactivate) without the tall stacked
+   column. Buttons stay single-line. */
+.student-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(max-content, 1fr));
+  gap: 6px;
+  min-width: 170px;
+}
+
+.student-actions button {
+  white-space: nowrap;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+@media (max-width: 600px) {
+  .student-actions {
+    grid-template-columns: 1fr;
+    min-width: 0;
+  }
+}
+
+.role-layout.ceo-dark .student-actions button {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--ceo-border) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .student-actions button:hover:not(:disabled) {
+  border-color: rgba(124, 108, 255, 0.5) !important;
+  background: rgba(124, 108, 255, 0.14) !important;
+}
+
+/* ── CEO Dark Theme Overrides ─────────────────────────────────────────── */
+.role-layout.ceo-dark .simple-head span {
+  color: var(--ceo-violet) !important;
+}
+
+.role-layout.ceo-dark .simple-head h2 {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .simple-head p {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .panel {
+  background: var(--ceo-surface) !important;
+  border-color: var(--ceo-border) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.46) !important;
+  backdrop-filter: none !important;
+}
+
+.role-layout.ceo-dark .panel h3 {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .panel p {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .panel-head h3 {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .panel-head button {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--ceo-border) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .panel-head button:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: var(--ceo-violet) !important;
+  color: var(--ceo-violet) !important;
+}
+
+.role-layout.ceo-dark .form-grid-admin input,
+.role-layout.ceo-dark .form-grid-admin textarea,
+.role-layout.ceo-dark .form-grid-admin select,
+.role-layout.ceo-dark .admin-two form input,
+.role-layout.ceo-dark .admin-two form select {
+  background: rgba(255, 255, 255, 0.045) !important;
+  color: var(--ceo-text) !important;
+  border-color: var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark .form-grid-admin input::placeholder,
+.role-layout.ceo-dark .form-grid-admin textarea::placeholder,
+.role-layout.ceo-dark .admin-two form input::placeholder {
+  color: var(--ceo-placeholder, #9aa6c2) !important;
+  opacity: 1;
+}
+
+.role-layout.ceo-dark .form-grid-admin input:focus,
+.role-layout.ceo-dark .form-grid-admin textarea:focus,
+.role-layout.ceo-dark .form-grid-admin select:focus,
+.role-layout.ceo-dark .admin-two form input:focus,
+.role-layout.ceo-dark .admin-two form select:focus {
+  border-color: var(--ceo-violet) !important;
+  box-shadow: 0 0 0 3px rgba(124, 108, 255, 0.16) !important;
+}
+
+.role-layout.ceo-dark .field-label,
+.role-layout.ceo-dark .form-grid-admin .field-label {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .field-label .req,
+.role-layout.ceo-dark .form-grid-admin .field-label .req {
+  color: var(--ceo-amber) !important;
+}
+
+.role-layout.ceo-dark .field-hint,
+.role-layout.ceo-dark .form-grid-admin .field-hint {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .form-grid-admin select option {
+  background: var(--ceo-void-2) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .gold-btn {
+  background: linear-gradient(135deg, var(--ceo-violet), #5b4bdb) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+}
+
+.role-layout.ceo-dark .gold-btn:hover {
+  background: linear-gradient(135deg, #8b7bfa, #6b5bf0) !important;
+  box-shadow: 0 8px 20px rgba(124, 108, 255, 0.3) !important;
+}
+
+.role-layout.ceo-dark .success-msg {
+  background: rgba(53, 208, 127, 0.12) !important;
+  border-color: rgba(53, 208, 127, 0.34) !important;
+  color: #d6ffe9 !important;
+}
+
+.role-layout.ceo-dark .info-msg {
+  background: rgba(124, 108, 255, 0.12) !important;
+  border-color: rgba(124, 108, 255, 0.34) !important;
+  color: #c4b5fd !important;
+}
+
+.role-layout.ceo-dark .error-msg {
+  background: rgba(242, 85, 122, 0.12) !important;
+  border-color: rgba(242, 85, 122, 0.36) !important;
+  color: #ffd9e2 !important;
+}
+
+.role-layout.ceo-dark .list-row > div:nth-child(2) strong {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .list-row small {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .avatar {
+  background: linear-gradient(135deg, rgba(124, 108, 255, 0.4), rgba(47, 212, 196, 0.3)) !important;
+  color: var(--ceo-text) !important;
+  border-color: var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark .empty-state {
+  background: rgba(255, 255, 255, 0.025) !important;
+  border-color: var(--ceo-border) !important;
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .table-wrap th {
+  color: var(--ceo-text-mute) !important;
+  background: rgba(255, 255, 255, 0.035) !important;
+}
+
+.role-layout.ceo-dark .table-wrap td {
+  color: var(--ceo-text) !important;
+  border-color: var(--ceo-border) !important;
+}
+
+.role-layout.ceo-dark .table-wrap td small {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .perf-line {
+  border-color: var(--ceo-border) !important;
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .perf-score {
+  border-color: var(--ceo-border) !important;
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .admin-progress {
+  background: rgba(255, 255, 255, 0.07) !important;
+}
+
+.role-layout.ceo-dark .admin-progress i {
+  background: linear-gradient(90deg, var(--ceo-violet), var(--ceo-teal)) !important;
+}
+
+.role-layout.ceo-dark .search-input {
+  background: rgba(255, 255, 255, 0.045) !important;
+  border-color: var(--ceo-border) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .search-input::placeholder {
+  color: var(--ceo-placeholder, #9aa6c2) !important;
+  opacity: 1;
+}
+
+.role-layout.ceo-dark .submission-actions button {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--ceo-border) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .submission-actions button:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: var(--ceo-violet) !important;
+  color: var(--ceo-violet) !important;
+}
+
+.role-layout.ceo-dark .submission-actions .file-chip {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .section-kicker {
+  color: var(--ceo-violet) !important;
+}
+
+.role-layout.ceo-dark .outcome-preview {
+  color: var(--ceo-amber) !important;
+}
+
+.role-layout.ceo-dark .review-modal {
+  background: rgba(5, 7, 13, 0.85) !important;
+}
+
+.role-layout.ceo-dark .submission-manager {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+.role-layout.ceo-dark .submission-manager strong {
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .submission-manager small {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .submission-manager p {
+  color: var(--ceo-text-dim) !important;
+}
+
+.role-layout.ceo-dark .pill.completed {
+  background: rgba(53, 208, 127, 0.16) !important;
+  color: var(--ceo-green) !important;
+}
+
+.role-layout.ceo-dark .quick-actions button:not(.gold-btn) {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--ceo-border) !important;
+  color: var(--ceo-text) !important;
+}
+
+.role-layout.ceo-dark .quick-actions button:not(.gold-btn):hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: var(--ceo-violet) !important;
+  color: var(--ceo-violet) !important;
 }

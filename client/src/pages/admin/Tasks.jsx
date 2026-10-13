@@ -5,6 +5,31 @@ import "../../styles/admin.css";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 
+/* Fetch-with-auth download: a plain anchor cannot send the Authorization
+   header, so files are fetched as blobs and saved via object URL. */
+async function downloadSubmissionFile(file, onError) {
+  try {
+    const res = await fetch(`${API_URL}${file.download_url}`, { headers: auth() });
+    if (!res.ok) {
+      let msg = "Unable to download file";
+      try { msg = (await res.json()).message || msg; } catch {}
+      onError(msg);
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = file.name || "submission-file";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch {
+    onError("Unable to download file. Check your connection.");
+  }
+}
+
 // REMOVED: PROGRAMS array now loaded from batches collection (same source as signup dropdown)
 
 const DOMAINS = [
@@ -221,19 +246,22 @@ export default function Tasks() {
       {message && <div className="success-msg">{message}</div>}
       
       <form className="panel form-grid-admin" onSubmit={create} autoComplete="off">
-        <input 
-          id="task-title"
-          name="task-title"
-          placeholder="Task title" 
-          value={form.title} 
-          onChange={e => setForm({ ...form, title: e.target.value })} 
-          required 
-          autoComplete="off"
-        />
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label htmlFor="task-target-type" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Assign To <span style={{ color: '#FA9A02' }}>*</span>
+        <div className="field">
+          <label className="field-label" htmlFor="task-title">Task title <span className="req">*</span></label>
+          <input
+            id="task-title"
+            name="task-title"
+            placeholder="Task title"
+            value={form.title}
+            onChange={e => setForm({ ...form, title: e.target.value })}
+            required
+            autoComplete="off"
+          />
+        </div>
+
+        <div className="field">
+          <label className="field-label" htmlFor="task-target-type">
+            Assign To <span className="req">*</span>
           </label>
           <select
             id="task-target-type"
@@ -248,8 +276,8 @@ export default function Tasks() {
           </select>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label htmlFor="task-student" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div className="field">
+          <label className="field-label" htmlFor="task-student">
             Select Student
           </label>
           <select
@@ -259,7 +287,7 @@ export default function Tasks() {
             onChange={e => setStudent(e.target.value)}
             disabled={isStudentDisabled || targetType !== "student"}
             autoComplete="off"
-            style={isStudentDisabled || targetType !== "student" ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#F3F4F6' } : {}}
+            style={isStudentDisabled || targetType !== "student" ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
             title={isStudentDisabled ? "Disabled because a program is selected" : targetType !== "student" ? "Select 'Individual Student' above" : ""}
             aria-disabled={isStudentDisabled || targetType !== "student"}
           >
@@ -269,12 +297,12 @@ export default function Tasks() {
             ))}
           </select>
           {targetType !== "student" && (
-            <small style={{ fontSize: '10px', color: 'var(--text-muted-on-light)', marginTop: '2px' }}>Choose “Individual Student” to pick a student</small>
+            <small className="field-hint">Choose “Individual Student” to pick a student</small>
           )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label htmlFor="task-batch" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div className="field">
+          <label className="field-label" htmlFor="task-batch">
             Select Batch
           </label>
           <select
@@ -284,7 +312,7 @@ export default function Tasks() {
             onChange={e => setBatchId(e.target.value)}
             disabled={batchesLoading || targetType !== "batch"}
             autoComplete="off"
-            style={batchesLoading || targetType !== "batch" ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#F3F4F6' } : {}}
+            style={batchesLoading || targetType !== "batch" ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
             title={targetType !== "batch" ? "Select 'Entire Batch' above" : ""}
             aria-disabled={batchesLoading || targetType !== "batch"}
           >
@@ -293,28 +321,31 @@ export default function Tasks() {
               <option key={b.id} value={b.id}>{b.name}</option>
             ))}
           </select>
-          {batchesError && <small style={{ fontSize: '10px', color: '#B42318', marginTop: '2px' }}>{batchesError}</small>}
+          {batchesError && <small className="field-hint" style={{ color: '#B42318' }}>{batchesError}</small>}
           {targetType === "batch" && !batchesLoading && !batchesError && batches.length === 0 && (
-            <small style={{ fontSize: '10px', color: '#B42318', marginTop: '2px' }}>No batches available</small>
+            <small className="field-hint" style={{ color: '#B42318' }}>No batches available</small>
           )}
         </div>
-        
-        <select
-          id="task-priority"
-          name="task-priority"
-          value={form.priority}
-          onChange={e => setForm({ ...form, priority: e.target.value })}
-          autoComplete="off"
-        >
-          <option>low</option>
-          <option>medium</option>
-          <option>high</option>
-          <option>critical</option>
-        </select>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label htmlFor="task-domain" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Domain <span style={{ color: '#FA9A02' }}>*</span>
+        <div className="field">
+          <label className="field-label" htmlFor="task-priority">Priority</label>
+          <select
+            id="task-priority"
+            name="task-priority"
+            value={form.priority}
+            onChange={e => setForm({ ...form, priority: e.target.value })}
+            autoComplete="off"
+          >
+            <option>low</option>
+            <option>medium</option>
+            <option>high</option>
+            <option>critical</option>
+          </select>
+        </div>
+
+        <div className="field">
+          <label className="field-label" htmlFor="task-domain">
+            Domain <span className="req">*</span>
           </label>
           <select
             id="task-domain"
@@ -329,67 +360,79 @@ export default function Tasks() {
             ))}
           </select>
         </div>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label htmlFor="task-start-date" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Starting Date</label>
-          <input 
+
+        <div className="field">
+          <label className="field-label" htmlFor="task-start-date">Starting Date</label>
+          <input
             id="task-start-date"
             name="task-start-date"
-            type="date" 
-            value={form.start_date} 
-            onChange={e => setForm({ ...form, start_date: e.target.value })} 
+            type="date"
+            value={form.start_date}
+            onChange={e => setForm({ ...form, start_date: e.target.value })}
             autoComplete="off"
           />
         </div>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label htmlFor="task-due-date" style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted-on-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Ending Date</label>
-          <input 
+
+        <div className="field">
+          <label className="field-label" htmlFor="task-due-date">Ending Date</label>
+          <input
             id="task-due-date"
             name="task-due-date"
-            type="date" 
-            value={form.due_date} 
-            onChange={e => setForm({ ...form, due_date: e.target.value })} 
+            type="date"
+            value={form.due_date}
+            onChange={e => setForm({ ...form, due_date: e.target.value })}
             autoComplete="off"
           />
         </div>
-        
-        <textarea 
-          id="task-description"
-          name="task-description"
-          placeholder="Description" 
-          value={form.description} 
-          onChange={e => setForm({ ...form, description: e.target.value })} 
-          autoComplete="off"
-        />
-        
-        <textarea 
-          id="task-how-to-do"
-          name="task-how-to-do"
-          placeholder="How to Do" 
-          value={form.how_to_do} 
-          onChange={e => setForm({ ...form, how_to_do: e.target.value })} 
-          autoComplete="off"
-        />
-        
-        <textarea 
-          id="task-expected-output"
-          name="task-expected-output"
-          placeholder="Expected output" 
-          value={form.expected_output} 
-          onChange={e => setForm({ ...form, expected_output: e.target.value })} 
-          autoComplete="off"
-        />
-        
-        <textarea 
-          id="task-submission-requirements"
-          name="task-submission-requirements"
-          placeholder="Submission requirements" 
-          value={form.submission_requirements} 
-          onChange={e => setForm({ ...form, submission_requirements: e.target.value })} 
-          autoComplete="off"
-        />
-        
+
+        <div className="field">
+          <label className="field-label" htmlFor="task-description">Description</label>
+          <textarea
+            id="task-description"
+            name="task-description"
+            placeholder="Description"
+            value={form.description}
+            onChange={e => setForm({ ...form, description: e.target.value })}
+            autoComplete="off"
+          />
+        </div>
+
+        <div className="field">
+          <label className="field-label" htmlFor="task-how-to-do">How to Do</label>
+          <textarea
+            id="task-how-to-do"
+            name="task-how-to-do"
+            placeholder="How to Do"
+            value={form.how_to_do}
+            onChange={e => setForm({ ...form, how_to_do: e.target.value })}
+            autoComplete="off"
+          />
+        </div>
+
+        <div className="field">
+          <label className="field-label" htmlFor="task-expected-output">Expected Output</label>
+          <textarea
+            id="task-expected-output"
+            name="task-expected-output"
+            placeholder="Expected output"
+            value={form.expected_output}
+            onChange={e => setForm({ ...form, expected_output: e.target.value })}
+            autoComplete="off"
+          />
+        </div>
+
+        <div className="field">
+          <label className="field-label" htmlFor="task-submission-requirements">Submission Requirements</label>
+          <textarea
+            id="task-submission-requirements"
+            name="task-submission-requirements"
+            placeholder="Submission requirements"
+            value={form.submission_requirements}
+            onChange={e => setForm({ ...form, submission_requirements: e.target.value })}
+            autoComplete="off"
+          />
+        </div>
+
         <button className="gold-btn" type="submit" disabled={submitting}>
           {submitting ? "Assigning…" : "Assign Task"}
         </button>
@@ -552,13 +595,22 @@ export default function Tasks() {
                       {submissions[0].submission_code} · {new Date(submissions[0].submitted_at).toLocaleString()}
                     </small>
                     <p>{submissions[0].comment || "No submission comment."}</p>
+                    {(submissions[0].files || []).length ? (
+                      <div className="quick-actions">
+                        {submissions[0].files.map(f => (
+                          <button key={f.id} onClick={() => downloadSubmissionFile(f, setError)}>
+                            {f.name}{f.size ? ` (${f.size < 1024 ? `${f.size} B` : `${(f.size / 1024).toFixed(1)} KB`})` : ""}
+                          </button>
+                        ))}
+                      </div>
+                    ) : <small>No files attached to this version.</small>}
                   </div>
                   <span className="pill completed">{submissions[0].status}</span>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '20px' }}>
-                  <label htmlFor="review-comment" style={{ fontSize: '12px', fontWeight: '600', color: '#5F625F', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Review comments <span style={{ color: '#FA9A02' }}>*</span>
+                <div className="field" style={{ marginTop: '20px' }}>
+                  <label className="field-label" htmlFor="review-comment">
+                    Review comments <span className="req">*</span>
                   </label>
                   <textarea
                     id="review-comment"
@@ -567,7 +619,7 @@ export default function Tasks() {
                     onChange={e => setReview({ ...review, comment: e.target.value })}
                     placeholder="Review comments / revision reason"
                     required
-                    style={{ minHeight: '120px', padding: '12px 14px', fontSize: '14px', color: '#0C120C', fontWeight: '600' }}
+                    style={{ minHeight: '120px', padding: '12px 14px', fontSize: '14px', fontWeight: '600' }}
                   />
                 </div>
 

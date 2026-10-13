@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { createContext, useContext, useEffect, useState } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import TechinsIcon from "./TechinsIcon";
 import "./Navbar.css";
 
@@ -7,10 +7,63 @@ const readStoredUser = () => {
   try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
 };
 
-export default function Navbar({ role }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const navigate = useNavigate();
+/* Single open/closed state for the nav drawer, shared by the header
+   toggle button and the drawer itself. Layouts compose:
+     <NavProvider><Navbar role={r}/><main>…<header><NavbarToggle/>…</header></main></NavProvider>
+   so the hamburger sits in-flow inside the header (no floating button,
+   no reserved gap) while open/close behavior stays in one place. */
+const NavContext = createContext({ menuOpen: false, setMenuOpen: () => {} });
 
+export function NavProvider({ children }) {
+  // Closed by default: only the header toggle is visible on load.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { pathname } = useLocation();
+
+  // Close the drawer on route change (covers back/forward navigation,
+  // where no NavLink onClick fires).
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
+
+  // Escape closes the drawer; body scroll locks while it is open so the
+  // overlay never traps the page underneath on mobile/tablet.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e) => { if (e.key === "Escape") setMenuOpen(false); };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [menuOpen]);
+
+  return <NavContext.Provider value={{ menuOpen, setMenuOpen }}>{children}</NavContext.Provider>;
+}
+
+/* In-header hamburger — the only drawer opener. Rendered in-flow as the
+   first header item so it occupies a predictable spot and never overlaps
+   content. White bars come from Navbar.css per-portal overrides. */
+export function NavbarToggle({ className = "" }) {
+  const { menuOpen, setMenuOpen } = useContext(NavContext);
+  return (
+    <button
+      className={`navbar-hamburger ${className}`.trim()}
+      type="button"
+      aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
+      aria-expanded={menuOpen}
+      aria-controls="techins-nav-menu"
+      onClick={() => setMenuOpen((v) => !v)}
+    >
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+  );
+}
+
+export default function Navbar({ role }) {
+  const { menuOpen, setMenuOpen } = useContext(NavContext);
+  const navigate = useNavigate();
   // Held in state (not read inline) so a profile save can refresh the
   // displayed name immediately instead of on the next full reload.
   const [user, setUser] = useState(readStoredUser);
@@ -40,6 +93,7 @@ export default function Navbar({ role }) {
           { path: "/admin", icon: "home", label: "Dashboard", end: true },
           { path: "/admin/students", icon: "user", label: "Students" },
           { path: "/admin/tasks", icon: "clipboard", label: "Tasks" },
+          { path: "/admin/submissions", icon: "upload", label: "Submissions" },
           { path: "/admin/missions", icon: "target", label: "Missions" },
           { path: "/admin/daily-activities", icon: "notepad", label: "Daily Activity" },
           { path: "/admin/performance", icon: "gauge", label: "Performance" },
@@ -52,6 +106,7 @@ export default function Navbar({ role }) {
           { path: "/manager/monitor", icon: "grid", label: "Activity Monitor" },
           { path: "/manager/students", icon: "user", label: "Students" },
           { path: "/manager/tasks", icon: "clipboard", label: "Tasks" },
+          { path: "/manager/submissions", icon: "upload", label: "Submissions" },
           { path: "/manager/missions", icon: "target", label: "Missions" },
           { path: "/manager/daily-activities", icon: "notepad", label: "Daily Activity" },
           { path: "/manager/performance", icon: "gauge", label: "Performance" },
@@ -77,27 +132,17 @@ export default function Navbar({ role }) {
 
   return (
     <>
-      {/* Hamburger Button */}
-      <button
-        className="navbar-hamburger"
-        type="button"
-        aria-label="Open navigation menu"
-        aria-expanded={menuOpen}
-        onClick={() => setMenuOpen(true)}
-      >
-        <span></span>
-        <span></span>
-        <span></span>
-      </button>
-
-      {/* Backdrop */}
+      {/* Backdrop — outside click closes on mobile/tablet/desktop */}
       <div
         className={`navbar-backdrop ${menuOpen ? "show" : ""}`}
         onClick={() => setMenuOpen(false)}
+        aria-hidden={!menuOpen}
       />
 
-      {/* Navigation Menu */}
-      <nav className={`navbar-menu ${menuOpen ? "open" : ""}`}>
+      {/* Navigation Menu — overlay drawer; page content keeps full width
+          underneath (see RoleLayout/StudentLayout margin-left:0) so the
+          drawer never covers content unexpectedly without the backdrop. */}
+      <nav id="techins-nav-menu" className={`navbar-menu ${menuOpen ? "open" : ""}`} aria-hidden={!menuOpen}>
         {/* Close Button */}
         <button
           className="navbar-close"
