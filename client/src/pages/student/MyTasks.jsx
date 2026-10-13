@@ -40,9 +40,31 @@ export default function MyTasks() {
       setLoading(true);
       const { data } = await axios.get(`${API_URL}/api/tasks/my`, { headers: auth() });
       const next = data.tasks || [];
-      const approved = next.filter((task) => task.workflow_status === "Approved" || task.status === "completed").length;
+      
+      // Fetch per-student submission status for each task
+      const tasksWithSubmissionStatus = await Promise.all(
+        next.map(async (task) => {
+          try {
+            const { data: subData } = await axios.get(
+              `${API_URL}/api/tasks/${task.id}/my-submission-status`,
+              { headers: auth() }
+            );
+            return {
+              ...task,
+              has_submission: subData.has_submission || false,
+              student_workflow_status: subData.workflow_status || null,
+              latest_submission: subData.latest_submission || null
+            };
+          } catch (err) {
+            // If endpoint fails, fall back to task data
+            return task;
+          }
+        })
+      );
+      
+      const approved = tasksWithSubmissionStatus.filter((task) => task.workflow_status === "Approved" || task.status === "completed").length;
       previousApproved.current = approved;
-      setTasks(next);
+      setTasks(tasksWithSubmissionStatus);
       setError("");
     } catch (err) {
       setError(err.response?.data?.message || "Unable to load your tasks.");
@@ -172,7 +194,16 @@ export default function MyTasks() {
         <div className="tasks-list">
           {tasks.length ? tasks.filter(t => !domainFilter || t.domain === domainFilter).map((task) => {
             const workflow = task.workflow_status || (task.status === "completed" ? "Approved" : task.status === "in_progress" ? "In Progress" : "Assigned");
-            const canSubmit = ["In Progress", "Revision Required", "Acknowledged", "Assigned"].includes(workflow);
+            
+            // Check if this specific student has submitted - use per-student submission status
+            const hasStudentSubmission = task.has_submission === true;
+            const studentStatus = task.student_workflow_status || workflow;
+            
+            // Student can submit if they haven't submitted yet AND the task allows submission
+            const canSubmit = !hasStudentSubmission && ["In Progress", "Revision Required", "Acknowledged", "Assigned"].includes(workflow);
+            
+            // Show "awaiting review" only if this student actually submitted
+            const showAwaitingReview = hasStudentSubmission && ["Submitted", "Under Review", "Resubmitted"].includes(studentStatus);
             
             // Check if task is overdue
             const isOverdue = task.due_date && new Date(task.due_date) < new Date() && workflow !== "Approved";
@@ -207,10 +238,10 @@ export default function MyTasks() {
                 </div>
                 <div className="task-actions">
                   {(workflow === "Assigned" || task.status === "pending") && <button className="action-progress" disabled={busy === task.id} onClick={() => startTask(task.id)}>{busy === task.id ? "Updating…" : "Start Task"}</button>}
-                  {workflow === "Under Review" || workflow === "Submitted" || workflow === "Resubmitted" ? <div className="completed-label">Submission received · awaiting review</div> : null}
+                  {showAwaitingReview ? <div className="completed-label">Submission received · awaiting review</div> : null}
                   {workflow === "Approved" && <div className="completed-label"><TechinsIcon name="check" size={16} variant="light" /> Task approved and recorded</div>}
                 </div>
-                {task.workflow_status === "Revision Required" && <div className="feedback-box"><strong>Revision requested</strong><p>{task.feedback || "Review the manager feedback and submit a new version."}</p></div>}
+                {task.workflow_status === "Revision Required" && hasStudentSubmission && <div className="feedback-box"><strong>Revision requested</strong><p>{task.feedback || "Review the manager feedback and submit a new version."}</p></div>}
                 {canSubmit && <div className="upload-box">
                   <div><strong>{workflow === "Revision Required" ? "Submit revised work" : "Submit task work"}</strong><small>PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, ZIP, PNG, JPG · max 10 MB each</small></div>
                   <textarea value={comments[task.id] || ""} onChange={(e) => setComments((value) => ({ ...value, [task.id]: e.target.value }))} placeholder="Submission comment / outcome (optional if files are selected)" />

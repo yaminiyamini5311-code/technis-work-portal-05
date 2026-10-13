@@ -645,6 +645,17 @@
   box-shadow: 0 4px 16px rgba(124, 108, 255, 0.4) !important;
 }
 
+.role-layout.ceo-dark .chart-tabs button.export-excel-btn {
+  background: linear-gradient(135deg, var(--ceo-green), #059669) !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+.role-layout.ceo-dark .chart-tabs button.export-excel-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669, #047857) !important;
+  box-shadow: 0 4px 16px rgba(53, 208, 127, 0.4) !important;
+}
+
 .role-layout.ceo-dark .simple-head h2 {
   color: var(--ceo-text) !important;
 }

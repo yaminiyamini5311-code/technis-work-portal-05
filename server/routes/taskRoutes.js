@@ -225,9 +225,168 @@ router.get("/submissions", authenticateToken, authorizeRoles("admin", "manager",
   } catch (e) { console.error("GET SUBMISSIONS:", e); res.status(500).json({ success: false, message: "Unable to fetch submissions" }); }
 });
 
+/* ─── EXPORT SUBMISSIONS TO EXCEL ──────────────────────────────────────────
+ * Export student submissions as Excel workbook (.xlsx).
+ * Supports filters: batch, status, task_id, student_id.
+ * Returns all matching records without pagination limit.
+ */
+router.get("/submissions/export", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
+  try {
+    const XLSX = require('xlsx');
+    const db = req.db;
+    
+    // Build filter from query params
+    const filter = {};
+    if (req.query.task_id) filter.task_id = String(req.query.task_id);
+    if (req.query.student_id) filter.student_id = String(req.query.student_id);
+    if (req.query.status) filter.status = String(req.query.status);
+    if (req.query.batch_name) {
+      // Need to find batch ID from name
+      const batch = await db.collection("batches").findOne({ name: String(req.query.batch_name) }, { projection: { _id: 1 } });
+      if (batch) {
+        // Filter students by batch, then submissions by those students
+        const batchStudents = await db.collection("users").find(
+          { batch_id: String(batch._id) },
+          { projection: { _id: 1 } }
+        ).toArray();
+        const studentIds = batchStudents.map(s => String(s._id));
+        if (studentIds.length > 0) {
+          filter.student_id = { $in: studentIds };
+        } else {
+          // No students in this batch, return empty
+          return res.json({ success: true, submissions: [] });
+        }
+      }
+    }
+    
+    // Fetch all matching submissions without limit
+    const subs = await db.collection("submissions").find(filter).sort({ submitted_at: -1 }).toArray();
+    
+    if (subs.length === 0) {
+      return res.status(404).json({ success: false, message: "No submissions found matching the filters" });
+    }
+    
+    // Build complete dataset with all details
+    const rows = await Promise.all(subs.map(async s => {
+      const sid = String(s._id);
+      const [task, student, files, assignment, reviewer] = await Promise.all([
+        db.collection("tasks").findOne({ _id: toId(s.task_id) }, { projection: { task_code: 1, title: 1, description: 1, status: 1, workflow_status: 1, feedback: 1, priority: 1, due_date: 1, start_date: 1, domain: 1 } }),
+        db.collection("users").findOne({ _id: toId(s.student_id) }, { projection: { name: 1, email: 1, phone: 1, program: 1, department: 1, batch_id: 1, student_id: 1 } }),
+        db.collection("submission_files").find({ submission_id: sid }, { projection: { original_name: 1, size: 1, mime_type: 1, created_at: 1 } }).toArray(),
+        db.collection("task_assignments").findOne({ task_id: String(s.task_id), student_id: String(s.student_id) }, { projection: { progress: 1, status: 1 } }),
+        s.reviewer_id ? db.collection("users").findOne({ _id: toId(s.reviewer_id) }, { projection: { name: 1 } }) : null,
+      ]);
+      
+      let batchName = null;
+      if (student?.batch_id) {
+        const batch = await db.collection("batches").findOne({ _id: toId(student.batch_id) }, { projection: { name: 1 } });
+        batchName = batch?.name || null;
+      }
+      
+      // Format file names as comma-separated list
+      const fileNames = files.map(f => f.original_name).join(', ') || 'No files';
+      
+      // Format dates
+      const formatDate = (d) => d ? new Date(d).toISOString().split('T')[0] : '';
+      const formatDateTime = (d) => d ? new Date(d).toLocaleString('en-US', { 
+        year: 'numeric', month: '2-digit', day: '2-digit', 
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false 
+      }) : '';
+      
+      return {
+        'Submission Code': s.submission_code || '',
+        'Submission Version': s.version || 1,
+        'Submission Status': s.status || '',
+        'Submission Date': formatDateTime(s.submitted_at),
+        'Student Name': student?.name || '',
+        'Student ID': student?.student_id || String(s.student_id),
+        'Student Email': student?.email || '',
+        'Student Phone': student?.phone || '',
+        'Department': student?.department || '',
+        'Program': student?.program || '',
+        'Batch': batchName || '',
+        'Task Code': task?.task_code || '',
+        'Task Title': task?.title || '',
+        'Task Description': task?.description || '',
+        'Task Domain': task?.domain || '',
+        'Task Priority': task?.priority || '',
+        'Task Start Date': formatDate(task?.start_date),
+        'Task Due Date': formatDate(task?.due_date),
+        'Task Workflow Status': task?.workflow_status || '',
+        'Student Response/Comment': s.comment || '',
+        'Uploaded Files': fileNames,
+        'File Count': files.length,
+        'Assignment Progress (%)': assignment?.progress ?? '',
+        'Assignment Status': assignment?.status || '',
+        'Reviewer Name': reviewer?.name || '',
+        'Reviewed Date': formatDateTime(s.reviewed_at),
+        'Review Comments': s.review_comments || '',
+        'Task Feedback': task?.feedback || '',
+      };
+    }));
+    
+    // Create Excel workbook
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    
+    // Set column widths for better readability
+    const columnWidths = [
+      { wch: 18 }, // Submission Code
+      { wch: 10 }, // Version
+      { wch: 15 }, // Status
+      { wch: 20 }, // Submission Date
+      { wch: 20 }, // Student Name
+      { wch: 15 }, // Student ID
+      { wch: 25 }, // Student Email
+      { wch: 15 }, // Student Phone
+      { wch: 15 }, // Department
+      { wch: 20 }, // Program
+      { wch: 15 }, // Batch
+      { wch: 15 }, // Task Code
+      { wch: 30 }, // Task Title
+      { wch: 50 }, // Task Description
+      { wch: 12 }, // Task Domain
+      { wch: 10 }, // Task Priority
+      { wch: 12 }, // Task Start Date
+      { wch: 12 }, // Task Due Date
+      { wch: 15 }, // Task Workflow Status
+      { wch: 50 }, // Student Response
+      { wch: 40 }, // Uploaded Files
+      { wch: 10 }, // File Count
+      { wch: 10 }, // Progress
+      { wch: 15 }, // Assignment Status
+      { wch: 20 }, // Reviewer Name
+      { wch: 20 }, // Reviewed Date
+      { wch: 50 }, // Review Comments
+      { wch: 50 }, // Task Feedback
+    ];
+    worksheet['!cols'] = columnWidths;
+    
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Student Submissions');
+    
+    // Generate Excel file
+    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    
+    // Generate filename with current date
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const filename = `TECHINS_Student_Submissions_${today}.xlsx`;
+    
+    // Set headers for Excel download
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', excelBuffer.length);
+    
+    res.send(excelBuffer);
+  } catch (e) {
+    console.error("EXPORT SUBMISSIONS TO EXCEL:", e);
+    res.status(500).json({ success: false, message: "Unable to export submissions to Excel" });
+  }
+});
+
 /* ─── DOWNLOAD SUBMISSION FILE ──────────────────────────────────────────
  * Streams file from MongoDB GridFS or migrates from legacy filesystem.
  * Supports both new GridFS files and old filesystem files for backward compatibility.
+
  */
 router.get("/files/:fileId/download", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
   try {
@@ -884,6 +1043,71 @@ router.patch("/:id/outcome", authenticateToken, checkStudentRegistrationStatus, 
 
     res.json({ success: true, message: "Task outcome saved" });
   } catch (e) { res.status(500).json({ success: false, message: "Unable to save outcome" }); }
+});
+
+/* ─── GET MY SUBMISSION STATUS (student) ─────────────────────────────────────
+ * Returns whether the authenticated student has submitted this specific task.
+ * Used by the frontend to determine if the Submit button should be shown.
+ */
+router.get("/:id/my-submission-status", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), async (req, res) => {
+  try {
+    const db = req.db;
+    const taskId = req.params.id;
+    
+    // Check if student has a submission for this task
+    const submission = await db.collection("submissions")
+      .findOne(
+        { task_id: String(taskId), student_id: req.user.id },
+        { projection: { _id: 1, status: 1, version: 1, submitted_at: 1, comment: 1 } }
+      );
+    
+    // Get the student's assignment record for this task
+    const { getAssignment } = require("../models/TaskAssignment");
+    const assignment = await getAssignment(db, String(taskId), req.user.id);
+    
+    // Get the task to check if it's assigned to this student via legacy assigned_to
+    const task = await db.collection("tasks").findOne(
+      { _id: toId(taskId) },
+      { projection: { assigned_to: 1, workflow_status: 1 } }
+    );
+    
+    const legacyOwner = task?.assigned_to === req.user.id;
+    
+    // Student must have either an assignment or be the legacy owner
+    if (!assignment && !legacyOwner) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+    
+    // Determine the workflow status for THIS student
+    let studentWorkflowStatus = null;
+    if (submission) {
+      // Student has submitted - use submission status
+      studentWorkflowStatus = submission.status;
+    } else if (assignment) {
+      // No submission yet - use assignment status or task status
+      if (assignment.status === "revision_required") {
+        studentWorkflowStatus = "Revision Required";
+      } else if (assignment.status === "approved") {
+        studentWorkflowStatus = "Approved";
+      }
+    }
+    
+    res.json({
+      success: true,
+      has_submission: !!submission,
+      workflow_status: studentWorkflowStatus,
+      latest_submission: submission ? {
+        id: String(submission._id),
+        version: submission.version,
+        submitted_at: submission.submitted_at,
+        status: submission.status,
+        comment: submission.comment
+      } : null
+    });
+  } catch (e) {
+    console.error("GET MY SUBMISSION STATUS:", e);
+    res.status(500).json({ success: false, message: "Unable to check submission status" });
+  }
 });
 
 /* ─── GET TASK SUBMISSIONS ──────────────────────────────────────────────── */

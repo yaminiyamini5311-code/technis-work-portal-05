@@ -292,6 +292,7 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [exporting, setExporting] = useState(false);
   
   // View state
   const [selectedSubmission, setSelectedSubmission] = useState(null);
@@ -318,6 +319,58 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
       setError(e.message || "Unable to load submissions. Check your connection.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Export to Excel
+  const exportToExcel = async () => {
+    if (exporting) return;
+    
+    try {
+      setExporting(true);
+      setError("");
+      
+      // Build query params based on active filters
+      const params = new URLSearchParams();
+      if (filterStatus !== "all") params.append("status", filterStatus);
+      if (filterBatch !== "all") params.append("batch_name", filterBatch);
+      
+      // If search query is active, we can't filter server-side, so we'll download all and mention it
+      const queryString = params.toString();
+      const url = `${API_URL}/api/tasks/submissions/export${queryString ? `?${queryString}` : ''}`;
+      
+      const res = await fetch(url, { headers: auth() });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Unable to export submissions");
+      }
+      
+      // Get the blob and trigger download
+      const blob = await res.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = res.headers.get('Content-Disposition');
+      let filename = `TECHINS_Student_Submissions_${new Date().toISOString().split('T')[0]}.xlsx`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/);
+        if (match) filename = match[1];
+      }
+      
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(downloadUrl);
+      
+      setNotice(`Excel file downloaded successfully: ${filename}`);
+    } catch (e) {
+      setError(e.message || "Unable to export submissions. Check your connection.");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -461,6 +514,18 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
             </select>
             <button onClick={load} disabled={loading}>
               {loading ? "Loading…" : "Refresh"}
+            </button>
+            <button 
+              className="export-excel-btn"
+              onClick={exportToExcel} 
+              disabled={exporting || loading}
+            >
+              {exporting ? "Exporting…" : (
+                <>
+                  <span>📊</span>
+                  <span>Export to Excel</span>
+                </>
+              )}
             </button>
           </div>
         </div>
