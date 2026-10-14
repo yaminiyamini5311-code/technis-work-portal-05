@@ -5,6 +5,8 @@ import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import ActivityCard from "../components/ActivityCard";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 function WorkHistory() {
   const [activities, setActivities] = useState([]);
 
@@ -14,7 +16,7 @@ function WorkHistory() {
         const token = localStorage.getItem("token");
 
         const response = await axios.get(
-          "http://localhost:5000/api/activities",
+          `${API_URL}/api/activities`,
           {
             headers: {
               Authorization: `Bearer ${token}`
