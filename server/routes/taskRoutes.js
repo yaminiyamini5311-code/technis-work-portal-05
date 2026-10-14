@@ -388,7 +388,131 @@ router.get("/submissions/export", authenticateToken, authorizeRoles("admin", "ma
   }
 });
 
-/* ─── DOWNLOAD SUBMISSION FILE ──────────────────────────────────────────
+/* -- EXPORT FILE RECORDS TO EXCEL (with Drive links) ----------------------
+ * One row per uploaded FILE (not per submission), including files that
+ * predate Drive storage - those get blank Drive columns and their real
+ * storage provider. A Drive link is never invented.
+ *
+ * Authorization is derived from the verified JWT only:
+ *   admin / manager / ceo -> every file record, exactly as the existing
+ *                            submissions list already exposes to them.
+ *   student                 -> only their own files.
+ * Query parameters can only NARROW that scope; none of them can widen it.
+ */
+router.get("/files/export", authenticateToken, async (req, res) => {
+  const { ObjectId } = require("mongodb");
+  const exporter = require("../utils/excelExport");
+  try {
+    const db = req.db;
+    const role = req.user.role;
+    const isReviewer = ["admin", "manager", "ceo"].includes(role);
+    const isStudent = ["student", "member"].includes(role);
+    if (!isReviewer && !isStudent) {
+      return res.status(403).json({ success: false, message: "You do not have permission to export file records" });
+    }
+
+    const match = {};
+
+    // -- Filters: every one is validated and can only narrow scope ----------
+    const userOid = req.query.user_id ? String(req.query.user_id).trim() : null;
+    if (userOid) {
+      if (!ObjectId.isValid(userOid)) {
+        return res.status(400).json({ success: false, message: "Invalid user_id" });
+      }
+      match["sub.student_id"] = userOid;
+    }
+
+    const taskOid = req.query.task_id ? String(req.query.task_id).trim() : null;
+    if (taskOid) {
+      if (!ObjectId.isValid(taskOid)) {
+        return res.status(400).json({ success: false, message: "Invalid task_id" });
+      }
+      match["sub.task_id"] = taskOid;
+    }
+
+    if (req.query.role) {
+      const wanted = String(req.query.role).toLowerCase().trim();
+      if (!["student", "member", "manager", "admin", "ceo"].includes(wanted)) {
+        return res.status(400).json({ success: false, message: "Invalid role filter" });
+      }
+      match["user.role"] = wanted;
+    }
+
+    if (req.query.from || req.query.to) {
+      const range = {};
+      const parseBoundary = (value, endOfDay) => {
+        const raw = String(value).trim();
+        const d = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+          ? new Date(raw + "T" + (endOfDay ? "23:59:59.999" : "00:00:00.000") + "Z")
+          : new Date(raw);
+        if (Number.isNaN(d.getTime())) return null;
+        return d.toISOString();
+      };
+      if (req.query.from) {
+        const v = parseBoundary(req.query.from, false);
+        if (!v) return res.status(400).json({ success: false, message: "Invalid from date" });
+        range.$gte = v;
+      }
+      if (req.query.to) {
+        const v = parseBoundary(req.query.to, true);
+        if (!v) return res.status(400).json({ success: false, message: "Invalid to date" });
+        range.$lte = v;
+      }
+      if (Object.keys(range).length) match.created_at = range;
+    }
+
+    // A student's export is hard-scoped to their own submissions. This is
+    // applied AFTER any filters and always wins, so no parameter can widen it.
+    if (isStudent) {
+      match["sub.student_id"] = String(req.user.id);
+    }
+
+    const pipeline = [
+      { $sort: { created_at: -1 } },
+      // submission_id / task_id are stored as strings while _id is an
+      // ObjectId, so convert before joining.
+      { $addFields: { sub_oid: { $convert: { input: "$submission_id", to: "objectId", onError: null, onNull: null } } } },
+      { $lookup: { from: "submissions", localField: "sub_oid", foreignField: "_id", as: "submission" } },
+      { $addFields: { sub: { $arrayElemAt: ["$submission", 0] } } },
+      { $addFields: { sub_task_oid: { $convert: { input: "$sub.task_id", to: "objectId", onError: null, onNull: null } } } },
+      { $addFields: { sub_student_oid: { $convert: { input: "$sub.student_id", to: "objectId", onError: null, onNull: null } } } },
+      { $lookup: { from: "users", localField: "sub_student_oid", foreignField: "_id", as: "user" } },
+      { $addFields: { user: { $arrayElemAt: ["$user", 0] } } },
+      { $lookup: { from: "tasks", localField: "sub_task_oid", foreignField: "_id", as: "task" } },
+      { $addFields: { task: { $arrayElemAt: ["$task", 0] } } },
+    ];
+    if (Object.keys(match).length) pipeline.push({ $match: match });
+    // +1 so truncation can be detected and reported.
+    pipeline.push({ $limit: exporter.MAX_ROWS + 1 });
+
+    const docs = await db.collection("submission_files").aggregate(pipeline).toArray();
+    const truncated = docs.length > exporter.MAX_ROWS;
+    const page = truncated ? docs.slice(0, exporter.MAX_ROWS) : docs;
+
+    const rows = page.map((doc, i) => exporter.buildRow({
+      sno: i + 1,
+      file: doc,
+      user: doc.user,
+      task: doc.task,
+      submission: doc.sub,
+    }));
+
+    const buffer = await exporter.buildWorkbook(rows);
+    const filename = exporter.exportFileName();
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", buffer.length);
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    res.setHeader("X-Export-Truncated", truncated ? "true" : "false");
+    res.send(buffer);
+  } catch (e) {
+    console.error("EXPORT FILE RECORDS:", e);
+    res.status(500).json({ success: false, message: "Unable to export file records" });
+  }
+});
+
+/* -- DOWNLOAD SUBMISSION FILE ------------------------------------------
  * Streams file from MongoDB GridFS or migrates from legacy filesystem.
  * Supports both new GridFS files and old filesystem files for backward compatibility.
  *
