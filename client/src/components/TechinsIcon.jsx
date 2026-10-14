@@ -189,6 +189,25 @@ const icons = {
       <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="icon-accent-stroke"/>
     </svg>
   ),
+
+  close: (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" className="icon-stroke" />
+    </svg>
+  ),
+
+  logout: (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M10 4H6a2 2 0 00-2 2v12a2 2 0 002 2h4M14 16l4-4-4-4M18 12H9" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="icon-stroke" />
+    </svg>
+  ),
+
+  alert: (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 3l9 17H3L12 3z" stroke="currentColor" strokeWidth="1.75" strokeLinejoin="round" className="icon-stroke" />
+      <path d="M12 9v5M12 17v.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" className="icon-accent-stroke" />
+    </svg>
+  ),
   
   home: (
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

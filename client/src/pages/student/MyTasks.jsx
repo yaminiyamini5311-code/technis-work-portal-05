@@ -226,7 +226,7 @@ export default function MyTasks() {
                     {task.how_to_do && <div className="task-section"><strong>How to Do:</strong><p style={{ whiteSpace: 'pre-wrap' }}>{task.how_to_do}</p></div>}
                     {task.submission_requirements && <div className="task-section"><strong>Submission Requirements:</strong><p style={{ whiteSpace: 'pre-wrap' }}>{task.submission_requirements}</p></div>}
                   </div>
-                  <span className={`status ${task.status} ${isOverdue ? 'overdue-badge' : ''}`}>{isOverdue ? '⚠ Overdue' : workflow}</span>
+                  <span className={`status ${task.status} ${isOverdue ? 'overdue-badge' : ''}`}>{isOverdue && <TechinsIcon name="alert" size={13} ariaHidden />} {isOverdue ? 'Overdue' : workflow}</span>
                 </div>
                 <div className="task-meta-grid">
                   <div><span>Priority</span><strong className={`priority ${task.priority}`}>{task.priority || "medium"}</strong></div>

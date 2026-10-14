@@ -459,7 +459,7 @@ function DailyActivity() {
 
                                         {activity.blockers && (
                                             <span>
-                                                ⚠ Blocker reported
+                                                <TechinsIcon name="alert" size={14} ariaHidden /> Blocker reported
                                             </span>
                                         )}
 

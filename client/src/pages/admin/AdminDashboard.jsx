@@ -209,12 +209,12 @@ export default function AdminDashboard() {
   
   if(loading&&!data)return <div className="portal-loading"><div className="loader-dot"/><h2>Loading CEO workspace</h2><p>Syncing the latest team data.</p></div>;
 
-  if(error && !data) return <div className="portal-loading"><div className="error-icon">⚠</div><h2>Unable to load dashboard</h2><p>{error.message}</p>{error.kind === "network" && <p style={{marginTop:"0.5rem",fontSize:"0.9rem",opacity:0.8}}>Check that the backend API is running and VITE_API_URL is configured correctly.</p>}<button onClick={() => { setLoading(true); load({ force: true }); }} disabled={loading} style={{marginTop:"1rem",padding:"0.75rem 1.5rem",fontSize:"1rem"}}>{loading ? "Retrying…" : "Retry"}</button></div>;
+  if(error && !data) return <div className="portal-loading"><div className="error-icon"><TechinsIcon name="alert" size={28} ariaLabel="Error" /></div><h2>Unable to load dashboard</h2><p>{error.message}</p>{error.kind === "network" && <p style={{marginTop:"0.5rem",fontSize:"0.9rem",opacity:0.8}}>Check that the backend API is running and VITE_API_URL is configured correctly.</p>}<button onClick={() => { setLoading(true); load({ force: true }); }} disabled={loading} style={{marginTop:"1rem",padding:"0.75rem 1.5rem",fontSize:"1rem"}}>{loading ? "Retrying…" : "Retry"}</button></div>;
 
   return <div className="admin-simple page-enter">
     <div className="simple-head"><span>CEO CONTROL CENTER</span><h2>Command dashboard</h2><p>One view for students, assignments, missions, daily work and performance.</p></div>
     {loading && data ? <div className="dashboard-sync" role="status">Syncing latest data…</div> : null}
-    {error && data ? <div className="dashboard-error" role="alert" style={{padding:"1rem",margin:"1rem 0",background:"#fff3cd",border:"1px solid #ffc107",borderRadius:"8px",display:"flex",alignItems:"center",gap:"1rem"}}><span style={{fontSize:"1.5rem"}}>⚠️</span><div style={{flex:1}}><strong>Partial data loaded</strong><p style={{margin:"0.25rem 0 0",fontSize:"0.9rem"}}>{error.message}</p></div><button onClick={() => load({ force: true })} disabled={loading} style={{padding:"0.5rem 1rem"}}>{loading ? "Retrying…" : "Retry"}</button></div> : null}
+    {error && data ? <div className="dashboard-error" role="alert" style={{padding:"1rem",margin:"1rem 0",background:"#fff3cd",border:"1px solid #ffc107",borderRadius:"8px",display:"flex",alignItems:"center",gap:"1rem"}}><TechinsIcon name="alert" size={22} ariaLabel="Warning" /><div style={{flex:1}}><strong>Partial data loaded</strong><p style={{margin:"0.25rem 0 0",fontSize:"0.9rem"}}>{error.message}</p></div><button onClick={() => load({ force: true })} disabled={loading} style={{padding:"0.5rem 1rem"}}>{loading ? "Retrying…" : "Retry"}</button></div> : null}
 
     {/* Pending Registrations Panel */}
     {pendingRegistrations.length > 0 && (
