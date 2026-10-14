@@ -41,6 +41,7 @@ export default function Feedback() {
 
   const submit = async (e) => {
     e.preventDefault();
+    if (loading) return; // Prevent double submission
     setMessage("");
     setLoading(true);
 
@@ -53,7 +54,7 @@ export default function Feedback() {
         },
         body: JSON.stringify({
           ...form,
-          user_id: Number(form.user_id),
+          user_id: form.user_id,
           strengths: form.strengths.split(",").map(x => x.trim()).filter(Boolean),
           improvements: form.improvements.split(",").map(x => x.trim()).filter(Boolean)
         })

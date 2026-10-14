@@ -28,7 +28,10 @@
   --ceo-text: #eef2fb;
   --ceo-text-dim: #9aa6c2;
   --ceo-text-mute: #6b7691;
+  /* CEO dark theme MUST override the light theme's hover bg (#f8fafc)
+     which would wash out the light text on hover. */
   --ceo-control-bg: rgba(255, 255, 255, 0.045);
+  --control-bg-hover: rgba(255, 255, 255, 0.065);
 
   --ceo-violet: #7c6cff;
   --ceo-teal: #2fd4c4;
@@ -287,6 +290,19 @@
 .role-layout.ceo-dark .pill.inactive   { background: rgba(255, 255, 255, 0.06) !important; color: var(--ceo-text-mute) !important; }
 .role-layout.ceo-dark .pill.submitted  { background: rgba(47, 212, 196, 0.16) !important; color: var(--ceo-teal) !important; }
 .role-layout.ceo-dark .pill.reviewed   { background: rgba(124, 108, 255, 0.16) !important; color: var(--ceo-violet) !important; }
+
+/* ── Student email label in submissions (CEO dark) ───────────────────────── */
+.role-layout.ceo-dark .student-details .detail-line .label,
+.role-layout.ceo-dark .panel .detail-line .label {
+  color: var(--ceo-text);
+  opacity: 0.8;
+}
+
+/* ── Student email value in submissions (CEO dark) ───────────────────────── */
+.role-layout.ceo-dark .student-details .detail-line,
+.role-layout.ceo-dark .panel .detail-line {
+  color: var(--ceo-text);
+}
 
 /* ── Forms ────────────────────────────────────────────────────────────── */
 .role-layout.ceo-dark input,
