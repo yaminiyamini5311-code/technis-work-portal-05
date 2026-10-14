@@ -3,13 +3,15 @@ const { ObjectId } = require("mongodb");
 const { authenticateToken, authorizeRoles, checkStudentRegistrationStatus } = require("../middleware/authMiddleware");
 const multer = require("multer");
 const fs = require("fs");
-const path = require("path");
 const { sendTaskAssignmentEmail } = require("../utils/email");
 const { writeAudit } = require("../utils/audit_mongo");
 const { ALLOWED_DOMAINS, ALLOWED_PROGRAMS } = require("../config");
 const { createCeoNotification, createUserNotification } = require("../utils/ceoNotification");
 const { normalizeRegistrationStatus } = require("../utils/userAccount");
 const { uploadFile, downloadFile, migrateFileToGridFS } = require("../utils/fileStorage");
+// Shared upload rules (same values as before, now single-sourced so the Drive
+// resumable-upload path enforces exactly the same allowlist and size cap).
+const { ALLOWED_EXTENSIONS, MAX_FILE_BYTES, MAX_FILES, isAllowedExtension } = require("../utils/uploadRules");
 
 const router = express.Router();
 // Per-file limit is 4 MB: Vercel serverless rejects request bodies above
@@ -18,11 +20,10 @@ const router = express.Router();
 // The client mirrors this limit so students get an instant, clear error.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 4 * 1024 * 1024, files: 5 },
+  limits: { fileSize: MAX_FILE_BYTES, files: MAX_FILES },
   fileFilter: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const allowed = new Set([".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".png", ".jpg", ".jpeg"]);
-    cb(allowed.has(ext) ? null : new Error("Unsupported file type"), allowed.has(ext));
+    const allowed = isAllowedExtension(file.originalname);
+    cb(allowed ? null : new Error("Unsupported file type"), allowed);
   }
 });
 
@@ -412,7 +413,7 @@ router.get("/files/:fileId/download", authenticateToken, async (req, res) => {
       return res.status(403).json({ success: false, message: "You do not have permission to access this file" });
     }
     
-    // Try GridFS first (new storage)
+    // Try GridFS (legacy storage)
     if (file.gridfs_id) {
       try {
         const { stream, file: gridfsFile } = await downloadFile(db, file.gridfs_id);
@@ -901,7 +902,7 @@ router.patch("/:id/status", authenticateToken, async (req, res) => {
 });
 
 /* ─── SUBMIT TASK ───────────────────────────────────────────────────────── */
-router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), upload.array("files", 5), async (req, res) => {
+router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), upload.array("files", MAX_FILES), async (req, res) => {
   try {
     const db = req.db;
     const task = await db.collection("tasks").findOne({ _id: toId(req.params.id) });
@@ -917,8 +918,34 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
     // Reject empty submissions: at least one file or a comment is required
     // (mirrors the student UI validation so API clients get the same rule).
     const commentText = String(req.body?.comment || "").trim();
-    if (!(req.files || []).length && !commentText) {
+    // Files may arrive either as multipart uploads (legacy GridFS relay) or as
+    // upload_tokens referencing files already transferred straight to Drive.
+    const uploadTokens = Array.isArray(req.body?.upload_tokens)
+      ? req.body.upload_tokens.map(String).map(t => t.trim()).filter(Boolean)
+      : [];
+    const uploadedCount = (req.files || []).length + uploadTokens.length;
+    if (uploadedCount > MAX_FILES) {
+      return res.status(400).json({ success: false, message: `Select at most ${MAX_FILES} files per submission.` });
+    }
+    if (!uploadedCount && !commentText) {
       return res.status(400).json({ success: false, message: "Add at least one file or a submission comment before submitting." });
+    }
+
+    // Validate every Drive upload token belongs to THIS user and THIS task
+    // before the submission row is created, so a forged token cannot attach
+    // someone else's file.
+    const stagedUploads = [];
+    if (uploadTokens.length) {
+      const found = await db.collection("drive_uploads").find({
+        upload_token: { $in: uploadTokens },
+        user_id: req.user.id,
+        task_id: String(task._id),
+        status: "verified",
+      }).toArray();
+      if (found.length !== uploadTokens.length) {
+        return res.status(400).json({ success: false, message: "One or more uploads are not ready. Please upload the files again." });
+      }
+      stagedUploads.push(...found);
     }
 
     const lastSub = await db.collection("submissions").find({ task_id: String(task._id) }).sort({ version: -1 }).limit(1).toArray();
@@ -967,6 +994,66 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
       }
     }
 
+    // ── Attach Drive-backed uploads to this submission ────────────────────
+    // The bytes already went straight from the browser to Drive. This writes
+    // only the metadata row, reusing every existing field so nothing else in
+    // the app needs to change. Records stay private: access is always through
+    // the authenticated download endpoint, never a Drive link.
+    const failedDriveFiles = [];
+    for (const staged of stagedUploads) {
+      try {
+        const driveFileId = String(staged.drive_file_id);
+        // Unique index on drive_file_id: a retried submit can never create a
+        // second record for the same Drive file.
+        await db.collection("submission_files").updateOne(
+          { drive_file_id: driveFileId },
+          {
+            $setOnInsert: {
+              submission_id: sid,
+              original_name: staged.original_file_name,
+              stored_file_name: staged.drive_file_name || staged.stored_file_name,
+              mime_type: staged.actual_mime_type || staged.mime_type,
+              size: staged.actual_size ?? staged.declared_size,
+              user_id: req.user.id,
+              user_display_name: staged.user_display_name || null,
+              user_role: staged.user_role || req.user.role,
+              task_id: staged.task_id,
+              task_title: staged.task_title || null,
+              drive_file_id: driveFileId,
+              drive_folder_id: staged.drive_folder_id,
+              drive_folder_name: staged.drive_folder_name,
+              // Derived from the verified Drive file id only — never fabricated
+              // for records that do not have one.
+              drive_file_link: `https://drive.google.com/file/d/${driveFileId}/view`,
+              drive_folder_link: staged.drive_folder_id ? `https://drive.google.com/drive/folders/${staged.drive_folder_id}` : null,
+              upload_status: "complete",
+              storage_type: "gdrive",
+              gridfs_id: null,
+              created_at: submittedAt,
+            },
+          },
+          { upsert: true }
+        );
+        await db.collection("drive_uploads").updateOne(
+          { upload_token: staged.upload_token },
+          { $set: { status: "linked", submission_id: sid, updated_at: new Date().toISOString() } }
+        );
+      } catch (fileError) {
+        // The Drive file exists but the DB write failed. Record it as
+        // incomplete so nothing is silently lost, and surface it to the user.
+        console.error(`[Submit] Drive metadata write failed for ${staged.stored_file_name}:`, fileError.message);
+        failedDriveFiles.push(staged.original_file_name);
+        try {
+          await db.collection("drive_uploads").updateOne(
+            { upload_token: staged.upload_token },
+            { $set: { status: "incomplete", error: "metadata_write_failed", updated_at: new Date().toISOString() } }
+          );
+        } catch { /* nothing further we can do here */ }
+      }
+    }
+    await db.collection("submission_files").createIndex({ drive_file_id: 1 }, { unique: true, sparse: true });
+    await db.collection("submission_files").createIndex({ submission_id: 1 });
+
     await transition(db, task, version > 1 ? "Resubmitted" : "Submitted", req.user.id, "Submission received");
     // Record the submission snapshot on the student's own assignment
     await updateAssignment(db, String(task._id), req.user.id, {
@@ -978,7 +1065,18 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
     await notify(db, task.assigned_by, "submission_received", "Submission received", `${submissionCode} was submitted for ${task.title}.`, String(task._id));
     await writeAudit(db, { actorId: req.user.id, action: "submission_uploaded", entityType: "submission", entityId: sid, newValue: { submission_code: submissionCode, task_id: String(task._id), version, submitted_at: submittedAt } });
 
-    res.status(201).json({ success: true, message: "Submission stored successfully", submissionId: sid, submissionCode, version, submittedAt });
+    res.status(201).json({
+      success: true,
+      message: "Submission stored successfully",
+      submissionId: sid,
+      submissionCode,
+      version,
+      submittedAt,
+      // Additive: only present when a Drive file was uploaded but its metadata
+      // could not be written. The file is NOT lost — it is flagged incomplete
+      // and reported here rather than silently dropped.
+      ...(failedDriveFiles.length ? { warnings: [`Uploaded to Drive but could not be recorded: ${failedDriveFiles.join(", ")}. Please re-upload.`] } : {}),
+    });
   } catch (e) { console.error("Submission error:", e); res.status(500).json({ success: false, message: "Unable to store submission" }); }
 });
 

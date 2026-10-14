@@ -31,6 +31,19 @@ if (missing.length) {
 const { connect, healthCheck } = require("./mongodb");
 const { authenticateToken, checkStudentRegistrationStatus, requireApprovedStudent } = require("./middleware/authMiddleware");
 
+// ─── GOOGLE DRIVE CONFIG CHECK (non-fatal) ─────────────────────────────────
+// Drive-backed uploads are additive: when these are absent the app keeps
+// working exactly as before and the upload endpoints answer 503. Only the
+// variable NAMES are ever printed — never their values.
+const DRIVE_ENV = ["GOOGLE_SERVICE_ACCOUNT_EMAIL", "GOOGLE_PRIVATE_KEY", "GOOGLE_DRIVE_PARENT_FOLDER_ID"];
+const driveMissing = DRIVE_ENV.filter(k => !process.env[k]);
+if (driveMissing.length) {
+  console.warn(
+    `[TECHINS] Google Drive uploads are DISABLED — missing env var(s): ${driveMissing.join(", ")}. ` +
+    `Set them in Vercel → Settings → Environment Variables to enable Drive uploads.`
+  );
+}
+
 const app = express();
 
 // ─── CORS CONFIGURATION ────────────────────────────────────────────────────
@@ -236,6 +249,7 @@ const performanceRoutes  = require("./routes/performanceRoutes");
 const auditRoutes        = require("./routes/auditRoutes");
 const authorizedUsersRoutes = require("./routes/authorizedUsersRoutes");
 const batchRoutes        = require("./routes/batchRoutes");
+const uploadRoutes       = require("./routes/uploadRoutes");
 
 app.use("/api/auth",         authRoutes);
 app.use("/api/admin",        adminRoutes);
@@ -245,6 +259,9 @@ app.use("/api/admin",        adminRoutes);
 // students whose registration is pending/rejected — unlike
 // checkStudentRegistrationStatus it never rejects the env-based CEO token
 // (CEO legitimately uses /api/tasks).
+// Google Drive resumable uploads. MUST be registered before /api/tasks because
+// taskRoutes has a "/:id" route that would otherwise match "/uploads/...".
+app.use("/api/tasks/uploads", authenticateToken, requireApprovedStudent, uploadRoutes);
 app.use("/api/tasks",        authenticateToken, requireApprovedStudent, taskRoutes);
 app.use("/api/student",      authenticateToken, checkStudentRegistrationStatus, studentRoutes);
 app.use("/api/students",     studentsRoutes);
