@@ -303,6 +303,7 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [exportingFiles, setExportingFiles] = useState(false);
   
   // View state
   const [selectedSubmission, setSelectedSubmission] = useState(null);
@@ -381,6 +382,51 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
       setError(e.message || "Unable to export submissions. Check your connection.");
     } finally {
       setExporting(false);
+    }
+  };
+
+  // Export FILE RECORDS (one row per uploaded file) with clickable Drive links.
+  // Same endpoint/auth layer as the existing export, separate action.
+  const exportFileRecords = async () => {
+    if (exportingFiles) return;
+    try {
+      setExportingFiles(true);
+      setError("");
+      setNotice("");
+
+      const res = await fetch(`${API_URL}/api/tasks/files/export`, { headers: auth() });
+      if (!res.ok) {
+        let message = "Unable to export file records";
+        try { message = (await res.json()).message || message; } catch { /* non-JSON error body */ }
+        throw new Error(message);
+      }
+
+      const blob = await res.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+
+      let filename = `TECHINS_File_Records_${new Date().toISOString().split("T")[0]}.xlsx`;
+      const contentDisposition = res.headers.get("Content-Disposition");
+      const match = contentDisposition && contentDisposition.match(/filename="(.+)"/);
+      if (match) filename = match[1];
+
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(downloadUrl);
+
+      const truncated = res.headers.get("X-Export-Truncated") === "true";
+      setNotice(
+        truncated
+          ? `File records downloaded (${filename}). The result was capped for performance - narrow it with filters.`
+          : `File records downloaded: ${filename}`
+      );
+    } catch (e) {
+      setError(e.message || "Unable to export file records. Check your connection.");
+    } finally {
+      setExportingFiles(false);
     }
   };
 
@@ -534,6 +580,19 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
                 <>
                   <TechinsIcon name="chart" size={18} ariaHidden />
                   <span>Export to Excel</span>
+                </>
+              )}
+            </button>
+            <button
+              className="export-excel-btn"
+              onClick={exportFileRecords}
+              disabled={exportingFiles || exporting || loading}
+              title="One row per uploaded file, with Google Drive links"
+            >
+              {exportingFiles ? "Exporting…" : (
+                <>
+                  <TechinsIcon name="chart" size={18} ariaHidden />
+                  <span>Export File Records</span>
                 </>
               )}
             </button>

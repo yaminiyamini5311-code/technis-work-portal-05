@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
 import { useScrollReveal } from "../../components/useScrollReveal";
+import { uploadToDriveSession } from "../../lib/driveUpload";
 import "./MyTasks.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -58,6 +59,7 @@ export default function MyTasks() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(null);
+  const [progress, setProgress] = useState({});
   const [selectedFiles, setSelectedFiles] = useState({});
   const [comments, setComments] = useState({});
   const [domainFilter, setDomainFilter] = useState("");
@@ -181,16 +183,59 @@ export default function MyTasks() {
     try {
       setBusy(task.id);
       submittingRef.current = true;
-      const form = new FormData();
-      files.forEach((file) => form.append("files", file));
-      if (comment) form.append("comment", comment);
-      await axios.post(`${API_URL}/api/tasks/${task.id}/submit`, form, { headers: auth() });
+
+      // Preferred path: transfer each file straight to Google Drive, then
+      // submit the resulting tokens. Falls back to the existing server relay
+      // when Drive is not configured yet, so nothing breaks.
+      let useLegacyRelay = false;
+      const tokens = [];
+      for (const file of files) {
+        let init;
+        try {
+          const { data } = await axios.post(
+            `${API_URL}/api/tasks/uploads/init`,
+            { taskId: task.id, fileName: file.name, mimeType: file.type || "application/octet-stream", size: file.size },
+            { headers: auth() }
+          );
+          init = data;
+        } catch (initErr) {
+          if (initErr.response?.status === 503) { useLegacyRelay = true; break; }
+          throw initErr;
+        }
+
+        const uploaded = await uploadToDriveSession(init.sessionUrl, file, (sent) => {
+          setProgress((value) => ({ ...value, [task.id]: Math.round((sent / file.size) * 100) }));
+        });
+
+        const { data: finalized } = await axios.post(
+          `${API_URL}/api/tasks/uploads/finalize`,
+          { uploadToken: init.uploadToken, driveFileId: uploaded.fileId },
+          { headers: auth() }
+        );
+        tokens.push(finalized.uploadToken || init.uploadToken);
+      }
+
+      if (useLegacyRelay) {
+        const form = new FormData();
+        files.forEach((file) => form.append("files", file));
+        if (comment) form.append("comment", comment);
+        await axios.post(`${API_URL}/api/tasks/${task.id}/submit`, form, { headers: auth() });
+      } else {
+        await axios.post(
+          `${API_URL}/api/tasks/${task.id}/submit`,
+          { comment, upload_tokens: tokens },
+          { headers: { ...auth(), "Content-Type": "application/json" } }
+        );
+      }
+
+      setProgress((value) => ({ ...value, [task.id]: 0 }));
       setSelectedFiles((value) => ({ ...value, [task.id]: [] }));
       setComments((value) => ({ ...value, [task.id]: "" }));
       setMessage("Submission recorded with a server timestamp.");
       await load();
     } catch (err) {
-      setError(err.response?.data?.message || "Unable to submit the task.");
+      setProgress((value) => ({ ...value, [task.id]: 0 }));
+      setError(err.response?.data?.message || err.message || "Unable to submit the task.");
     } finally {
       setBusy(null);
       submittingRef.current = false;
@@ -372,6 +417,7 @@ export default function MyTasks() {
                   <textarea value={comments[task.id] || ""} onChange={(e) => setComments((value) => ({ ...value, [task.id]: e.target.value }))} placeholder="Submission comment / outcome (optional if files are selected)" />
                   <label className="upload-button">{selectedFiles[task.id]?.length ? `${selectedFiles[task.id].length} file(s) selected` : "Choose files"}<input type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.png,.jpg,.jpeg" onChange={(e) => setSelectedFiles((value) => ({ ...value, [task.id]: Array.from(e.target.files || []) }))} /></label>
                   <button className="gold-btn" disabled={busy === task.id} onClick={() => submitTask(task)}>{busy === task.id ? "Submitting…" : "Submit for Review"}</button>
+                  {busy === task.id && progress[task.id] > 0 && <small className="upload-progress">Uploading… {progress[task.id]}%</small>}
                 </div>}
                 {task.feedback && workflow !== "Revision Required" && <div className="feedback-box"><strong>Feedback</strong><p>{task.feedback}</p></div>}
               </article>

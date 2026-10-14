@@ -464,6 +464,16 @@
     white-space: nowrap;
 }
 
+/* Drive upload progress line (reuses the existing upload-box grid) */
+.upload-box .upload-progress {
+    grid-area: submit;
+    justify-self: end;
+    align-self: center;
+    font-size: 0.75rem;
+    opacity: 0.75;
+    white-space: nowrap;
+}
+
 .task-top {
     display: flex;
     justify-content: space-between;
