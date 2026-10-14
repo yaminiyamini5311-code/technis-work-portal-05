@@ -280,6 +280,13 @@
 .role-layout.ceo-dark .pill.progress,
 .role-layout.ceo-dark .pill.in_progress { background: rgba(47, 212, 196, 0.16) !important; color: var(--ceo-teal) !important; }
 .role-layout.ceo-dark .pill.overdue    { background: rgba(242, 85, 122, 0.16) !important; color: var(--ceo-rose) !important; }
+/* Approval states (distinct concepts: pending / approved / rejected /
+   deactivated) keep their meaning in the dark theme too. */
+.role-layout.ceo-dark .pill.approved   { background: rgba(53, 208, 127, 0.16) !important; color: var(--ceo-green) !important; }
+.role-layout.ceo-dark .pill.rejected   { background: rgba(242, 85, 122, 0.16) !important; color: var(--ceo-rose) !important; }
+.role-layout.ceo-dark .pill.inactive   { background: rgba(255, 255, 255, 0.06) !important; color: var(--ceo-text-mute) !important; }
+.role-layout.ceo-dark .pill.submitted  { background: rgba(47, 212, 196, 0.16) !important; color: var(--ceo-teal) !important; }
+.role-layout.ceo-dark .pill.reviewed   { background: rgba(124, 108, 255, 0.16) !important; color: var(--ceo-violet) !important; }
 
 /* ── Forms ────────────────────────────────────────────────────────────── */
 .role-layout.ceo-dark input,

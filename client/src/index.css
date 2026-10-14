@@ -154,6 +154,11 @@ img{max-width:100%}
   white-space:nowrap;
 }
 .pill.pending{background:#FFF8E1;color:#F57F17}
+.pill.approved{background:#E8F5E9;color:#2E7D32}
+.pill.rejected{background:#FDECEA;color:#B3261E}
+.pill.inactive{background:#F1F3F5;color:#5F625F}
+.pill.submitted{background:#E3F2FD;color:#1565C0}
+.pill.reviewed{background:#EDE7F6;color:#5E35B1}
 .pill.in_progress{background:#E3F2FD;color:#1565C0}
 .pill.completed{background:#E8F5E9;color:#2E7D32}
 .simple-head{margin-bottom:20px}

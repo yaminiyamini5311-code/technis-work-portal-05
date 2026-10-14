@@ -727,3 +727,76 @@
         animation: none;
     }
 }
+
+/* Student submission history (versions + private file downloads). */
+.submission-history {
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px solid var(--space-border, rgba(250, 154, 2, 0.25));
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    display: grid;
+    gap: 12px;
+}
+
+.submission-history-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--space-border, rgba(250, 154, 2, 0.25));
+}
+
+.submission-history-row:last-child {
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.submission-history-row > div:first-child {
+    min-width: 0;
+    flex: 1 1 220px;
+}
+
+.submission-history-row strong {
+    display: block;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.submission-history-row small {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.submission-history-row p {
+    margin: 6px 0 0;
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.submission-history-row .submission-history-review {
+    color: var(--text-accent-on-dark);
+}
+
+.submission-history-files {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    max-width: 100%;
+}
+
+.submission-history-files button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

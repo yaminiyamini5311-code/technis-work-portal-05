@@ -12,9 +12,13 @@ const { normalizeRegistrationStatus } = require("../utils/userAccount");
 const { uploadFile, downloadFile, migrateFileToGridFS } = require("../utils/fileStorage");
 
 const router = express.Router();
+// Per-file limit is 4 MB: Vercel serverless rejects request bodies above
+// ~4.5 MB at the platform level (opaque 413 before the app sees it), so a
+// higher app-level limit could never actually be used in production.
+// The client mirrors this limit so students get an instant, clear error.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024, files: 5 },
+  limits: { fileSize: 4 * 1024 * 1024, files: 5 },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     const allowed = new Set([".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".png", ".jpg", ".jpeg"]);
@@ -794,7 +798,15 @@ router.get("/:id", authenticateToken, async (req, res) => {
     }));
     const subsWithNames = await Promise.all(submissions.map(async s => {
       const u = s.reviewer_id ? await db.collection("users").findOne({ _id: toId(s.reviewer_id) }, { projection: { name: 1 } }) : null;
-      return { ...s, id: String(s._id), reviewer_name: u?.name };
+      // File metadata (id + authenticated download path) so the owning
+      // student can open their own submission history and download files
+      // without a second request. Access is still enforced on download.
+      const files = await db.collection("submission_files").find({ submission_id: String(s._id) }, { projection: { original_name: 1, size: 1, mime_type: 1 } }).toArray();
+      return {
+        ...s, id: String(s._id), reviewer_name: u?.name,
+        file_count: files.length,
+        files: files.map(f => ({ id: String(f._id), name: f.original_name, size: f.size, mime: f.mime_type, download_url: `/api/tasks/files/${String(f._id)}/download` })),
+      };
     }));
 
     // Per-student assignments (CEO/admin/manager only — students see only their own)

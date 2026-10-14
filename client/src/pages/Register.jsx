@@ -9,7 +9,6 @@ const PHONE_RE = /^\+?[0-9\s-]{7,15}$/;
 
 export default function Register() {
   const navigate = useNavigate();
-  const location = useLocation();
   const errorRef = useRef(null);
   const [form, setForm] = useState({
     name: "",

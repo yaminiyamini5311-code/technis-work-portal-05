@@ -7,6 +7,43 @@ import "./MyTasks.css";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 
+function formatDateTime(value) {
+  if (!value) return "—";
+  try { return new Date(value).toLocaleString(); } catch { return String(value); }
+}
+
+function formatBytes(n) {
+  if (n === null || n === undefined) return "";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/* Downloads through fetch so the Authorization header travels with the
+   request (a plain anchor cannot send it), then saves the blob locally. */
+async function downloadOwnFile(file, onError) {
+  try {
+    const res = await fetch(`${API_URL}${file.download_url}`, { headers: auth() });
+    if (!res.ok) {
+      let msg = "Unable to download file";
+      try { msg = (await res.json()).message || msg; } catch {}
+      onError(msg);
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = file.name || "submission-file";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch {
+    onError("Unable to download file. Check your connection.");
+  }
+}
+
 const DOMAINS = [
   { value: "edutins", label: "EduTins" },
   { value: "resins", label: "ResIns" },
@@ -24,6 +61,8 @@ export default function MyTasks() {
   const [selectedFiles, setSelectedFiles] = useState({});
   const [comments, setComments] = useState({});
   const [domainFilter, setDomainFilter] = useState("");
+  // Submission history per task (fetched on demand, never in the list call)
+  const [history, setHistory] = useState({});
   const previousApproved = useRef(null);
   // Synchronous guards: React state updates are async, so a fast second
   // click could still observe stale `busy`/`loading` values and fire a
@@ -121,7 +160,9 @@ export default function MyTasks() {
     // student gets instant feedback instead of a failed upload.
     const allowedExt = new Set([".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".png", ".jpg", ".jpeg"]);
     const maxFiles = 5;
-    const maxBytes = 10 * 1024 * 1024;
+    // Must match the server's multer limit AND Vercel's ~4.5 MB serverless
+    // request-body cap: anything larger fails at the platform.
+    const maxBytes = 4 * 1024 * 1024;
     if (files.length > maxFiles) {
       setError(`Select at most ${maxFiles} files per submission.`);
       return;
@@ -133,7 +174,7 @@ export default function MyTasks() {
         return;
       }
       if (f.size > maxBytes) {
-        setError(`File too large: ${f.name} (max 10 MB each).`);
+        setError(`File too large: ${f.name} (max 4 MB each).`);
         return;
       }
     }
@@ -153,6 +194,25 @@ export default function MyTasks() {
     } finally {
       setBusy(null);
       submittingRef.current = false;
+    }
+  };
+
+  const toggleHistory = async (task) => {
+    // Collapse when already open; otherwise fetch the versions on demand.
+    if (history[task.id]) {
+      setHistory((prev) => { const next = { ...prev }; delete next[task.id]; return next; });
+      return;
+    }
+    setHistory((prev) => ({ ...prev, [task.id]: { loading: true } }));
+    try {
+      const { data } = await axios.get(`${API_URL}/api/tasks/${task.id}`, { headers: auth() });
+      const versions = (data.submissions || [])
+        .slice()
+        .sort((a, b) => (b.version || 0) - (a.version || 0));
+      setHistory((prev) => ({ ...prev, [task.id]: { versions } }));
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to load your submission history.");
+      setHistory((prev) => { const next = { ...prev }; delete next[task.id]; return next; });
     }
   };
 
@@ -263,11 +323,52 @@ export default function MyTasks() {
                 <div className="task-actions">
                   {(workflow === "Assigned" || task.status === "pending") && <button className="action-progress" disabled={busy === task.id} onClick={() => startTask(task.id)}>{busy === task.id ? "Updating…" : "Start Task"}</button>}
                   {showAwaitingReview ? <div className="completed-label">Submission received · awaiting review</div> : null}
+                  {hasStudentSubmission && (
+                    <button className="action-progress" onClick={() => toggleHistory(task)} aria-expanded={!!history[task.id]}>
+                      <TechinsIcon name="history" size={14} variant="light" ariaHidden />
+                      {history[task.id] ? "Hide my submissions" : "My submissions"}{" "}
+                      {task.latest_version ? `(v${task.latest_version})` : ""}
+                    </button>
+                  )}
                   {workflow === "Approved" && <div className="completed-label"><TechinsIcon name="check" size={16} variant="light" /> Task approved and recorded</div>}
                 </div>
+                {hasStudentSubmission && history[task.id] && (
+                  <div className="submission-history">
+                    {history[task.id].loading && <small>Loading your submissions…</small>}
+                    {history[task.id].versions && history[task.id].versions.length === 0 && (
+                      <small>No submission versions recorded yet.</small>
+                    )}
+                    {(history[task.id].versions || []).map((v) => (
+                      <div className="submission-history-row" key={v.id || v.version}>
+                        <div>
+                          <strong>Version {v.version} · {v.status}</strong>
+                          <small>{formatDateTime(v.submitted_at)} · {v.submission_code || "—"}</small>
+                          {v.comment && <p>{v.comment}</p>}
+                          {v.review_comments && (
+                            <p className="submission-history-review">
+                              Reviewer feedback: {v.review_comments}
+                            </p>
+                          )}
+                        </div>
+                        {(v.files || []).length > 0 ? (
+                          <div className="submission-history-files">
+                            {v.files.map((f) => (
+                              <button key={f.id} className="action-progress" onClick={() => downloadOwnFile(f, setError)}>
+                                <TechinsIcon name="download" size={13} variant="light" ariaHidden />
+                                {f.name}{f.size ? ` (${formatBytes(f.size)})` : ""}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <small>No files on this version</small>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {task.workflow_status === "Revision Required" && hasStudentSubmission && <div className="feedback-box"><strong>Revision requested</strong><p>{task.feedback || "Review the manager feedback and submit a new version."}</p></div>}
                 {canSubmit && <div className="upload-box">
-                  <div><strong>{workflow === "Revision Required" ? "Submit revised work" : "Submit task work"}</strong><small>PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, ZIP, PNG, JPG · max 10 MB each</small></div>
+                  <div><strong>{workflow === "Revision Required" ? "Submit revised work" : "Submit task work"}</strong><small>PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, ZIP, PNG, JPG · max 4 MB each</small></div>
                   <textarea value={comments[task.id] || ""} onChange={(e) => setComments((value) => ({ ...value, [task.id]: e.target.value }))} placeholder="Submission comment / outcome (optional if files are selected)" />
                   <label className="upload-button">{selectedFiles[task.id]?.length ? `${selectedFiles[task.id].length} file(s) selected` : "Choose files"}<input type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.png,.jpg,.jpeg" onChange={(e) => setSelectedFiles((value) => ({ ...value, [task.id]: Array.from(e.target.files || []) }))} /></label>
                   <button className="gold-btn" disabled={busy === task.id} onClick={() => submitTask(task)}>{busy === task.id ? "Submitting…" : "Submit for Review"}</button>

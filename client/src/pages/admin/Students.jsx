@@ -178,6 +178,21 @@ export default function Students() {
   };
 
   const isLimitReached = total >= maxStudents;
+
+  // Approval state must be distinguishable: pending approval, approved,
+  // rejected and deactivated are different concepts (Stage 5D).
+  const approvalLabel = (s) => {
+    const reg = String(s.registration_status || "approved").toLowerCase();
+    if (reg === "pending") return "Pending approval";
+    if (reg === "rejected") return "Rejected";
+    return s.active === 1 ? "Approved" : "Deactivated";
+  };
+  const approvalClass = (s) => {
+    const reg = String(s.registration_status || "approved").toLowerCase();
+    if (reg === "pending") return "pending";
+    if (reg === "rejected") return "rejected";
+    return s.active === 1 ? "approved" : "inactive";
+  };
   // Stable close handlers + shared dialog behavior (Escape, outside click,
   // focus trap/restore, scroll lock) for the edit and batch modals.
   const closeEdit = useCallback(() => setEditTarget(null), []);
@@ -274,8 +289,8 @@ export default function Students() {
                         <td style={{ padding: "8px" }}>{s.email}</td>
                         <td style={{ padding: "8px" }}>{s.batch?.name || "—"}</td>
                         <td style={{ padding: "8px" }}>
-                          <span className={`pill ${s.active === 1 ? "approved" : "pending"}`}>
-                            {s.active === 1 ? "Active" : "Inactive"}
+                          <span className={`pill ${approvalClass(s)}`}>
+                            {approvalLabel(s)}
                           </span>
                         </td>
                         <td style={{ padding: "8px" }}>

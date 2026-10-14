@@ -37,8 +37,14 @@ function Performance() {
       }
 
       try {
+        // The student summary payload (progress, score, mission completion,
+        // strengths/improvement lists, feedback) is produced by
+        // /api/student/dashboard. /api/performance/me returns the raw review
+        // records array (`records`) — reading dashboard-shaped fields from it
+        // silently rendered 0/empty cards, which is why this page now uses
+        // the dashboard payload.
         const response = await axios.get(
-          `${API_URL}/api/performance/me`,
+          `${API_URL}/api/student/dashboard`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -92,7 +98,7 @@ function Performance() {
             onClick={() => navigate("/student")}
             className="back-button"
           >
-            ← Back to Dashboard
+            <TechinsIcon name="chevron" size={14} variant="light" ariaHidden style={{ transform: "rotate(180deg)" }} /> Back to Dashboard
           </button>
         </div>
       </div>
