@@ -12,9 +12,13 @@ const { normalizeRegistrationStatus } = require("../utils/userAccount");
 const { uploadFile, downloadFile, migrateFileToGridFS } = require("../utils/fileStorage");
 
 const router = express.Router();
+// Per-file limit is 4 MB: Vercel serverless rejects request bodies above
+// ~4.5 MB at the platform level (opaque 413 before the app sees it), so a
+// higher app-level limit could never actually be used in production.
+// The client mirrors this limit so students get an instant, clear error.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024, files: 5 },
+  limits: { fileSize: 4 * 1024 * 1024, files: 5 },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     const allowed = new Set([".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".png", ".jpg", ".jpeg"]);
@@ -386,9 +390,14 @@ router.get("/submissions/export", authenticateToken, authorizeRoles("admin", "ma
 /* ─── DOWNLOAD SUBMISSION FILE ──────────────────────────────────────────
  * Streams file from MongoDB GridFS or migrates from legacy filesystem.
  * Supports both new GridFS files and old filesystem files for backward compatibility.
-
+ *
+ * Authorization: reviewers (admin/manager/ceo) may download any submission
+ * file; a student may download files belonging to THEIR OWN submissions
+ * (submission history access). The owning student is matched by id — never
+ * by a client-supplied field — and pending/rejected students are already
+ * blocked by requireApprovedStudent on this router.
  */
-router.get("/files/:fileId/download", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
+router.get("/files/:fileId/download", authenticateToken, async (req, res) => {
   try {
     const db = req.db;
     const file = await db.collection("submission_files").findOne({ _id: toId(req.params.fileId) });
@@ -396,6 +405,12 @@ router.get("/files/:fileId/download", authenticateToken, authorizeRoles("admin",
     
     const sub = await db.collection("submissions").findOne({ _id: toId(file.submission_id) });
     if (!sub) return res.status(404).json({ success: false, message: "Submission not found" });
+
+    const isReviewer = ["admin", "manager", "ceo"].includes(req.user.role);
+    const isOwner = req.user.role === "student" && String(sub.student_id) === String(req.user.id);
+    if (!isReviewer && !isOwner) {
+      return res.status(403).json({ success: false, message: "You do not have permission to access this file" });
+    }
     
     // Try GridFS first (new storage)
     if (file.gridfs_id) {
@@ -783,7 +798,15 @@ router.get("/:id", authenticateToken, async (req, res) => {
     }));
     const subsWithNames = await Promise.all(submissions.map(async s => {
       const u = s.reviewer_id ? await db.collection("users").findOne({ _id: toId(s.reviewer_id) }, { projection: { name: 1 } }) : null;
-      return { ...s, id: String(s._id), reviewer_name: u?.name };
+      // File metadata (id + authenticated download path) so the owning
+      // student can open their own submission history and download files
+      // without a second request. Access is still enforced on download.
+      const files = await db.collection("submission_files").find({ submission_id: String(s._id) }, { projection: { original_name: 1, size: 1, mime_type: 1 } }).toArray();
+      return {
+        ...s, id: String(s._id), reviewer_name: u?.name,
+        file_count: files.length,
+        files: files.map(f => ({ id: String(f._id), name: f.original_name, size: f.size, mime: f.mime_type, download_url: `/api/tasks/files/${String(f._id)}/download` })),
+      };
     }));
 
     // Per-student assignments (CEO/admin/manager only — students see only their own)

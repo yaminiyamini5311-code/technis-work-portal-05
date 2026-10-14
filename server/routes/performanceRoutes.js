@@ -43,8 +43,14 @@ router.get("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), as
         task_id: { $in: taskIds }
       }).toArray();
       
-      // Count completed tasks (tasks with approved submissions)
-      const completedTasks = submissions.filter(s => s.review_status === "approved").length;
+      // Count completed tasks (approved SUBMISSIONS).
+      // Root cause of the always-zero scorecard: the submissions collection
+      // stores the decision in `status` with capitalized values
+      // ("Submitted" | "Approved" | "Revision Required"). This code used to
+      // read a non-existent `review_status` field with a lowercase value, so
+      // completedTasks was 0 for every student no matter how much real work
+      // existed. Compare case-insensitively against the real field.
+      const completedTasks = submissions.filter(s => String(s.status || "").toLowerCase() === "approved").length;
       const totalTasks = assignments.length;
       
       // Get missions assigned to this student
@@ -52,7 +58,9 @@ router.get("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), as
         assigned_to: studentId 
       }).toArray();
       
-      const completedMissions = missions.filter(m => m.status === "Completed").length;
+      // Mission statuses are stored lowercase ("completed"); the previous
+      // capitalized comparison never matched.
+      const completedMissions = missions.filter(m => String(m.status || "").toLowerCase() === "completed").length;
       const totalMissions = missions.length;
       
       // Calculate overall progress percentage

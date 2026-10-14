@@ -12,7 +12,6 @@ const {
   normalizeRole,
   normalizeRegistrationStatus,
   isActiveFlag,
-  isBlockedRegistrationStatus,
 } = require("../utils/userAccount");
 
 const router = express.Router();
@@ -169,27 +168,31 @@ router.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }), async (r
 
     // ── Account status checks (after password verification) ──
     // Robust to legacy shapes: NULL, boolean, "1"/"true" strings, casing.
-    // Truly pending and truly deactivated accounts are still blocked.
+    //
+    // Pending/rejected STUDENTS are allowed to authenticate and receive a
+    // session token, but only so they can reach the dedicated "Waiting for
+    // Approval" screen. Every student route is gated by
+    // checkStudentRegistrationStatus / requireApprovedStudent (403
+    // REGISTRATION_PENDING / REGISTRATION_REJECTED), so the token can never
+    // read portal data. The frontend reads registration_status from this
+    // response (and /api/auth/me) and renders the matching gate.
+    // Deactivated accounts (and managers awaiting activation) stay blocked.
     const registrationStatus = normalizeRegistrationStatus(user.registration_status);
+    const role0 = normalizeRole(user.role);
+    const awaitingReview =
+      role0 === "student" &&
+      (registrationStatus === "pending" || registrationStatus === "rejected");
 
-    if (isBlockedRegistrationStatus(registrationStatus)) {
-      if (registrationStatus === "pending") {
-        console.log("[AUTH] Login blocked: registration is pending approval");
-      } else {
-        console.log("[AUTH] Login blocked: registration was rejected");
-      }
+    if (!isActiveFlag(user.active) && !awaitingReview) {
+      console.log("[AUTH] Login blocked: account is deactivated");
       return res.status(401).json({
         success: false,
         message: "Your account is pending approval or has been deactivated"
       });
     }
 
-    if (!isActiveFlag(user.active)) {
-      console.log("[AUTH] Login blocked: account is deactivated");
-      return res.status(401).json({
-        success: false,
-        message: "Your account is pending approval or has been deactivated"
-      });
+    if (awaitingReview) {
+      console.log(`[AUTH] Login granted to ${registrationStatus} student — portal routes remain gated`);
     }
 
     const role = normalizeRole(user.role);
@@ -278,15 +281,18 @@ router.get("/me", authenticateToken, async (req, res) => {
       });
     }
     
-    // Regular user - lookup in database
+    // Regular user - lookup in database.
+    // NOTE: inactive/pending users must still be able to read their own
+    // record: the frontend's RegistrationStatusGate polls /me to display
+    // the Waiting-for-Approval screen. Returning 404 here would hide the
+    // very status the student needs. Only the token-verified owner can
+    // read this record, so no data is exposed.
     const db = req.db;
     const user = await db.collection("users").findOne(
       { _id: toId(req.user.id) },
       { projection: { password: 0 } }
     );
-    if (!user || !isActiveFlag(user.active)) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
     // Resolve batch membership (id + name) for the auth payload
     let batch = null;
@@ -377,6 +383,21 @@ router.post("/signup", async (req, res) => {
     }
     if (password.length < 8) {
       return res.status(400).json({ success: false, message: "Password must be at least 8 characters" });
+    }
+    // Email format (client mirrors this; server is the authority)
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (!EMAIL_RE.test(email)) {
+      return res.status(400).json({ success: false, message: "Enter a valid email address" });
+    }
+    // Mobile format: optional in general, required for students (matches the
+    // signup form). Accepts +country prefixes, spaces, dashes, 7-15 digits.
+    const PHONE_RE = /^\+?[0-9\s-]{7,15}$/;
+    const digits = phone ? phone.replace(/[^0-9]/g, "") : "";
+    if (role === "student" && !digits) {
+      return res.status(400).json({ success: false, message: "Phone number is required for students" });
+    }
+    if (phone && (!PHONE_RE.test(phone) || digits.length < 7 || digits.length > 15)) {
+      return res.status(400).json({ success: false, message: "Enter a valid mobile number (7-15 digits)" });
     }
     
     // ═══════════════════════════════════════════════════════════════════════

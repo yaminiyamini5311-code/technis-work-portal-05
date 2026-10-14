@@ -130,14 +130,17 @@
   box-shadow: var(--shadow-md);
 }
 
-/* Secondary Buttons (light background, dark text) - Student Portal */
+/* Secondary Buttons (light background, dark text) - Student Portal
+   NOTE: the student portal's surfaces are dark glass (--space-surface), so
+   these buttons carry LIGHT text. The previous --text-on-light (#0C120C)
+   rendered near-black on dark glass (~1.1:1 contrast). */
 .student-layout .button-secondary,
 .student-layout .action-progress,
 .student-layout .refresh-button,
 .student-layout .refresh-btn,
 .student-layout .back-button {
   background: var(--surface) !important;
-  color: var(--text-on-light) !important;
+  color: var(--text-primary) !important;
   border: 1px solid var(--border-color) !important;
   font-weight: 700 !important;
   min-height: 42px;
@@ -154,7 +157,7 @@
 .student-layout .refresh-btn:hover:not(:disabled),
 .student-layout .back-button:hover:not(:disabled) {
   background: var(--surface-soft) !important;
-  color: var(--text-on-light) !important;
+  color: var(--text-primary) !important;
   border-color: var(--primary-color) !important;
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
@@ -163,7 +166,7 @@
 .student-layout .button-secondary:disabled,
 .student-layout .action-progress:disabled {
   background: var(--surface-soft) !important;
-  color: var(--text-subtle-on-light) !important;
+  color: var(--text-subtle) !important;
   border-color: var(--border-light) !important;
   opacity: 1 !important;
   cursor: not-allowed;
@@ -304,10 +307,11 @@
   box-shadow: var(--shadow-md);
 }
 
-/* Upload/File Buttons - Student Portal */
+/* Upload/File Buttons - Student Portal
+   Dark-glass surface: light text (was --text-on-light ≈ black-on-dark). */
 .student-layout .upload-button {
   background: var(--surface) !important;
-  color: var(--text-on-light) !important;
+  color: var(--text-primary) !important;
   border: 1px solid var(--border-color) !important;
   font-weight: 700 !important;
   padding: 10px 14px;
@@ -319,7 +323,7 @@
 
 .student-layout .upload-button:hover {
   background: var(--surface-soft) !important;
-  color: var(--text-on-light) !important;
+  color: var(--text-primary) !important;
   border-color: var(--primary-color) !important;
 }
 
@@ -494,10 +498,10 @@
   transform: translateY(-1px);
 }
 
-/* Panel/Form Buttons - Student Portal */
+/* Panel/Form Buttons - Student Portal (dark-glass panels: light text) */
 .student-layout .panel-head button {
   background: var(--surface) !important;
-  color: var(--text-on-light) !important;
+  color: var(--text-primary) !important;
   border: 1px solid var(--border-color) !important;
   font-weight: 700 !important;
   padding: 9px 13px;
@@ -507,7 +511,7 @@
 
 .student-layout .panel-head button:hover {
   background: var(--surface-soft) !important;
-  color: var(--text-on-light) !important;
+  color: var(--text-primary) !important;
   border-color: var(--primary-color) !important;
 }
 
@@ -614,10 +618,10 @@
   border-color: #FA9A02 !important;
 }
 
-/* Submission Actions - Student Portal */
+/* Submission Actions - Student Portal (dark-glass surface: light text) */
 .student-layout .submission-actions button {
   background: var(--surface) !important;
-  color: var(--text-on-light) !important;
+  color: var(--text-primary) !important;
   border: 1px solid var(--border-color) !important;
   font-weight: 700 !important;
   font-size: 11px;
@@ -627,7 +631,7 @@
 
 .student-layout .submission-actions button:hover {
   background: var(--surface-soft) !important;
-  color: var(--text-on-light) !important;
+  color: var(--text-primary) !important;
   border-color: var(--primary-color) !important;
 }
 

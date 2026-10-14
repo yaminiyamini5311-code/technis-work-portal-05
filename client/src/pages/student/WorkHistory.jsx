@@ -321,7 +321,7 @@ function WorkHistory() {
             <div style={styles.page}>
                 <div style={styles.loadingCard}>
                     <div style={styles.loadingIcon}>
-                        ⟳
+                        <TechinsIcon name="refresh" size={34} variant="light" ariaHidden />
                     </div>
 
                     <h2>
@@ -363,7 +363,7 @@ function WorkHistory() {
                     onClick={loadHistory}
                     style={styles.refreshButton}
                 >
-                    ↻ Refresh
+                    <TechinsIcon name="refresh" size={14} variant="light" ariaHidden /> Refresh
                 </button>
 
             </div>

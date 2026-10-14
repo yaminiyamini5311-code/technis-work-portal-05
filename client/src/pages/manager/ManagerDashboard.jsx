@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useCallback, useState } from "react";
+import useModalBehavior from "../../components/useModalBehavior";
 import { StatNumber } from "../../components/useCountUp";
 import "../admin/AdminDashboard.css";
 import "../../styles/admin.css";
@@ -58,6 +59,8 @@ export default function ManagerDashboard() {
   const [selected, setSelected] = useState(null);
   const [subList, setSubList] = useState([]);
   const [review, setReview] = useState({ decision: "revision", comment: "" });
+  const closeReview = useCallback(() => setSelected(null), []);
+  const reviewModalRef = useModalBehavior(!!selected, closeReview);
 
   // Task form state
   const [form, setForm] = useState({
@@ -309,7 +312,7 @@ export default function ManagerDashboard() {
 
           {/* Review Modal */}
           {selected && (
-            <div className="review-modal">
+            <div className="review-modal" ref={reviewModalRef}>
               <div className="panel">
                 <div className="panel-head">
                   <div><span className="section-kicker">SUBMISSION REVIEW</span><h3>{selected.task_code || "Task"} · {selected.title}</h3><p>{selected.student_name}</p></div>

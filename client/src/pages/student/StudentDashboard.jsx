@@ -49,7 +49,10 @@ export default function StudentDashboard(){
 
   useEffect(()=>{
     load();
-    const id=setInterval(load,20000);
+    const id=setInterval(()=>{
+      if (document.hidden) return; // pause polling on hidden tabs
+      load();
+    },20000);
     return()=>clearInterval(id);
   },[]);
 

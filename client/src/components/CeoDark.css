@@ -42,6 +42,7 @@
   position: relative;
   min-height: 100vh;
   color: var(--ceo-text);
+  color-scheme: dark;
   background:
     radial-gradient(1100px 620px at 12% -8%, rgba(124, 108, 255, 0.16), transparent 62%),
     radial-gradient(900px 540px at 92% 6%, rgba(47, 212, 196, 0.10), transparent 60%),
@@ -279,6 +280,13 @@
 .role-layout.ceo-dark .pill.progress,
 .role-layout.ceo-dark .pill.in_progress { background: rgba(47, 212, 196, 0.16) !important; color: var(--ceo-teal) !important; }
 .role-layout.ceo-dark .pill.overdue    { background: rgba(242, 85, 122, 0.16) !important; color: var(--ceo-rose) !important; }
+/* Approval states (distinct concepts: pending / approved / rejected /
+   deactivated) keep their meaning in the dark theme too. */
+.role-layout.ceo-dark .pill.approved   { background: rgba(53, 208, 127, 0.16) !important; color: var(--ceo-green) !important; }
+.role-layout.ceo-dark .pill.rejected   { background: rgba(242, 85, 122, 0.16) !important; color: var(--ceo-rose) !important; }
+.role-layout.ceo-dark .pill.inactive   { background: rgba(255, 255, 255, 0.06) !important; color: var(--ceo-text-mute) !important; }
+.role-layout.ceo-dark .pill.submitted  { background: rgba(47, 212, 196, 0.16) !important; color: var(--ceo-teal) !important; }
+.role-layout.ceo-dark .pill.reviewed   { background: rgba(124, 108, 255, 0.16) !important; color: var(--ceo-violet) !important; }
 
 /* ── Forms ────────────────────────────────────────────────────────────── */
 .role-layout.ceo-dark input,
@@ -286,6 +294,7 @@
 .role-layout.ceo-dark select {
   background: var(--ceo-control-bg);
   color: var(--ceo-text);
+  -webkit-text-fill-color: var(--ceo-text);
   border: 1px solid var(--ceo-border);
   border-radius: 10px;
   /* Dark native widgets (select arrows, date pickers, spinners) and dark
@@ -322,6 +331,13 @@
 .role-layout.ceo-dark select,
 .role-layout.ceo-dark input[type="date"] {
   color-scheme: dark;
+}
+
+.role-layout.ceo-dark input:disabled,
+.role-layout.ceo-dark textarea:disabled,
+.role-layout.ceo-dark select:disabled {
+  color: var(--ceo-text-dim);
+  -webkit-text-fill-color: var(--ceo-text-dim);
 }
 
 /* Submissions pages: search / filter / sort controls inside .chart-tabs

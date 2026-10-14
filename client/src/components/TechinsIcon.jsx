@@ -243,6 +243,14 @@ const icons = {
       <path d="M8 8l4-4 4-4" fill="currentColor" opacity="0.12" className="icon-fill"/>
     </svg>
   ),
+
+  eye: (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" stroke="currentColor" strokeWidth="1.75" strokeLinejoin="round" className="icon-stroke"/>
+      <circle cx="12" cy="12" r="2.8" stroke="currentColor" strokeWidth="1.75" className="icon-accent-stroke"/>
+      <circle cx="12" cy="12" r="1" fill="currentColor" className="icon-accent"/>
+    </svg>
+  ),
 };
 
 export default function TechinsIcon({ 

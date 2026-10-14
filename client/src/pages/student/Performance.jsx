@@ -37,8 +37,14 @@ function Performance() {
       }
 
       try {
+        // The student summary payload (progress, score, mission completion,
+        // strengths/improvement lists, feedback) is produced by
+        // /api/student/dashboard. /api/performance/me returns the raw review
+        // records array (`records`) — reading dashboard-shaped fields from it
+        // silently rendered 0/empty cards, which is why this page now uses
+        // the dashboard payload.
         const response = await axios.get(
-          `${API_URL}/api/performance/me`,
+          `${API_URL}/api/student/dashboard`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -71,7 +77,7 @@ function Performance() {
 
   if (loading) {
     return (
-      <div className="performance-page">
+      <div className="student-performance-page">
         <div className="loading-box">
           <div className="loader"></div>
           <h2>Loading your performance...</h2>
@@ -83,7 +89,7 @@ function Performance() {
 
   if (error) {
     return (
-      <div className="performance-page">
+      <div className="student-performance-page">
         <div className="error-box">
           <h2>Private Performance</h2>
           <p>{error}</p>
@@ -92,7 +98,7 @@ function Performance() {
             onClick={() => navigate("/student")}
             className="back-button"
           >
-            ← Back to Dashboard
+            <TechinsIcon name="chevron" size={14} variant="light" ariaHidden style={{ transform: "rotate(180deg)" }} /> Back to Dashboard
           </button>
         </div>
       </div>
@@ -110,27 +116,7 @@ function Performance() {
       : 0;
 
   return (
-    <div className="performance-page">
-
-      {/* HEADER */}
-
-      <header className="performance-header">
-
-        <button
-          className="back-button"
-          onClick={() => navigate("/student")}
-        >
-          ← Dashboard
-        </button>
-
-        <div className="header-title">
-          <h1>TECHINS WORK PORTAL</h1>
-          <p>Private Performance Dashboard</p>
-        </div>
-
-      </header>
-
-
+    <div className="student-performance-page">
       {/* STUDENT INFORMATION */}
 
       <main className="performance-container">
@@ -162,11 +148,11 @@ function Performance() {
 
         {/* MAIN PERFORMANCE */}
 
-        <section className="performance-grid">
+        <section className="student-performance-grid">
 
           {/* PROGRESS */}
 
-          <div className="performance-card reveal-card">
+          <div className="student-performance-card reveal-card">
 
             <div className="card-top">
               <span className="card-icon">
@@ -198,7 +184,7 @@ function Performance() {
 
           {/* SCORE */}
 
-          <div className="performance-card reveal-card">
+          <div className="student-performance-card reveal-card">
 
             <div className="card-top">
               <span className="card-icon">
@@ -230,7 +216,7 @@ function Performance() {
 
           {/* COMPLETED MISSIONS */}
 
-          <div className="performance-card reveal-card">
+          <div className="student-performance-card reveal-card">
 
             <div className="card-top">
               <span className="card-icon">
@@ -288,7 +274,7 @@ function Performance() {
                 )}
               </ul>
             ) : (
-              <p className="empty-text">
+              <p className="student-empty-text">
                 No strengths added yet.
               </p>
             )}
@@ -316,7 +302,7 @@ function Performance() {
                 )}
               </ul>
             ) : (
-              <p className="empty-text">
+              <p className="student-empty-text">
                 No improvement areas added yet.
               </p>
             )}

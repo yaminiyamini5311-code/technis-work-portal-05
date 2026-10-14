@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import TechinsIcon from "./TechinsIcon";
+import useModalBehavior from "./useModalBehavior";
 import "./SubmissionsView.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -42,8 +43,11 @@ async function downloadFile(file, onError) {
   }
 }
 
-/* Preview file - returns blob URL for image/PDF preview */
-async function previewFile(file, onError) {
+/* Preview file - returns blob URL for image/PDF preview.
+   NOTE: named fetchPreviewUrl (not previewFile) because DetailModal keeps a
+   `previewFile` STATE variable, which shadowed this helper inside the
+   component and made the Preview button call null(...) — it always failed. */
+async function fetchPreviewUrl(file, onError) {
   try {
     const res = await fetch(`${API_URL}${file.download_url}`, { headers: auth() });
     if (!res.ok) {
@@ -77,6 +81,11 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
   const [reviewing, setReviewing] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewFile, setPreviewFile] = useState(null);
+  const closePreview = () => { setPreviewUrl(null); setPreviewFile(null); };
+  // Shared dialog behavior (Escape, outside-click, focus trap/restore,
+  // scroll lock) for the detail modal and the file preview modal.
+  const dialogRef = useModalBehavior(!inline, onClose);
+  const previewRef = useModalBehavior(Boolean(previewUrl), closePreview);
 
   useEffect(() => {
     let cancelled = false;
@@ -133,21 +142,21 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
                 <div className="quick-actions" style={{ marginTop: '0.5rem' }}>
                   {v.files.map(f => (
                     <div key={f.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
-                      <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>📎 {f.name}</span>
+                      <span className="file-name-line"><TechinsIcon name="folder" size={14} variant="light" ariaHidden /> {f.name}</span>
                       {f.size && <span style={{ fontSize: '0.85rem', opacity: 0.7 }}>({formatBytes(f.size)})</span>}
                       {canPreview(f.mime) && (
                         <button onClick={async () => {
-                          const url = await previewFile(f, setError);
+                          const url = await fetchPreviewUrl(f, setError);
                           if (url) {
                             setPreviewUrl(url);
                             setPreviewFile(f);
                           }
                         }} style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}>
-                          👁 Preview
-                        </button>
+                            <TechinsIcon name="eye" size={13} variant="light" ariaHidden /> Preview
+                          </button>
                       )}
                       <button onClick={() => downloadFile(f, setError)} style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}>
-                        ⬇ Download
+                        <TechinsIcon name="download" size={13} variant="light" ariaHidden /> Download
                       </button>
                     </div>
                   ))}
@@ -161,7 +170,7 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
 
       {/* File Preview Modal */}
       {previewUrl && previewFile && (
-        <div className="review-modal" style={{ zIndex: 2000 }} onClick={(e) => { if (e.target === e.currentTarget) { setPreviewUrl(null); setPreviewFile(null); } }}>
+        <div className="review-modal" ref={previewRef} style={{ zIndex: 2000 }} onClick={(e) => { if (e.target === e.currentTarget) closePreview(); }}>
           <div className="panel" style={{ maxWidth: '90vw', maxHeight: '90vh', overflow: 'auto' }}>
             <div className="panel-head">
               <div>
@@ -271,7 +280,7 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
   }
 
   return (
-    <div className="review-modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="review-modal" ref={dialogRef} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="panel">
         <div className="panel-head">
           <div>
@@ -596,7 +605,7 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
                     <td className="files-column">
                       {item.file_count > 0 ? (
                         <div className="file-count">
-                          📎 {item.file_count} file{item.file_count === 1 ? '' : 's'}
+                          <TechinsIcon name="folder" size={13} variant="light" ariaHidden /> {item.file_count} file{item.file_count === 1 ? '' : 's'}
                         </div>
                       ) : (
                         <span className="no-files">No files</span>

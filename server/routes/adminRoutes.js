@@ -52,13 +52,14 @@ function ceoIdentity() {
   };
 }
 
-async function saveAvatar(userKey, file) {
-  const uploadsDir = path.join(__dirname, "..", "uploads", "avatars");
-  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-  const safeName = `${userKey}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${path.extname(file.originalname)}`;
-  const abs = path.join(uploadsDir, safeName);
-  fs.writeFileSync(abs, file.buffer);
-  return `/uploads/avatars/${safeName}`;
+// Avatars are stored in GridFS (Vercel's filesystem is read-only and
+// ephemeral — the previous disk write failed on every production deploy).
+// The CEO profile photo lives in the ceo_profile document; an admin's photo
+// lives on its users row. Both are served only through authenticated
+// endpoints (see GET /api/student/avatar/:id).
+async function saveAvatarGridfs(db, buffer, filename, metadata = {}) {
+  const { uploadAvatar } = require("../utils/fileStorage");
+  return uploadAvatar(db, buffer, filename, metadata);
 }
 
 router.get("/profile", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
@@ -76,6 +77,7 @@ router.get("/profile", authenticateToken, authorizeRoles("admin", "ceo"), async 
           name: saved?.name || identity.name,
           phone: saved?.phone || "",
           avatar: saved?.avatar || null,
+          avatar_gridfs_id: saved?.avatar_gridfs_id || null,
           email: identity.email,
           role: "ceo",
         },
@@ -99,9 +101,13 @@ router.put("/profile", authenticateToken, authorizeRoles("admin", "ceo"), avatar
       return res.status(400).json({ success: false, message: "Name is required" });
     }
 
-    let avatarPath = null;
+    let avatarGridfsId = null;
     if (req.file) {
-      avatarPath = await saveAvatar(req.user.role === "ceo" ? CEO_PROFILE_ID : req.user.id, req.file);
+      avatarGridfsId = await saveAvatarGridfs(db, req.file.buffer, req.file.originalname, {
+        user_id: req.user.role === "ceo" ? "ceo" : req.user.id,
+        mime_type: req.file.mimetype,
+        size: req.file.size
+      });
     }
 
     const cleanName = String(name).trim();
@@ -110,12 +116,16 @@ router.put("/profile", authenticateToken, authorizeRoles("admin", "ceo"), avatar
     if (req.user.role === "ceo") {
       const identity = ceoIdentity();
       const update = { name: cleanName, phone: cleanPhone };
-      if (avatarPath) {
-        update.avatar = avatarPath;
-        const prev = await db.collection("ceo_profile").findOne({ _id: CEO_PROFILE_ID }, { projection: { avatar: 1 } });
+      if (avatarGridfsId) {
+        update.avatar_gridfs_id = avatarGridfsId;
+        update.avatar = null;
+        const prev = await db.collection("ceo_profile").findOne({ _id: CEO_PROFILE_ID }, { projection: { avatar: 1, avatar_gridfs_id: 1 } });
         if (prev?.avatar) {
-          const oldAbs = path.join(__dirname, "..", prev.avatar);
-          if (fs.existsSync(oldAbs)) fs.unlinkSync(oldAbs);
+          try { fs.unlinkSync(path.join(__dirname, "..", prev.avatar)); } catch { /* already gone */ }
+        }
+        if (prev?.avatar_gridfs_id) {
+          const { deleteAvatar } = require("../utils/fileStorage");
+          deleteAvatar(db, prev.avatar_gridfs_id).catch(() => {});
         }
       }
       await db.collection("ceo_profile").updateOne(
@@ -127,7 +137,18 @@ router.put("/profile", authenticateToken, authorizeRoles("admin", "ceo"), avatar
       return res.json({ success: true, message: "Profile updated successfully" });
     }
     const update = { name: cleanName, phone: cleanPhone };
-    if (avatarPath) update.avatar = avatarPath;
+    if (avatarGridfsId) {
+      update.avatar_gridfs_id = avatarGridfsId;
+      update.avatar = null;
+      const prev = await db.collection("users").findOne({ _id: toId(req.user.id) }, { projection: { avatar: 1, avatar_gridfs_id: 1 } });
+      if (prev?.avatar) {
+        try { fs.unlinkSync(path.join(__dirname, "..", prev.avatar)); } catch { /* already gone */ }
+      }
+      if (prev?.avatar_gridfs_id) {
+        const { deleteAvatar } = require("../utils/fileStorage");
+        deleteAvatar(db, prev.avatar_gridfs_id).catch(() => {});
+      }
+    }
     await db.collection("users").updateOne({ _id: toId(req.user.id) }, { $set: update });
     return res.json({ success: true, message: "Profile updated successfully" });
   } catch (e) {
@@ -631,13 +652,21 @@ router.get("/pending-approvals", authenticateToken, authorizeRoles("admin", "ceo
 router.post("/approve-user/:id", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
   try {
     const db = req.db;
-    const userId = req.params.id;
+    const userId = toId(req.params.id); // ObjectId — a raw string never matches the _id field
     const user = await db.collection("users").findOne({ _id: userId });
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
-    if (isActiveFlag(user.active)) return res.status(400).json({ success: false, message: "User is already active" });
+    if (isActiveFlag(user.active) && normalizeRegistrationStatus(user.registration_status) !== "pending") {
+      return res.status(400).json({ success: false, message: "User is already active" });
+    }
 
-    await db.collection("users").updateOne({ _id: toId(userId) }, { $set: { active: 1 } });
-    await writeAudit(db, { actorId: req.user.id, action: "user_approved", entityType: "user", entityId: userId, newValue: { name: user.name, email: user.email, role: user.role, active: 1 } });
+    // Approval grants BOTH signals (active + registration_status) so the
+    // login gate and the approval workflow can never drift apart again.
+    // approve-registration/:id is the student-specific variant; this route
+    // also covers manager/admin activation.
+    const update = { active: 1, updated_at: new Date().toISOString() };
+    if (user.role === "student") update.registration_status = "approved";
+    await db.collection("users").updateOne({ _id: userId }, { $set: update });
+    await writeAudit(db, { actorId: req.user.id, action: "user_approved", entityType: "user", entityId: String(userId), newValue: { name: user.name, email: user.email, role: user.role, active: 1 } });
 
     res.json({ success: true, message: "User approved successfully" });
   } catch (error) {
@@ -725,9 +754,11 @@ router.post("/approve-registration/:id", authenticateToken, authorizeRoles("admi
       { $set: { registration_status: "approved", active: 1 } }
     );
 
-    // Mark related notifications as read
+    // Mark related notifications as read (email escaped: "+" or "." in an
+    // address would otherwise make the regex throw or over-match)
+    const emailPattern = user.email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     await db.collection("notifications").updateMany(
-      { type: "registration_pending", message: { $regex: user.email }, read_at: null },
+      { type: "registration_pending", message: { $regex: emailPattern }, read_at: null },
       { $set: { read_at: new Date().toISOString() } }
     );
 
@@ -754,8 +785,9 @@ router.post("/reject-registration/:id", authenticateToken, authorizeRoles("admin
       { $set: { registration_status: "rejected", active: 0 } }
     );
 
+    const emailPattern = user.email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     await db.collection("notifications").updateMany(
-      { type: "registration_pending", message: { $regex: user.email }, read_at: null },
+      { type: "registration_pending", message: { $regex: emailPattern }, read_at: null },
       { $set: { read_at: new Date().toISOString() } }
     );
 

@@ -29,7 +29,7 @@ if (missing.length) {
 }
 
 const { connect, healthCheck } = require("./mongodb");
-const { authenticateToken, checkStudentRegistrationStatus } = require("./middleware/authMiddleware");
+const { authenticateToken, checkStudentRegistrationStatus, requireApprovedStudent } = require("./middleware/authMiddleware");
 
 const app = express();
 
@@ -51,6 +51,22 @@ function buildCorsOriginsList() {
     process.env.CORS_ORIGINS
       .split(",")
       .map(url => url.trim().replace(/\/$/, ""))  // Strip trailing slashes
+      .filter(Boolean)
+      .forEach(url => origins.add(url));
+  }
+
+  // Also trust the deployed frontend URL when it is declared through any of
+  // these variables. Root cause of the production CORS outage: CORS_ORIGINS
+  // held a stale preview deployment URL while the canonical frontend domain
+  // (CLIENT_URL/APP_URL/FRONTEND_URL) was never allowed, so every browser
+  // request from the live site was blocked (preflight answered without
+  // Access-Control-Allow-Origin — verified against the live API).
+  for (const key of ["CLIENT_URL", "APP_URL", "FRONTEND_URL"]) {
+    const value = process.env[key];
+    if (!value) continue;
+    value
+      .split(",")
+      .map(url => url.trim().replace(/\/$/, ""))
       .filter(Boolean)
       .forEach(url => origins.add(url));
   }
@@ -223,11 +239,17 @@ const batchRoutes        = require("./routes/batchRoutes");
 
 app.use("/api/auth",         authRoutes);
 app.use("/api/admin",        adminRoutes);
-app.use("/api/tasks",        authenticateToken, taskRoutes);
+// Tasks and notifications are reachable with a student token (login now
+// issues a limited session to pending/rejected students so they can reach
+// the Waiting-for-Approval screen). requireApprovedStudent blocks ONLY
+// students whose registration is pending/rejected — unlike
+// checkStudentRegistrationStatus it never rejects the env-based CEO token
+// (CEO legitimately uses /api/tasks).
+app.use("/api/tasks",        authenticateToken, requireApprovedStudent, taskRoutes);
 app.use("/api/student",      authenticateToken, checkStudentRegistrationStatus, studentRoutes);
 app.use("/api/students",     studentsRoutes);
 app.use("/api/activities",   activityRoutes);
-app.use("/api/notifications",authenticateToken, notificationRoutes);
+app.use("/api/notifications",authenticateToken, requireApprovedStudent, notificationRoutes);
 app.use("/api/missions",     missionRoutes);
 app.use("/api/performance",  performanceRoutes);
 app.use("/api/audit-logs",   auditRoutes);
