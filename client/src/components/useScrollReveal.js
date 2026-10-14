@@ -150,7 +150,7 @@ export function useScrollReveal(selector = '.reveal-card', options = {}) {
 }
 
 // Helper to manually trigger reveal on mount (for dynamic content)
-export function revealOnMount(selector, options = {}) {
+export function useRevealOnMount(selector, options = {}) {
   const { stagger = 60 } = options;
 
   useEffect(() => {
