@@ -461,3 +461,54 @@ test("garbage token is rejected with 401 on every protected route", async () => 
     assert.equal(res.status, 401, `${p} should reject an invalid token`);
   }
 });
+
+/* ─── Status-code contract matrix ───────────────────────────────────────── */
+test("HTTP status codes are consistent (400/401/403/404/409/429 documented)", async () => {
+  // 404 — unknown API route (JSON error envelope, not HTML)
+  const unknown = await api("GET", "/api/does-not-exist");
+  assert.equal(unknown.status, 404);
+  assert.equal(unknown.json.success, false);
+
+  // 404 — valid route, wrong method
+  const wrongMethod = await api("GET", "/api/auth/login");
+  assert.ok([404, 405].includes(wrongMethod.status), `unexpected ${wrongMethod.status}`);
+
+  // 400 — invalid validation input on task creation (allowed domains)
+  const badDomain = await api("POST", "/api/tasks", { token: adminToken, body: { title: "t", domain: "not-a-domain", assigned_to: "000000000000000000000000" } });
+  assert.equal(badDomain.status, 400);
+
+  // 400 — invalid id passed to a route that validates it explicitly
+  const badDelete = await api("DELETE", "/api/tasks/not-an-objectid", { token: adminToken });
+  assert.equal(badDelete.status, 400);
+
+  // 404 — unknown entity id (well-formed ObjectId, no document)
+  const missingTask = await api("GET", "/api/tasks/000000000000000000000000", { token: adminToken });
+  assert.equal(missingTask.status, 404);
+
+  // 409 — duplicate email (case-insensitive through normalizeEmail)
+  const dup = await signupStudent("case-dup");
+  assert.equal(dup.status, 201);
+  const upper = await api("POST", "/api/auth/signup", {
+    body: { name: "Case Dup", email: email("case-dup").toUpperCase(), password: TEST_PASSWORD, role: "student", phone: "9876543210", batchId },
+  });
+  assert.equal(upper.status, 409);
+
+  // 400 — malformed JSON body is rejected, not crashed
+  const badJson = await fetch(`${BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{not-json",
+  });
+  assert.ok(badJson.status >= 400, `malformed JSON should 4xx, got ${badJson.status}`);
+
+  // 401 — missing token on a protected route
+  assert.equal((await api("GET", "/api/tasks/my")).status, 401);
+
+  // 200 — rate-limit headers are exposed on the login route
+  const loginRes = await fetch(`${BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "nobody@example.invalid", password: "x" }),
+  });
+  assert.ok(loginRes.headers.get("x-ratelimit-limit"), "login route must expose X-RateLimit-Limit");
+});

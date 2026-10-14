@@ -18,7 +18,9 @@ router.get("/", authenticateToken, authorizeRoles("ceo", "admin"), async (req, r
     const filters = {};
     if (req.query?.action) filters.action = String(req.query.action);
     if (req.query?.search) {
-      const search = String(req.query.search);
+      // Escape regex metacharacters: a raw value like "(" made MongoDB throw
+      // (500) and a pathological value could be used for regex backtracking.
+      const search = String(req.query.search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").slice(0, 100);
       filters.$or = [
         { action: { $regex: search, $options: "i" } },
         { entity_type: { $regex: search, $options: "i" } },
