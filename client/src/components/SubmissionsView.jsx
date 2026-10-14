@@ -43,8 +43,11 @@ async function downloadFile(file, onError) {
   }
 }
 
-/* Preview file - returns blob URL for image/PDF preview */
-async function previewFile(file, onError) {
+/* Preview file - returns blob URL for image/PDF preview.
+   NOTE: named fetchPreviewUrl (not previewFile) because DetailModal keeps a
+   `previewFile` STATE variable, which shadowed this helper inside the
+   component and made the Preview button call null(...) — it always failed. */
+async function fetchPreviewUrl(file, onError) {
   try {
     const res = await fetch(`${API_URL}${file.download_url}`, { headers: auth() });
     if (!res.ok) {
@@ -143,7 +146,7 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
                       {f.size && <span style={{ fontSize: '0.85rem', opacity: 0.7 }}>({formatBytes(f.size)})</span>}
                       {canPreview(f.mime) && (
                         <button onClick={async () => {
-                          const url = await previewFile(f, setError);
+                          const url = await fetchPreviewUrl(f, setError);
                           if (url) {
                             setPreviewUrl(url);
                             setPreviewFile(f);

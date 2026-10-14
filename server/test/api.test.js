@@ -103,38 +103,42 @@ test.after(async () => {
   if (serverProcess) serverProcess.kill();
   // Precise cleanup: only records created by these tests.
   try {
-    const { MongoClient } = require("mongodb");
+    const { MongoClient, ObjectId, GridFSBucket } = require("mongodb");
     require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
     if (!process.env.MONGODB_URI) return;
     const client = new MongoClient(process.env.MONGODB_URI);
     await client.connect();
     const db = client.db(process.env.MONGODB_DB_NAME || "techins");
-    const { GridFSBucket } = require("mongodb");
-    for (const id of created.gridfsIds) {
-      try { await new GridFSBucket(db, { bucketName: "submissions" }).delete(id); } catch { /* already gone */ }
-    }
-    if (created.taskIds.length) {
-      await db.collection("task_assignments").deleteMany({ task_id: { $in: created.taskIds } });
-      await db.collection("task_status_history").deleteMany({ task_id: { $in: created.taskIds } });
-    }
-    if (created.userIds.length) {
-      await db.collection("task_assignments").deleteMany({ student_id: { $in: created.userIds } });
-      await db.collection("notifications").deleteMany({ user_id: { $in: created.userIds } });
-      await db.collection("performance").deleteMany({ user_id: { $in: created.userIds } });
-    }
-    if (created.submissionIds.length) {
-      // Collect GridFS file ids before removing metadata rows.
+    // NOTE: _id values must be ObjectIds — string ids never match, which
+    // silently leaves the test records behind.
+    const oid = (v) => { try { return new ObjectId(String(v)); } catch { return null; } };
+    const userIds = created.userIds.map(oid).filter(Boolean);
+    const taskIds = created.taskIds.map(oid).filter(Boolean);
+    const submissionIds = created.submissionIds.map(oid).filter(Boolean);
+
+    // GridFS blobs belonging to these submissions
+    if (submissionIds.length) {
       const files = await db.collection("submission_files").find({ submission_id: { $in: created.submissionIds } }, { projection: { gridfs_id: 1 } }).toArray();
+      const bucket = new GridFSBucket(db, { bucketName: "submissions" });
       for (const f of files) {
         if (f.gridfs_id) {
-          try { await new GridFSBucket(db, { bucketName: "submissions" }).delete(f.gridfs_id); } catch { /* already gone */ }
+          try { await bucket.delete(f.gridfs_id); } catch { /* already gone */ }
         }
       }
       await db.collection("submission_files").deleteMany({ submission_id: { $in: created.submissionIds } });
-      await db.collection("submissions").deleteMany({ _id: { $in: created.submissionIds } });
+      await db.collection("submissions").deleteMany({ _id: { $in: submissionIds } });
     }
-    if (created.taskIds.length) await db.collection("tasks").deleteMany({ _id: { $in: created.taskIds } });
-    if (created.userIds.length) await db.collection("users").deleteMany({ _id: { $in: created.userIds } });
+    if (taskIds.length) {
+      await db.collection("task_assignments").deleteMany({ task_id: { $in: created.taskIds } });
+      await db.collection("task_status_history").deleteMany({ task_id: { $in: created.taskIds } });
+      await db.collection("tasks").deleteMany({ _id: { $in: taskIds } });
+    }
+    if (userIds.length) {
+      await db.collection("task_assignments").deleteMany({ student_id: { $in: created.userIds } });
+      await db.collection("notifications").deleteMany({ user_id: { $in: created.userIds } });
+      await db.collection("performance").deleteMany({ user_id: { $in: created.userIds } });
+      await db.collection("users").deleteMany({ _id: { $in: userIds } });
+    }
     await client.close();
     console.log(`[e2e] cleanup done: ${created.userIds.length} users, ${created.taskIds.length} tasks, ${created.submissionIds.length} submissions removed`);
   } catch (e) {
