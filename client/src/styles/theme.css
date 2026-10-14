@@ -99,6 +99,18 @@
   --anim-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --anim-easing-decelerate: cubic-bezier(0, 0, 0.2, 1);
   --anim-easing-accelerate: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Surface-aware control tokens. Controls must define their own foreground
+     because native form elements do not consistently inherit it. */
+  --control-bg: #ffffff;
+  --control-bg-hover: #f8fafc;
+  --control-text: #111827;
+  --control-placeholder: #667085;
+  --control-border: #cbd5e1;
+  --control-focus: #b45309;
+  --control-disabled-bg: #f1f5f9;
+  --control-disabled-text: #64748b;
+  --control-error: #b42318;
 }
 
 /* =========================================================
@@ -341,32 +353,33 @@
 .role-layout input,
 .role-layout textarea,
 .role-layout select {
-  background: #FFFFFF !important;
-  color: #111827 !important;
-  border: 1px solid #D1D5DB !important;
+  background: var(--control-bg);
+  color: var(--control-text);
+  border: 1px solid var(--control-border);
   -webkit-text-fill-color: #111827;
   color-scheme: light;
 }
 
 .role-layout input::placeholder,
 .role-layout textarea::placeholder {
-  color: #6B7280 !important;
+  color: var(--control-placeholder);
   opacity: 1;
 }
 
 .role-layout input:focus,
 .role-layout textarea:focus,
 .role-layout select:focus {
-  border-color: #FFB020 !important;
-  box-shadow: 0 0 0 3px rgba(255,176,32,.25) !important;
+  border-color: var(--control-focus);
+  box-shadow: 0 0 0 3px rgba(180,83,9,.2);
   outline: none;
 }
 
 .role-layout input:disabled,
 .role-layout textarea:disabled,
 .role-layout select:disabled {
-  background: #F3F4F6 !important;
-  color: #6B7280 !important;
+  background: var(--control-disabled-bg);
+  color: var(--control-disabled-text);
+  -webkit-text-fill-color: var(--control-disabled-text);
   cursor: not-allowed;
 }
 
@@ -379,29 +392,173 @@
 .student-layout input,
 .student-layout textarea,
 .student-layout select {
-  background: rgba(10,18,40,0.5) !important;
-  color: var(--text-primary) !important;
-  border-color: rgba(250,154,2,0.3) !important;
+  --control-bg: rgba(10,18,40,0.82);
+  --control-bg-hover: rgba(17,29,55,0.92);
+  --control-text: var(--text-primary);
+  --control-placeholder: var(--text-muted);
+  --control-border: rgba(250,154,2,0.38);
+  --control-focus: var(--accent);
+  --control-disabled-bg: rgba(10,18,40,0.5);
+  --control-disabled-text: var(--text-subtle);
+  background: var(--control-bg);
+  color: var(--control-text);
+  border-color: var(--control-border);
+  -webkit-text-fill-color: var(--control-text);
+  color-scheme: dark;
 }
 
 .student-layout input::placeholder,
 .student-layout textarea::placeholder {
-  color: var(--text-muted) !important;
+  color: var(--control-placeholder);
+  opacity: 1;
 }
 
 /* Input Fields - Login Page (Light Theme) */
 .login-page input,
 .login-page textarea,
 .login-page select {
-  background: #FFFFFF !important;
-  color: #111827 !important;
-  border: 1px solid #D1D5DB !important;
+  background: var(--control-bg);
+  color: var(--control-text);
+  border: 1px solid var(--control-border);
+  -webkit-text-fill-color: var(--control-text);
+  color-scheme: light;
 }
 
 .login-page input::placeholder,
 .login-page textarea::placeholder {
-  color: #6B7280 !important;
+  color: var(--control-placeholder);
   opacity: 1;
+}
+
+/* Shared native-control behavior. Keep this after portal styles so every
+   input, including controls in modals and filters, uses the same contract. */
+.role-layout,
+.login-page {
+  --control-bg: #ffffff;
+  --control-bg-hover: #f8fafc;
+  --control-text: #111827;
+  --control-placeholder: #667085;
+  --control-border: #cbd5e1;
+  --control-focus: #b45309;
+  --control-disabled-bg: #f1f5f9;
+  --control-disabled-text: #64748b;
+}
+
+.student-layout {
+  --control-bg: rgba(10,18,40,0.82);
+  --control-bg-hover: rgba(17,29,55,0.92);
+  --control-text: var(--text-primary);
+  --control-placeholder: var(--text-muted);
+  --control-border: rgba(250,154,2,0.38);
+  --control-focus: var(--accent);
+  --control-disabled-bg: rgba(10,18,40,0.5);
+  --control-disabled-text: var(--text-subtle);
+}
+
+.role-layout input,
+.role-layout textarea,
+.role-layout select,
+.student-layout input,
+.student-layout textarea,
+.student-layout select,
+.login-page input,
+.login-page textarea,
+.login-page select {
+  min-height: 42px;
+  border-radius: 10px;
+  color: var(--control-text);
+  background-color: var(--control-bg);
+  border-color: var(--control-border);
+  -webkit-text-fill-color: var(--control-text);
+  caret-color: var(--control-focus);
+}
+
+.role-layout input:hover:not(:disabled),
+.role-layout textarea:hover:not(:disabled),
+.role-layout select:hover:not(:disabled),
+.student-layout input:hover:not(:disabled),
+.student-layout textarea:hover:not(:disabled),
+.student-layout select:hover:not(:disabled),
+.login-page input:hover:not(:disabled),
+.login-page textarea:hover:not(:disabled),
+.login-page select:hover:not(:disabled) {
+  background-color: var(--control-bg-hover);
+}
+
+.role-layout input::placeholder,
+.role-layout textarea::placeholder,
+.student-layout input::placeholder,
+.student-layout textarea::placeholder,
+.login-page input::placeholder,
+.login-page textarea::placeholder {
+  color: var(--control-placeholder);
+  opacity: 1;
+}
+
+.role-layout input:focus-visible,
+.role-layout textarea:focus-visible,
+.role-layout select:focus-visible,
+.student-layout input:focus-visible,
+.student-layout textarea:focus-visible,
+.student-layout select:focus-visible,
+.login-page input:focus-visible,
+.login-page textarea:focus-visible,
+.login-page select:focus-visible {
+  outline: 2px solid var(--control-focus);
+  outline-offset: 2px;
+  border-color: var(--control-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--control-focus) 22%, transparent);
+}
+
+.role-layout input:disabled,
+.role-layout textarea:disabled,
+.role-layout select:disabled,
+.student-layout input:disabled,
+.student-layout textarea:disabled,
+.student-layout select:disabled,
+.login-page input:disabled,
+.login-page textarea:disabled,
+.login-page select:disabled {
+  background-color: var(--control-disabled-bg);
+  color: var(--control-disabled-text);
+  -webkit-text-fill-color: var(--control-disabled-text);
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.role-layout select option,
+.student-layout select option,
+.login-page select option {
+  background: var(--control-bg);
+  color: var(--control-text);
+}
+
+.role-layout input[type="date"],
+.role-layout input[type="time"],
+.student-layout input[type="date"],
+.student-layout input[type="time"] {
+  color-scheme: inherit;
+}
+
+.role-layout input[type="date"]::-webkit-datetime-edit,
+.role-layout input[type="time"]::-webkit-datetime-edit,
+.student-layout input[type="date"]::-webkit-datetime-edit,
+.student-layout input[type="time"]::-webkit-datetime-edit {
+  color: var(--control-text);
+}
+
+.role-layout input:-webkit-autofill,
+.role-layout input:-webkit-autofill:hover,
+.role-layout input:-webkit-autofill:focus,
+.login-page input:-webkit-autofill,
+.login-page input:-webkit-autofill:hover,
+.login-page input:-webkit-autofill:focus,
+.student-layout input:-webkit-autofill,
+.student-layout input:-webkit-autofill:hover,
+.student-layout input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--control-text);
+  -webkit-box-shadow: 0 0 0 1000px var(--control-bg) inset;
+  caret-color: var(--control-text);
 }
 
 /* Text Colors - Student Portal */

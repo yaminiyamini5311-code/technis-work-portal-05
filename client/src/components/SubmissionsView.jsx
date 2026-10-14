@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import TechinsIcon from "./TechinsIcon";
 import "./SubmissionsView.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -522,7 +523,7 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
             >
               {exporting ? "Exporting…" : (
                 <>
-                  <span>📊</span>
+                  <TechinsIcon name="chart" size={18} ariaHidden />
                   <span>Export to Excel</span>
                 </>
               )}

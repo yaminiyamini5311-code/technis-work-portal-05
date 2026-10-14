@@ -150,7 +150,7 @@ export default function Navbar({ role }) {
           aria-label="Close navigation menu"
           onClick={() => setMenuOpen(false)}
         >
-          ×
+           <TechinsIcon name="close" size={18} ariaHidden variant="dark" />
         </button>
 
         {/* Brand */}
@@ -206,7 +206,7 @@ export default function Navbar({ role }) {
 
         {/* Logout Button */}
         <button className="navbar-logout" onClick={logout}>
-          <span>↪</span>
+           <span><TechinsIcon name="logout" size={16} ariaHidden variant="dark" /></span>
           Logout
         </button>
       </nav>

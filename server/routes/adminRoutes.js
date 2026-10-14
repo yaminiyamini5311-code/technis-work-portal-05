@@ -151,21 +151,36 @@ router.use((err, req, res, next) => {
 });
 
 /* ─── STATS ─────────────────────────────────────────────────────────────── */
+/**
+ * Dashboard KPI Metrics
+ * - Students: Active student accounts (role='student', active=1)
+ * - Tasks: Total task records created
+ * - Completed: Tasks with workflow_status='Approved' (admin approved final outcome)
+ * - Pending: Tasks in 'Assigned' or 'Acknowledged' state (not yet started by student)
+ * - Missions: Total mission records
+ * - Today's Activity: Submissions made today (real student activity, not just daily_activity records)
+ */
 router.get("/stats", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
   try {
     const db = req.db;
     const today = new Date().toISOString().slice(0, 10);
 
-    const [students, tasks, missions, activities, activitiesToday, completedTasks, pendingTasks, inProgressTasks] = await Promise.all([
+    const [students, tasks, missions, completedTasks, pendingTasks, inProgressTasks, submissionsToday] = await Promise.all([
       db.collection("users").countDocuments({ role: "student", active: 1 }),
       db.collection("tasks").countDocuments(),
       db.collection("missions").countDocuments(),
-      db.collection("daily_activities").countDocuments(),
-      db.collection("daily_activities").countDocuments({ date: today }),
       db.collection("tasks").countDocuments({ workflow_status: "Approved" }),
       db.collection("tasks").countDocuments({ workflow_status: { $in: ["Assigned", "Acknowledged"] } }),
       db.collection("tasks").countDocuments({ workflow_status: { $in: ["In Progress", "Submitted", "Under Review", "Revision Required", "Resubmitted"] } }),
+      // Today's Activity: Count submissions created today (student activity)
+      db.collection("submissions").countDocuments({ 
+        created_at: { $gte: `${today}T00:00:00.000Z`, $lt: `${today}T23:59:59.999Z` } 
+      }),
     ]);
+
+    // Keep activities field for potential future use, but use submissionsToday for the card
+    const activities = 0; // Placeholder - daily_activities feature not currently used
+    const activitiesToday = submissionsToday; // Real student activity = submissions today
 
     res.json({
       success: true,
@@ -178,26 +193,77 @@ router.get("/stats", authenticateToken, authorizeRoles("admin", "manager", "ceo"
 });
 
 /* ─── PROGRESS ──────────────────────────────────────────────────────────── */
+/**
+ * Student Completion Activity Chart
+ * Shows submissions over time (student activity), not just admin approvals
+ * Periods: week (7 days), month (30 days), year (365 days)
+ * Groups by day for week/month, by month for year
+ */
 router.get("/progress", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
   try {
     const db = req.db;
     const period = String(req.query?.period || "week").toLowerCase();
-    const days = period === "month" ? 30 : 7;
+    
+    let days, groupByMonth = false;
+    if (period === "year") {
+      days = 365;
+      groupByMonth = true; // Group by month for year view
+    } else if (period === "month") {
+      days = 30;
+    } else {
+      days = 7; // week (default)
+    }
+    
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     const startDateStr = startDate.toISOString().slice(0, 10);
 
-    const tasks = await db.collection("tasks").find(
-      { workflow_status: "Approved", updated_at: { $gte: startDateStr } },
-      { projection: { updated_at: 1 } }
+    // Get submissions (real student activity) instead of only approved tasks
+    const submissions = await db.collection("submissions").find(
+      { created_at: { $gte: startDateStr } },
+      { projection: { created_at: 1 } }
     ).toArray();
 
     const grouped = {};
-    for (const t of tasks) {
-      const date = String(t.updated_at || "").slice(0, 10);
-      if (date) grouped[date] = (grouped[date] || 0) + 1;
+    
+    for (const sub of submissions) {
+      const timestamp = String(sub.created_at || "");
+      if (!timestamp) continue;
+      
+      let key;
+      if (groupByMonth) {
+        // Group by month for year view: "2026-10"
+        key = timestamp.slice(0, 7);
+      } else {
+        // Group by day for week/month: "2026-10-14"
+        key = timestamp.slice(0, 10);
+      }
+      
+      grouped[key] = (grouped[key] || 0) + 1;
     }
-    const progress = Object.entries(grouped).sort().map(([date, count]) => ({ date, count }));
+    
+    // Fill in missing dates/months with 0 to show continuous timeline
+    const filled = {};
+    const current = new Date(startDateStr);
+    const end = new Date();
+    
+    if (groupByMonth) {
+      // Fill months
+      while (current <= end) {
+        const key = current.toISOString().slice(0, 7);
+        filled[key] = grouped[key] || 0;
+        current.setMonth(current.getMonth() + 1);
+      }
+    } else {
+      // Fill days
+      while (current <= end) {
+        const key = current.toISOString().slice(0, 10);
+        filled[key] = grouped[key] || 0;
+        current.setDate(current.getDate() + 1);
+      }
+    }
+    
+    const progress = Object.entries(filled).sort().map(([date, count]) => ({ date, count }));
 
     res.json({ success: true, progress, period, days });
   } catch (error) {

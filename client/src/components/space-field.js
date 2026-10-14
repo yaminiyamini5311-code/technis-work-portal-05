@@ -5,10 +5,6 @@
 
 export function mountSpace({ force = false } = {}) {
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-  const smooth = (a, b, x) => {
-    const t = clamp((x - a) / (b - a), 0, 1);
-    return t * t * (3 - 2 * t);
-  };
 
   const reduce = !force && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const debug = /[?&]spacedebug=1/.test(location.search);
@@ -113,39 +109,6 @@ export function mountSpace({ force = false } = {}) {
   const onTouchEnd = () => {
     touchY = null;
   };
-
-  // Depth transitions for cards/sections marked data-space-depth
-  const visible = new Set();
-  const io = new IntersectionObserver(
-    (entries) => {
-      for (const en of entries) {
-        if (en.isIntersecting) {
-          visible.add(en.target);
-          en.target.style.willChange = 'transform, opacity';
-        } else {
-          visible.delete(en.target);
-          en.target.style.willChange = '';
-        }
-      }
-    },
-    { rootMargin: '25% 0px' }
-  );
-
-  const seen = new WeakSet();
-  const scan = () =>
-    document.querySelectorAll('[data-space-depth]').forEach((el) => {
-      if (!seen.has(el)) {
-        seen.add(el);
-        io.observe(el);
-      }
-    });
-
-  scan();
-  const mo = new MutationObserver(() => {
-    clearTimeout(mo._t);
-    mo._t = setTimeout(scan, 80);
-  });
-  mo.observe(document.body, { childList: true, subtree: true });
 
   // Rare soft light streak
   let flare = null,
@@ -293,15 +256,6 @@ export function mountSpace({ force = false } = {}) {
     nebula.style.transform = `translate3d(0,${(-progress * 80).toFixed(1)}px,0) scale(${(1 + progress * 0.12 + Math.min(Math.abs(v), 60) * 0.0015).toFixed(4)})`;
     root.style.setProperty('--space-progress', progress.toFixed(3));
 
-    for (const el of visible) {
-      // depth transitions, reversible with scroll direction
-      const r = el.getBoundingClientRect();
-      const d = clamp((r.top + r.height / 2 - h / 2) / h, -1.3, 1.3),
-        ad = Math.abs(d);
-      el.style.transform = `translate3d(0,${(d * 14).toFixed(1)}px,0) scale(${(1 - 0.05 * ad).toFixed(4)})`;
-      el.style.opacity = (1 - 0.65 * smooth(0.55, 1.15, ad)).toFixed(3);
-    }
-
     fpsN++;
     if (t - fpsT > 1000) {
       fps = Math.round((fpsN * 1000) / (t - fpsT));
@@ -316,11 +270,11 @@ export function mountSpace({ force = false } = {}) {
       velocity: +v.toFixed(2),
       scrollEvents: events,
       progress: +progress.toFixed(3),
-      depthVisible: visible.size,
+      depthVisible: 0,
     };
 
     if (badge)
-      badge.textContent = `space live | fps ${fps} | v ${v.toFixed(1)} | scroll ev ${events} | depth ${visible.size}`;
+      badge.textContent = `space live | fps ${fps} | v ${v.toFixed(1)} | scroll ev ${events}`;
   }
 
   const onVis = () => {
@@ -355,13 +309,6 @@ export function mountSpace({ force = false } = {}) {
     window.removeEventListener('touchend', onTouchEnd);
     window.removeEventListener('resize', resize);
     document.removeEventListener('visibilitychange', onVis);
-    io.disconnect();
-    mo.disconnect();
-    visible.forEach((el) => {
-      el.style.transform = '';
-      el.style.opacity = '';
-      el.style.willChange = '';
-    });
     nebula.remove();
     canvas.remove();
     if (badge) badge.remove();
