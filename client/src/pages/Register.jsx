@@ -196,7 +196,10 @@ export default function Register() {
             </div>
           )}
 
-          <form onSubmit={submit}>
+          {/* noValidate: the form uses the shared validation below so every
+              message renders in the styled, readable error box (and is
+              identical to the server rules) instead of a native tooltip. */}
+          <form onSubmit={submit} noValidate>
             <label htmlFor="register-name">Full name</label>
             <input
               id="register-name"
