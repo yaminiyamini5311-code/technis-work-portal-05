@@ -1364,12 +1364,18 @@ router.get("/:id/my-submission-status", authenticateToken, checkStudentRegistrat
       // Student has submitted - use submission status
       studentWorkflowStatus = submission.status;
     } else if (assignment) {
-      // No submission yet - use assignment status or task status
-      if (assignment.status === "revision_required") {
-        studentWorkflowStatus = "Revision Required";
-      } else if (assignment.status === "approved") {
-        studentWorkflowStatus = "Approved";
-      }
+      // No submission yet - map assignment status to workflow status
+      // These mappings ensure that the per-student status is always available,
+      // preventing the frontend from falling back to the global task.workflow_status
+      // (which changes when ANY student submits, causing buttons to disappear for everyone)
+      const statusMap = {
+        "assigned": "Assigned",
+        "in_progress": "In Progress",
+        "submitted": "Submitted",
+        "revision_required": "Revision Required",
+        "approved": "Approved"
+      };
+      studentWorkflowStatus = statusMap[assignment.status] || "Assigned";
     }
     
     res.json({

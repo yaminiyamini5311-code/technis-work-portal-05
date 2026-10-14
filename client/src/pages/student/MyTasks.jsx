@@ -317,22 +317,26 @@ export default function MyTasks() {
 
         <div className="tasks-list">
           {tasks.length ? tasks.filter(t => !domainFilter || t.domain === domainFilter).map((task) => {
-            const workflow = task.workflow_status || (task.status === "completed" ? "Approved" : task.status === "in_progress" ? "In Progress" : "Assigned");
-            
-            // Check if this specific student has submitted - use per-student submission status
+            // Use per-student state for button visibility, NOT the global task workflow_status
+            // (when one student submits, task.workflow_status changes to "Submitted" for everyone,
+            // hiding buttons for students who haven't submitted yet — the bug we're fixing)
             const hasStudentSubmission = task.has_submission === true;
-            const studentStatus = task.student_workflow_status || workflow;
+            const studentStatus = task.student_workflow_status;
+            
+            // Determine the effective workflow for THIS student:
+            // If they have a per-student status, use it; otherwise fall back to task status
+            const workflow = studentStatus || task.workflow_status || (task.status === "completed" ? "Approved" : task.status === "in_progress" ? "In Progress" : "Assigned");
             
             // Student can submit if the task still accepts work. A student
             // who already submitted may submit AGAIN only when the reviewer
             // requested a revision — that creates the next version
             // ("Resubmitted"). Previously any prior submission permanently
             // hid the submit UI, so revise-and-resubmit was impossible.
-            const needsRevision = workflow === "Revision Required" || task.student_workflow_status === "Revision Required";
+            const needsRevision = workflow === "Revision Required";
             const canSubmit = ["In Progress", "Revision Required", "Acknowledged", "Assigned"].includes(workflow) && (!hasStudentSubmission || needsRevision);
             
             // Show "awaiting review" only if this student actually submitted
-            const showAwaitingReview = hasStudentSubmission && ["Submitted", "Under Review", "Resubmitted"].includes(studentStatus);
+            const showAwaitingReview = hasStudentSubmission && ["Submitted", "Under Review", "Resubmitted"].includes(workflow);
             
             // Check if task is overdue
             const isOverdue = task.due_date && new Date(task.due_date) < new Date() && workflow !== "Approved";
