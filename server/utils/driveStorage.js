@@ -314,7 +314,10 @@ async function ensureFolderCached(db, { parentId, name, props, key }) {
     if (await folderStillExists(drive, cachedRow.drive_id)) {
       return { id: cachedRow.drive_id, cached: true };
     }
-    // Cached folder was deleted/trashed — fall through and recreate it.
+    // Cached folder was deleted/trashed. Drop the dead row so the recreation
+    // below can be cached: leaving it in place would make every insert fail
+    // with E11000 and hand back the dead id forever.
+    await cache.deleteOne({ key });
     console.warn(`[Drive] Cached folder ${key} no longer exists in Drive; recreating.`);
   }
 
