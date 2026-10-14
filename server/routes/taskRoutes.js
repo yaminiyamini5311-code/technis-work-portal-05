@@ -413,6 +413,41 @@ router.get("/files/:fileId/download", authenticateToken, async (req, res) => {
       return res.status(403).json({ success: false, message: "You do not have permission to access this file" });
     }
     
+    // Drive-backed files are streamed through the service account. The file stays
+    // PRIVATE: no public / anyone-with-the-link permission is ever set, and
+    // webViewLink is never treated as an access grant.
+    if (file.storage_type === "gdrive" && file.drive_file_id) {
+      try {
+        const driveStore = require("../utils/driveStorage");
+        const meta = await driveStore.getFileMetadata(String(file.drive_file_id));
+        if (meta.trashed) {
+          return res.status(404).json({ success: false, message: "File is no longer available" });
+        }
+        const stream = await driveStore.downloadStream(String(file.drive_file_id));
+        res.setHeader("Content-Type", meta.mimeType || file.mime_type || "application/octet-stream");
+        if (meta.size) res.setHeader("Content-Length", String(meta.size));
+        res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(file.original_name || "submission-file")}"`);
+        res.setHeader("Cache-Control", "private, no-store");
+        stream.on("error", (streamErr) => {
+          console.error("[Download] Drive stream error:", streamErr.message);
+          if (!res.headersSent) res.status(502).json({ success: false, message: "Unable to download file" });
+          else res.destroy();
+        });
+        stream.pipe(res);
+        await writeAudit(db, {
+          actorId: req.user.id,
+          action: "submission_file_downloaded",
+          entityType: "submission_file",
+          entityId: String(file._id),
+          newValue: { submission_id: String(sub._id), storage_type: "gdrive" }
+        });
+        return;
+      } catch (driveError) {
+        console.error("[Download] Drive error:", driveError.message);
+        return res.status(404).json({ success: false, message: "File is no longer available" });
+      }
+    }
+
     // Try GridFS (legacy storage)
     if (file.gridfs_id) {
       try {
