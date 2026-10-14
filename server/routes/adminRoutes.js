@@ -695,7 +695,7 @@ router.get("/feedback", authenticateToken, authorizeRoles("admin", "manager", "c
   }
 });
 
-router.post("/feedback", authenticateToken, authorizeRoles("admin", "manager"), async (req, res) => {
+router.post("/feedback", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
   try {
     const db = req.db;
     const { user_id, score, strengths, improvements, feedback } = req.body || {};

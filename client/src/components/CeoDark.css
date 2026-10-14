@@ -294,9 +294,11 @@
 .role-layout.ceo-dark select {
   background: var(--ceo-control-bg);
   color: var(--ceo-text);
-  -webkit-text-fill-color: var(--ceo-text);
+  /* Force light text color to override theme.css's dark #111827 fill */
+  -webkit-text-fill-color: var(--ceo-text) !important;
   border: 1px solid var(--ceo-border);
   border-radius: 10px;
+  caret-color: var(--ceo-text); /* Ensure cursor is visible */
   /* Dark native widgets (select arrows, date pickers, spinners) and dark
      form-control rendering. Beats theme.css `.role-layout input`
      color-scheme:light on specificity (0,2,1 vs 0,1,1). */
@@ -613,7 +615,8 @@
 }
 
 .role-layout.ceo-dark .detail-line .label {
-  color: var(--ceo-text-mute) !important;
+  color: var(--ceo-text) !important; /* Changed from text-mute to text for better contrast */
+  opacity: 0.7;
 }
 
 .role-layout.ceo-dark .task-info strong {
