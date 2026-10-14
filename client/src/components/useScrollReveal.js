@@ -8,7 +8,6 @@ import { useEffect, useRef, useCallback } from 'react';
 
 export function useScrollReveal(selector = '.reveal-card', options = {}) {
   const observerRef = useRef(null);
-  const elementsRef = useRef(new Map());
   const {
     threshold = [0, 0.15],
     rootMargin = '-60px 0px -60px 0px',
@@ -89,30 +88,13 @@ export function useScrollReveal(selector = '.reveal-card', options = {}) {
       });
     }, 2000);
 
-    observerRef.current = new IntersectionObserver((entries) => {
+    observerRef.current = new IntersectionObserver((entries, observer) => {
       entries.forEach((entry) => {
-        const element = entry.target;
-        const rect = element.getBoundingClientRect();
-        const viewportHeight = window.innerHeight;
-
-        // Calculate scroll progress (0 at bottom of viewport, 1 when fully visible)
-        const progress = Math.max(0, Math.min(1,
-          (viewportHeight - rect.top) / (viewportHeight + rect.height)
-        ));
-
-        // Hysteresis to prevent flicker at threshold
-        const currentState = elementsRef.current.get(element) || { progress: 0, isEntering: false };
-        const hysteresis = 0.05;
-
-        let isEntering;
-        if (entry.isIntersecting) {
-          isEntering = progress > currentState.progress + hysteresis;
-        } else {
-          isEntering = false;
-        }
-
-        elementsRef.current.set(element, { progress, isEntering });
-        applyRevealState(element, progress, isEntering);
+        if (!entry.isIntersecting) return;
+        // Reveal once. Reversing cards on every viewport crossing made this
+        // effect compete with the space-field scroll renderer.
+        applyRevealState(entry.target, 1, true);
+        observer.unobserve(entry.target);
       });
     }, {
       threshold,
@@ -122,6 +104,7 @@ export function useScrollReveal(selector = '.reveal-card', options = {}) {
     // Set initial state and observe with staggered delays
     const transition = `opacity 0.4s cubic-bezier(0.2, 0.9, 0.25, 1.1), transform 0.4s cubic-bezier(0.2, 0.9, 0.25, 1.1)`;
 
+    const timers = [];
     elements.forEach((el, index) => {
       if (!el.style.opacity || el.style.opacity === '1') {
         el.style.opacity = initialOpacity.toFixed(3);
@@ -133,18 +116,19 @@ export function useScrollReveal(selector = '.reveal-card', options = {}) {
       // Stagger initial reveal for elements above the fold. Batched into a
       // single timer chain instead of one setTimeout per element.
       if (el.getBoundingClientRect().top < window.innerHeight) {
-        setTimeout(() => applyRevealState(el, 1, true), index * stagger);
+        timers.push(setTimeout(() => applyRevealState(el, 1, true), index * stagger));
       }
 
       observerRef.current.observe(el);
     });
 
+    const observer = observerRef.current;
     return () => {
       clearTimeout(safetyTimeout);
-      if (observerRef.current) {
-        observerRef.current.disconnect();
+      if (observer) {
+        observer.disconnect();
       }
-      elementsRef.current.clear();
+      timers.forEach(clearTimeout);
     };
   }, [selector, threshold, rootMargin, stagger, initialScale, initialOpacity, initialTranslateY, initialBlur, applyRevealState]);
 }

@@ -28,6 +28,7 @@
   --ceo-text: #eef2fb;
   --ceo-text-dim: #9aa6c2;
   --ceo-text-mute: #6b7691;
+  --ceo-control-bg: rgba(255, 255, 255, 0.045);
 
   --ceo-violet: #7c6cff;
   --ceo-teal: #2fd4c4;
@@ -283,10 +284,10 @@
 .role-layout.ceo-dark input,
 .role-layout.ceo-dark textarea,
 .role-layout.ceo-dark select {
-  background: rgba(255, 255, 255, 0.045) !important;
-  color: var(--ceo-text) !important;
-  border: 1px solid var(--ceo-border) !important;
-  border-radius: 10px !important;
+  background: var(--ceo-control-bg);
+  color: var(--ceo-text);
+  border: 1px solid var(--ceo-border);
+  border-radius: 10px;
   /* Dark native widgets (select arrows, date pickers, spinners) and dark
      form-control rendering. Beats theme.css `.role-layout input`
      color-scheme:light on specificity (0,2,1 vs 0,1,1). */
@@ -296,18 +297,18 @@
    input surface — below AA. This lighter mute clears 4.5:1 (≈7:1). */
 .role-layout.ceo-dark { --ceo-placeholder: #9aa6c2; }
 .role-layout.ceo-dark input::placeholder,
-.role-layout.ceo-dark textarea::placeholder { color: var(--ceo-placeholder) !important; opacity: 1; }
+.role-layout.ceo-dark textarea::placeholder { color: var(--ceo-placeholder); opacity: 1; }
 /* Empty date fields render `mm/dd/yyyy` via -webkit-datetime-edit: keep
    it at placeholder contrast, filled dates at full text contrast. */
-.role-layout.ceo-dark input[type="date"] { color: var(--ceo-text) !important; }
+.role-layout.ceo-dark input[type="date"] { color: var(--ceo-text); }
 .role-layout.ceo-dark input[type="date"]::-webkit-datetime-edit { color: inherit; }
 .role-layout.ceo-dark input[type="date"]:invalid::-webkit-datetime-edit { color: var(--ceo-placeholder); }
 .role-layout.ceo-dark input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.75; cursor: pointer; }
 .role-layout.ceo-dark input:focus,
 .role-layout.ceo-dark textarea:focus,
 .role-layout.ceo-dark select:focus {
-  border-color: var(--ceo-violet) !important;
-  box-shadow: 0 0 0 3px rgba(124, 108, 255, 0.16) !important;
+  border-color: var(--ceo-violet);
+  box-shadow: 0 0 0 3px rgba(124, 108, 255, 0.16);
   outline: none;
 }
 
@@ -315,8 +316,8 @@
    surface. Without this, option text renders dark-on-dark or
    white-on-white depending on the OS widget. */
 .role-layout.ceo-dark select option {
-  background: var(--ceo-void-2) !important;
-  color: var(--ceo-text) !important;
+  background: var(--ceo-void-2);
+  color: var(--ceo-text);
 }
 .role-layout.ceo-dark select,
 .role-layout.ceo-dark input[type="date"] {
@@ -329,13 +330,13 @@
 .role-layout.ceo-dark .chart-tabs select,
 .role-layout.ceo-dark .chart-head input,
 .role-layout.ceo-dark .chart-head select {
-  background: rgba(255, 255, 255, 0.045) !important;
-  color: var(--ceo-text) !important;
-  border: 1px solid var(--ceo-border) !important;
+  background: var(--ceo-control-bg);
+  color: var(--ceo-text);
+  border: 1px solid var(--ceo-border);
 }
 .role-layout.ceo-dark .chart-tabs input::placeholder,
 .role-layout.ceo-dark .chart-head input::placeholder {
-  color: var(--ceo-placeholder, #9aa6c2) !important;
+  color: var(--ceo-placeholder, #9aa6c2);
   opacity: 1;
 }
 
