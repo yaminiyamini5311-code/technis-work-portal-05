@@ -25,6 +25,11 @@ export default function MyTasks() {
   const [comments, setComments] = useState({});
   const [domainFilter, setDomainFilter] = useState("");
   const previousApproved = useRef(null);
+  // Synchronous guards: React state updates are async, so a fast second
+  // click could still observe stale `busy`/`loading` values and fire a
+  // duplicate request. Refs are read synchronously in the same tick.
+  const submittingRef = useRef(false);
+  const loadingRef = useRef(false);
 
   // Scroll reveal effect for space theme - sophisticated animation
   useScrollReveal('.reveal-card', {
@@ -36,6 +41,10 @@ export default function MyTasks() {
   });
 
   const load = async () => {
+    // Guard overlapping polls/refetches (the 20s interval can fire while a
+    // slow request is still in flight).
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     try {
       setLoading(true);
       const { data } = await axios.get(`${API_URL}/api/tasks/my`, { headers: auth() });
@@ -70,12 +79,17 @@ export default function MyTasks() {
       setError(err.response?.data?.message || "Unable to load your tasks.");
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   };
 
   useEffect(() => {
     load();
-    const id = setInterval(load, 20000);
+    const id = setInterval(() => {
+      // Pause polling while the tab is hidden; resume on visibility.
+      if (document.hidden) return;
+      load();
+    }, 20000);
     return () => clearInterval(id);
   }, []);
 
@@ -93,7 +107,10 @@ export default function MyTasks() {
   };
 
   const submitTask = async (task) => {
-    if (busy) return; // prevent accidental duplicate submissions on double-click
+    // Synchronous duplicate-submit guard (double-click / retry): the ref is
+    // set before the first await, so a second click in the same tick is a
+    // no-op. React state (`busy`) only drives the button's disabled look.
+    if (submittingRef.current) return;
     const files = selectedFiles[task.id] || [];
     const comment = String(comments[task.id] || "").trim();
     if (!files.length && !comment) {
@@ -122,6 +139,7 @@ export default function MyTasks() {
     }
     try {
       setBusy(task.id);
+      submittingRef.current = true;
       const form = new FormData();
       files.forEach((file) => form.append("files", file));
       if (comment) form.append("comment", comment);
@@ -134,6 +152,7 @@ export default function MyTasks() {
       setError(err.response?.data?.message || "Unable to submit the task.");
     } finally {
       setBusy(null);
+      submittingRef.current = false;
     }
   };
 
@@ -168,7 +187,7 @@ export default function MyTasks() {
                 <option key={d.value} value={d.value}>{d.label}</option>
               ))}
             </select>
-            <button className="refresh-button" onClick={load} disabled={loading}>↻ Refresh</button>
+            <button className="refresh-button" onClick={load} disabled={loading}><TechinsIcon name="refresh" size={14} variant="light" /> Refresh</button>
           </div>
         </div>
         {error && <div className="task-alert">{error}</div>}
@@ -199,8 +218,13 @@ export default function MyTasks() {
             const hasStudentSubmission = task.has_submission === true;
             const studentStatus = task.student_workflow_status || workflow;
             
-            // Student can submit if they haven't submitted yet AND the task allows submission
-            const canSubmit = !hasStudentSubmission && ["In Progress", "Revision Required", "Acknowledged", "Assigned"].includes(workflow);
+            // Student can submit if the task still accepts work. A student
+            // who already submitted may submit AGAIN only when the reviewer
+            // requested a revision — that creates the next version
+            // ("Resubmitted"). Previously any prior submission permanently
+            // hid the submit UI, so revise-and-resubmit was impossible.
+            const needsRevision = workflow === "Revision Required" || task.student_workflow_status === "Revision Required";
+            const canSubmit = ["In Progress", "Revision Required", "Acknowledged", "Assigned"].includes(workflow) && (!hasStudentSubmission || needsRevision);
             
             // Show "awaiting review" only if this student actually submitted
             const showAwaitingReview = hasStudentSubmission && ["Submitted", "Under Review", "Resubmitted"].includes(studentStatus);

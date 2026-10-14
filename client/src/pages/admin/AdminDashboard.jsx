@@ -154,11 +154,15 @@ export default function AdminDashboard() {
   // Single effect owner: initial load + 20s refresh, no loops (dep is the
   // stable `load` callback, which only changes with `period`). Aborts any
   // in-flight request and clears the interval on unmount or period change.
+  // Polling pauses while the tab is hidden and resumes when visible again.
   useEffect(()=>{
     let alive = true;
     setLoading(true);
     load({ force: true });
-    const id=setInterval(()=>{ if (alive) load({ force: true }); },20000);
+    const id=setInterval(()=>{
+      if (!alive || document.hidden) return;
+      load({ force: true });
+    },20000);
     return()=>{ alive = false; clearInterval(id); abortRef.current?.abort(); };
   },[load]);
   const maxStudents = data?.maxStudents || 100;

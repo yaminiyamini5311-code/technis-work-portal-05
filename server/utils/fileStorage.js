@@ -133,10 +133,77 @@ async function migrateFileToGridFS(db, storagePath, filename, metadata = {}) {
   }
 }
 
+/**
+ * Profile avatars live in their own GridFS bucket ("avatars").
+ *
+ * Why: profile photos used to be written to server/uploads/avatars on the
+ * local filesystem. Vercel's filesystem is ephemeral and read-only, so the
+ * write failed (EROFS) on every production deploy and any file written
+ * locally was lost on the next cold start. GridFS works identically on
+ * Vercel and on long-running servers, and files stay private — they are
+ * only served through the authenticated /avatar endpoints.
+ */
+
+async function uploadAvatar(db, buffer, filename, metadata = {}) {
+  try {
+    const bucket = new GridFSBucket(db, { bucketName: "avatars" });
+
+    return new Promise((resolve, reject) => {
+      const uploadStream = bucket.openUploadStream(filename, {
+        metadata: {
+          ...metadata,
+          uploadedAt: new Date().toISOString()
+        }
+      });
+
+      uploadStream.on("error", reject);
+      uploadStream.on("finish", () => resolve(String(uploadStream.id)));
+
+      uploadStream.end(buffer);
+    });
+  } catch (error) {
+    console.error("[FileStorage] Avatar upload error:", error.message);
+    throw new Error(`Failed to upload avatar: ${error.message}`);
+  }
+}
+
+async function downloadAvatar(db, fileId) {
+  try {
+    const bucket = new GridFSBucket(db, { bucketName: "avatars" });
+
+    const files = await db.collection("avatars.files").find({ _id: new ObjectId(fileId) }).toArray();
+
+    if (!files.length) {
+      throw new Error("File not found");
+    }
+
+    const file = files[0];
+    const downloadStream = bucket.openDownloadStream(new ObjectId(fileId));
+
+    return { stream: downloadStream, file };
+  } catch (error) {
+    console.error("[FileStorage] Avatar download error:", error.message);
+    throw new Error(`Failed to download avatar: ${error.message}`);
+  }
+}
+
+async function deleteAvatar(db, fileId) {
+  try {
+    const bucket = new GridFSBucket(db, { bucketName: "avatars" });
+    await bucket.delete(new ObjectId(fileId));
+  } catch (error) {
+    console.error("[FileStorage] Avatar delete error:", error.message);
+    throw new Error(`Failed to delete avatar: ${error.message}`);
+  }
+}
+
 module.exports = {
   uploadFile,
   downloadFile,
   deleteFile,
   fileExists,
-  migrateFileToGridFS
+  migrateFileToGridFS,
+  uploadAvatar,
+  downloadAvatar,
+  deleteAvatar
 };

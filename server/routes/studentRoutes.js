@@ -64,22 +64,31 @@ router.put("/profile", authenticateToken, authorizeRoles("student", "member"), u
     const { name, phone } = req.body || {};
     if (!name || !name.trim()) return res.status(400).json({ success: false, message: "Name is required" });
 
-    let avatarPath = null;
+    // Avatars are stored in GridFS (serverless-safe; Vercel's filesystem is
+    // read-only). Legacy on-disk avatars are deleted best-effort on replace.
+    let avatarGridfsId = null;
     if (req.file) {
-      const uploadsDir = path.join(__dirname, "..", "uploads", "avatars");
-      if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-      const safeName = `${req.user.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${path.extname(req.file.originalname)}`;
-      avatarPath = path.join(uploadsDir, safeName);
-      fs.writeFileSync(avatarPath, req.file.buffer);
-
-      const oldUser = await db.collection("users").findOne({ _id: toId(req.user.id) }, { projection: { avatar: 1 } });
-      if (oldUser?.avatar && fs.existsSync(oldUser.avatar)) fs.unlinkSync(oldUser.avatar);
-
-      avatarPath = `/uploads/avatars/${safeName}`;
+      const { uploadAvatar, deleteAvatar } = require("../utils/fileStorage");
+      const previous = await db.collection("users").findOne({ _id: toId(req.user.id) }, { projection: { avatar: 1, avatar_gridfs_id: 1 } });
+      avatarGridfsId = await uploadAvatar(db, req.file.buffer, req.file.originalname, {
+        user_id: req.user.id,
+        mime_type: req.file.mimetype,
+        size: req.file.size
+      });
+      if (previous?.avatar && previous.avatar.startsWith("/uploads/")) {
+        try { fs.unlinkSync(path.join(__dirname, "..", previous.avatar)); } catch { /* already gone */ }
+      }
+      if (previous?.avatar_gridfs_id) {
+        deleteAvatar(db, previous.avatar_gridfs_id).catch(() => {});
+      }
     }
 
     const update = { name: String(name).trim(), phone: phone ? String(phone).trim() : null };
-    if (avatarPath) update.avatar = avatarPath;
+    if (avatarGridfsId) {
+      update.avatar_gridfs_id = avatarGridfsId;
+      update.avatar = null; // legacy disk path no longer used
+      update.avatar_updated_at = new Date().toISOString();
+    }
 
     await db.collection("users").updateOne({ _id: toId(req.user.id) }, { $set: update });
     const updatedUser = await db.collection("users").findOne({ _id: toId(req.user.id) }, { projection: { password: 0 } });
@@ -88,6 +97,42 @@ router.put("/profile", authenticateToken, authorizeRoles("student", "member"), u
   } catch (e) {
     console.error("Update profile error:", e);
     res.status(500).json({ success: false, message: "Unable to update profile" });
+  }
+});
+
+/* ─── PROFILE AVATAR (authenticated) ───────────────────────────────────────
+ * Streams a profile photo from GridFS. Only the account owner and
+ * admin/manager/ceo may fetch it; avatars are never public. The CEO profile
+ * photo lives in the ceo_profile document and is requested with id "ceo".
+ */
+router.get("/avatar/:id", authenticateToken, async (req, res) => {
+  try {
+    const db = req.db;
+    const id = String(req.params.id || "");
+    const isPrivileged = ["admin", "manager", "ceo"].includes(req.user.role);
+    if (!isPrivileged && id !== req.user.id) {
+      return res.status(403).json({ success: false, message: "You do not have permission to view this avatar" });
+    }
+
+    let gridfsId = null;
+    if (id === "ceo") {
+      const saved = await db.collection("ceo_profile").findOne({ _id: "ceo" }, { projection: { avatar_gridfs_id: 1 } });
+      gridfsId = saved?.avatar_gridfs_id || null;
+    } else {
+      const user = await db.collection("users").findOne({ _id: toId(id) }, { projection: { avatar_gridfs_id: 1 } });
+      gridfsId = user?.avatar_gridfs_id || null;
+    }
+
+    if (!gridfsId) return res.status(404).json({ success: false, message: "No avatar set" });
+
+    const { downloadAvatar } = require("../utils/fileStorage");
+    const { stream, file } = await downloadAvatar(db, gridfsId);
+    res.setHeader("Content-Type", file.metadata?.mime_type || "application/octet-stream");
+    res.setHeader("Cache-Control", "private, max-age=300");
+    stream.pipe(res);
+  } catch (e) {
+    console.error("Avatar fetch error:", e.message);
+    res.status(404).json({ success: false, message: "Avatar is no longer available" });
   }
 });
 

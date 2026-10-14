@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import TechinsIcon from "../../components/TechinsIcon";
 import "./StudentDashboard.css";
 import "./Profile.css";
@@ -17,6 +17,13 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  // Track the last blob URL created so it can be revoked when replaced or
+  // when the component unmounts (no leaks on repeated profile loads).
+  const blobUrlRef = useRef(null);
+
+  useEffect(() => () => {
+    if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+  }, []);
 
   const load = async () => {
     try {
@@ -33,6 +40,21 @@ export default function Profile() {
       });
       setAvatarPreview(d.user.avatar || null);
       setError("");
+      // GridFS avatars are private: fetch through the authenticated
+      // endpoint and render the blob (never a direct public URL).
+      if (d.user.avatar_gridfs_id) {
+        try {
+          const avatarRes = await fetch(`${API_URL}/api/student/avatar/${d.user.id}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+          });
+          if (avatarRes.ok) {
+            const blob = await avatarRes.blob();
+            if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+            blobUrlRef.current = URL.createObjectURL(blob);
+            setAvatarPreview(blobUrlRef.current);
+          }
+        } catch { /* keep initial-letter fallback */ }
+      }
     } catch (e) {
       setError(e.message);
     } finally {

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import useModalBehavior from "../../components/useModalBehavior";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 
@@ -177,6 +178,12 @@ export default function Students() {
   };
 
   const isLimitReached = total >= maxStudents;
+  // Stable close handlers + shared dialog behavior (Escape, outside click,
+  // focus trap/restore, scroll lock) for the edit and batch modals.
+  const closeEdit = useCallback(() => setEditTarget(null), []);
+  const closeBatch = useCallback(() => setBatchTarget(null), []);
+  const editModalRef = useModalBehavior(!!editTarget, closeEdit);
+  const batchModalRef = useModalBehavior(!!batchTarget, closeBatch);
 
   return (
     <div className="admin-simple page-enter">
@@ -300,7 +307,7 @@ export default function Students() {
       </div>
 
       {editTarget && (
-        <div className="review-modal" onClick={() => setEditTarget(null)}>
+        <div className="review-modal" ref={editModalRef} onClick={() => setEditTarget(null)}>
           <div className="panel" onClick={e => e.stopPropagation()}>
             <div className="panel-head">
               <h3>Edit Student</h3>
@@ -328,7 +335,7 @@ export default function Students() {
       )}
 
       {batchTarget && (
-        <div className="review-modal" onClick={() => setBatchTarget(null)}>
+        <div className="review-modal" ref={batchModalRef} onClick={() => setBatchTarget(null)}>
           <div className="panel" onClick={e => e.stopPropagation()}>
             <div className="panel-head">
               <h3>Change Batch — {batchTarget.name}</h3>

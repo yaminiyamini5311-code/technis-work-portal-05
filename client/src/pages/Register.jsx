@@ -4,9 +4,12 @@ import { useNavigate, Link } from "react-router-dom";
 import "./Login.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const PHONE_RE = /^\+?[0-9\s-]{7,15}$/;
 
 export default function Register() {
   const navigate = useNavigate();
+  const location = useLocation();
   const errorRef = useRef(null);
   const [form, setForm] = useState({
     name: "",
@@ -17,11 +20,16 @@ export default function Register() {
     phone: "",
     batchId: ""
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [batches, setBatches] = useState([]);
   const [batchesLoading, setBatchesLoading] = useState(true);
   const [batchesError, setBatchesError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // After a successful signup that requires approval we swap the form for a
+  // dedicated success panel — the student is never stranded on a message.
+  const [submitted, setSubmitted] = useState(false);
 
   // Load active batches from the public API (id + name only)
   useEffect(() => {
@@ -52,10 +60,12 @@ export default function Register() {
   const validateForm = () => {
     if (!form.name.trim()) return "Name is required";
     if (!form.email.trim()) return "Email is required";
+    if (!EMAIL_RE.test(form.email.trim())) return "Enter a valid email address";
     if (!form.password) return "Password is required";
     if (form.password.length < 8) return "Password must be at least 8 characters";
     if (form.password !== form.confirmPassword) return "Passwords do not match";
     if (form.role === "student" && !form.phone.trim()) return "Phone number is required for students";
+    if (form.phone.trim() && !PHONE_RE.test(form.phone.trim())) return "Enter a valid mobile number (7-15 digits)";
     if (form.role === "student" && !form.batchId) return "Batch selection is required";
     return null;
   };
@@ -82,18 +92,60 @@ export default function Register() {
       });
 
       if (data.success) {
-        if (data.message.includes("pending")) {
-          setError(data.message);
+        if (data.requiresApproval) {
+          // Pending approval: dedicated success panel with a working next
+          // step (sign in once approved) — never stranded on a message.
+          setSubmitted(true);
         } else {
           navigate("/login", { replace: true });
         }
       }
     } catch (err) {
-      setError(err.response?.data?.message || "Unable to create account. Please try again.");
+      const status = err.response?.status;
+      const message = err.response?.data?.message || "Unable to create account. Please try again.";
+      if (status === 409) {
+        // Account already exists — route to login instead of leaving the
+        // user stuck on an error (and never create a duplicate account).
+        navigate("/login", { replace: true, state: { notice: `${message} Please sign in instead.` } });
+        return;
+      }
+      setError(message);
     } finally {
       setLoading(false);
     }
   };
+
+  // Success panel — shown after a pending-approval signup.
+  if (submitted) {
+    return (
+      <main className="login-page">
+        <section className="login-section" aria-label="TECHINS workspace registration submitted">
+          <div className="login-card">
+            <div className="login-brand">
+              <img src="/techins-logo-full.jpg" alt="TECHINS logo" />
+              <span>ACCOUNT CREATED</span>
+            </div>
+            <div className="login-heading">
+              <h2>You're all set</h2>
+              <p>Your TECHINS workspace account has been created.</p>
+            </div>
+            <div className="login-success" role="status">
+              Your registration is <strong>awaiting CEO approval</strong>. You can sign in as soon as an
+              administrator approves your account — the Student Portal unlocks automatically.
+            </div>
+            <button className="login-submit" type="button" onClick={() => navigate("/login", { replace: true })}>
+              Go to login <span aria-hidden="true">→</span>
+            </button>
+            <div className="login-footer-line">
+              <span />
+              <small>Already approved? <Link to="/login" style={{ color: '#FA9A02', textDecoration: 'none', fontWeight: '700' }}>Sign in</Link></small>
+              <span />
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="login-page">
@@ -211,26 +263,32 @@ export default function Register() {
             <div className="password-field">
               <input
                 id="register-password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 placeholder="Min 8 characters"
                 autoComplete="new-password"
                 required
               />
+              <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? "Hide password" : "Show password"}>
+                {showPassword ? "Hide" : "Show"}
+              </button>
             </div>
 
             <label htmlFor="register-confirm">Confirm password</label>
             <div className="password-field">
               <input
                 id="register-confirm"
-                type="password"
+                type={showConfirm ? "text" : "password"}
                 value={form.confirmPassword}
                 onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
                 placeholder="Re-enter password"
                 autoComplete="new-password"
                 required
               />
+              <button type="button" onClick={() => setShowConfirm((v) => !v)} aria-label={showConfirm ? "Hide confirm password" : "Show confirm password"}>
+                {showConfirm ? "Hide" : "Show"}
+              </button>
             </div>
 
             <button className="login-submit" disabled={loading} type="submit">

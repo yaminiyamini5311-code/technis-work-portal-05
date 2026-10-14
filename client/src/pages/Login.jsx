@@ -1,21 +1,24 @@
 import { useState } from "react";
 import axios from "axios";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import "./Login.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState(location.state?.notice || "");
   const [loading, setLoading] = useState(false);
 
   const submit = async (event) => {
     event.preventDefault();
     setError("");
+    setNotice("");
     if (!email || !password) {
       setError("Please enter your email and password.");
       return;
@@ -31,6 +34,9 @@ export default function Login() {
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("role", data.user.role);
       const role = String(data.user.role || "").toLowerCase();
+      // Pending/rejected students authenticate into a limited session: every
+      // student route is gated server-side, and StudentLayout's
+      // RegistrationStatusGate renders the Waiting/Not-Approved screen.
       const dest = role === "admin" || role === "ceo"
         ? "/admin"
         : role === "manager"
@@ -116,6 +122,7 @@ export default function Login() {
               </button>
             </div>
 
+            {notice && !error && <div className="login-success" role="status">{notice}</div>}
             {error && <div className="login-error" role="alert">{error}</div>}
 
             <button className="login-submit" disabled={loading} type="submit">

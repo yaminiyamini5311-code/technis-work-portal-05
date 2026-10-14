@@ -123,4 +123,42 @@ async function checkStudentRegistrationStatus(req, res, next) {
   }
 }
 
-module.exports = { authenticateToken, authorizeRoles, authorizeCEO, rejectCEO, checkStudentRegistrationStatus, getSecret };
+/**
+ * Middleware that gates ONLY students whose registration is pending/rejected.
+ * Unlike checkStudentRegistrationStatus it never rejects the env-based CEO
+ * token, so it is safe to mount on shared routes (/api/tasks, /api/notifications)
+ * that both students and the CEO use. Used to keep the limited session issued
+ * to pending students (for the Waiting-for-Approval screen) away from data.
+ */
+async function requireApprovedStudent(req, res, next) {
+  if (!req.user || req.user.role !== "student") return next();
+  try {
+    const db = req.db;
+    if (!db) return res.status(500).json({ success: false, message: "Database connection unavailable" });
+
+    const { ObjectId } = require("mongodb");
+    let query;
+    try {
+      query = { _id: new ObjectId(req.user.id) };
+    } catch {
+      query = { _id: req.user.id };
+    }
+
+    const user = await db.collection("users").findOne(query, { projection: { registration_status: 1 } });
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    const status = normalizeRegistrationStatus(user.registration_status);
+    if (status === "pending") {
+      return res.status(403).json({ success: false, code: "REGISTRATION_PENDING", message: "Your registration is pending CEO approval" });
+    }
+    if (status === "rejected") {
+      return res.status(403).json({ success: false, code: "REGISTRATION_REJECTED", message: "Your registration has been rejected" });
+    }
+    next();
+  } catch (error) {
+    console.error("[Auth] Student approval check error:", error.message);
+    return res.status(500).json({ success: false, message: "Unable to verify registration status" });
+  }
+}
+
+module.exports = { authenticateToken, authorizeRoles, authorizeCEO, rejectCEO, checkStudentRegistrationStatus, requireApprovedStudent, getSecret };

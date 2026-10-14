@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import TechinsIcon from "./TechinsIcon";
 
@@ -62,6 +62,7 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);
   const navigate = useNavigate();
+  const wrapRef = useRef(null);
 
   let user = {};
   try {
@@ -94,9 +95,28 @@ export default function NotificationBell() {
   useEffect(() => {
     const ctrl = new AbortController();
     load(ctrl.signal);
-    const id = setInterval(() => load(ctrl.signal), 20000);
+    const id = setInterval(() => {
+      if (document.hidden) return; // pause polling on hidden tabs
+      load(ctrl.signal);
+    }, 20000);
     return () => { clearInterval(id); ctrl.abort(); };
   }, []);
+
+  // Close the panel on outside click and on Escape (keyboard parity with
+  // the nav drawer). Only bound while the panel is open.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   const markAndNavigate = async (item) => {
     // Mark as read
@@ -116,7 +136,7 @@ export default function NotificationBell() {
   };
 
   return (
-    <div className="notification-wrap">
+    <div className="notification-wrap" ref={wrapRef}>
       <button
         className="notification-button"
         onClick={() => setOpen(v => !v)}

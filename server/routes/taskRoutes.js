@@ -386,9 +386,14 @@ router.get("/submissions/export", authenticateToken, authorizeRoles("admin", "ma
 /* ─── DOWNLOAD SUBMISSION FILE ──────────────────────────────────────────
  * Streams file from MongoDB GridFS or migrates from legacy filesystem.
  * Supports both new GridFS files and old filesystem files for backward compatibility.
-
+ *
+ * Authorization: reviewers (admin/manager/ceo) may download any submission
+ * file; a student may download files belonging to THEIR OWN submissions
+ * (submission history access). The owning student is matched by id — never
+ * by a client-supplied field — and pending/rejected students are already
+ * blocked by requireApprovedStudent on this router.
  */
-router.get("/files/:fileId/download", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
+router.get("/files/:fileId/download", authenticateToken, async (req, res) => {
   try {
     const db = req.db;
     const file = await db.collection("submission_files").findOne({ _id: toId(req.params.fileId) });
@@ -396,6 +401,12 @@ router.get("/files/:fileId/download", authenticateToken, authorizeRoles("admin",
     
     const sub = await db.collection("submissions").findOne({ _id: toId(file.submission_id) });
     if (!sub) return res.status(404).json({ success: false, message: "Submission not found" });
+
+    const isReviewer = ["admin", "manager", "ceo"].includes(req.user.role);
+    const isOwner = req.user.role === "student" && String(sub.student_id) === String(req.user.id);
+    if (!isReviewer && !isOwner) {
+      return res.status(403).json({ success: false, message: "You do not have permission to access this file" });
+    }
     
     // Try GridFS first (new storage)
     if (file.gridfs_id) {

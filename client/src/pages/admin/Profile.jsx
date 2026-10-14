@@ -38,6 +38,21 @@ export default function Profile() {
       setForm({ name: d.user.name || "", phone: d.user.phone || "" });
       setAvatarPreview(d.user.avatar || null);
       setError("");
+      // GridFS avatars are private: fetch through the authenticated
+      // endpoint and render the blob (never a direct public URL).
+      if (d.user.avatar_gridfs_id) {
+        try {
+          const avatarRes = await fetch(`${API_URL}/api/student/avatar/${d.user.id}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+          });
+          if (avatarRes.ok) {
+            const blob = await avatarRes.blob();
+            if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+            blobUrlRef.current = URL.createObjectURL(blob);
+            setAvatarPreview(blobUrlRef.current);
+          }
+        } catch { /* keep initial-letter fallback */ }
+      }
     } catch (e) {
       setError(e.message);
     } finally {
