@@ -1030,17 +1030,22 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
     });
     const sid = String(subResult.insertedId);
 
-    const { ensureStudentFolder, ensureDayFolder, validateUpload, uploadToDrive, deleteFromDrive } = require("../utils/driveStorage");
+    const { ensureStudentFolder, ensureTaskFolder, validateUpload, uploadToDrive, deleteFromDrive } = require("../utils/driveStorage");
     const crypto = require("crypto");
-    const dayNumber = task.day_number || task.day || (req.body && (req.body.day || req.body.day_number)) || null;
+    // Fetch student info for folder naming
+    const student = await db.collection("users").findOne({ _id: toId(req.user.id) }, { projection: { name: 1, student_id: 1 } });
     let parentFolderId = null;
     // Drive is only contacted when files are actually attached: comment-only
     // submissions must keep working even if Drive is temporarily unavailable.
     if ((req.files || []).length) {
       try {
-        const folder = dayNumber
-          ? await ensureDayFolder(db, req.user.id, dayNumber)
-          : await ensureStudentFolder(db, req.user.id);
+        const folder = await ensureTaskFolder(
+          db,
+          req.user.id,
+          String(task._id),
+          task.task_code || String(task._id),
+          task.title || "Untitled Task"
+        );
         parentFolderId = folder.id;
       } catch (folderErr) {
         console.error("[Submit] Drive folder error:", folderErr.message);
@@ -1058,8 +1063,7 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
         const ext = (file.originalname.match(/\.[^.]+$/) || [""])[0].toLowerCase();
         const datePart = (submittedAt || new Date().toISOString()).slice(0, 10);
         const taskPart = "TASK_" + String(task.task_code || task.id || task._id).replace(/[^a-zA-Z0-9]/g, "_");
-        const dayPart = dayNumber ? "DAY_" + String(dayNumber).padStart(2, "0") + "_" : "";
-        const overrideName = dayPart + taskPart + "_SUBMISSION_" + datePart + "_v" + version + ext;
+        const overrideName = taskPart + "_SUBMISSION_" + datePart + "_v" + version + ext;
         driveFile = await uploadToDrive(file.buffer, file.originalname, file.mimetype, parentFolderId, overrideName);
       } catch (upErr) {
         console.error("[Submit] Drive upload error:", upErr.message);

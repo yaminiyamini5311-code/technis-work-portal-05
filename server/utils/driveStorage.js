@@ -173,15 +173,22 @@ async function getStudentsRootFolder(db) {
   return ensureFolder(db, "drive:root:students", ROOT_FOLDER_ID(), "Students");
 }
 
-async function ensureStudentFolder(db, studentId) {
+async function ensureStudentFolder(db, studentId, studentName, studentCode) {
   const root = await getStudentsRootFolder(db);
-  return ensureFolder(db, "drive:student:" + studentId, root.id, String(studentId));
+  // Folder name format: "TECHINS001 - Student Name"
+  const code = studentCode || studentId;
+  const name = studentName || "Unknown Student";
+  const folderName = `${code} - ${name}`;
+  return ensureFolder(db, "drive:student:" + studentId, root.id, folderName);
 }
 
-async function ensureDayFolder(db, studentId, dayNumber) {
+async function ensureTaskFolder(db, studentId, taskId, taskCode, taskTitle) {
   const studentFolder = await ensureStudentFolder(db, studentId);
-  const dayName = "Day " + String(dayNumber).padStart(2, "0");
-  return ensureFolder(db, "drive:student:" + studentId + ":day:" + dayNumber, studentFolder.id, dayName);
+  // Folder name format: "Task 1 - Task Name"
+  const code = taskCode || taskId;
+  const title = taskTitle || "Untitled Task";
+  const folderName = `${code} - ${title}`;
+  return ensureFolder(db, "drive:student:" + studentId + ":task:" + taskId, studentFolder.id, folderName);
 }
 
 function splitExt(filename) {
@@ -270,7 +277,7 @@ module.exports = {
   ensureFolder: ensureFolder,
   getStudentsRootFolder: getStudentsRootFolder,
   ensureStudentFolder: ensureStudentFolder,
-  ensureDayFolder: ensureDayFolder,
+  ensureTaskFolder: ensureTaskFolder,
   validateUpload: validateUpload,
   uploadToDrive: uploadToDrive,
   downloadFromDrive: downloadFromDrive,
