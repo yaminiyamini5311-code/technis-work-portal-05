@@ -86,10 +86,10 @@ if (missing.length) {
 
 **Local has**:
 ```env
-JWT_SECRET=a02d246d7689c4af4cbd0746145a26cfa5197b2689337203bc61d2b88a07cafbfd3a602f9b20b2138c79b2d8c04013b18df31947e9e476b8a9b45da69af0b2f0
+JWT_SECRET=[REDACTED]
 MONGODB_URI=mongodb://127.0.0.1:27017
 CEO_EMAIL=ceo@techins.com
-CEO_PASSWORD_HASH=$2b$12$3Kf/fjqiPRgJSjeOt6rVzu4gmWPzazJ0kSphRvGZbN18NLkl8T7yO
+CEO_PASSWORD_HASH=[REDACTED]
 ```
 
 **Impact**:
