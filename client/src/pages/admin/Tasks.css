@@ -796,3 +796,21 @@ tbody tr:last-child td {
   border-color: var(--ceo-border) !important;
   border-top-color: var(--ceo-violet) !important;
 }
+/* Scoped: review command input/display text stays black in all states */
+.role-layout .review-modal textarea,
+.role-layout .review-modal textarea:hover,
+.role-layout .review-modal textarea:focus,
+.role-layout .review-modal textarea:active,
+.role-layout .review-modal textarea:disabled {
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+  background-color: #fff;
+}
+.role-layout .feedback-box,
+.role-layout .feedback-box * {
+  color: #000;
+}
+.role-layout .feedback-box:hover,
+.role-layout .feedback-box:hover * {
+  color: #000;
+}

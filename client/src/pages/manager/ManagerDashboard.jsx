@@ -65,7 +65,7 @@ export default function ManagerDashboard() {
   // Task form state
   const [form, setForm] = useState({
     title: "", description: "", priority: "medium",
-    start_date: "", due_date: "", domain: "edutins",
+    start_date: "", start_time: "", due_date: "", due_time: "", domain: "edutins",
     how_to_do: "", expected_output: "", submission_requirements: ""
   });
   const [assignMode, setAssignMode] = useState("student"); // "student" | "program"
@@ -119,7 +119,7 @@ export default function ManagerDashboard() {
     const data = await res.json();
     if (!res.ok) return setError(data.message || "Unable to create task");
     setMessage(`Task ${data.taskCode} assigned successfully.`);
-    setForm({ title: "", description: "", priority: "medium", start_date: "", due_date: "", domain: "edutins", how_to_do: "", expected_output: "", submission_requirements: "" });
+    setForm({ title: "", description: "", priority: "medium", start_date: "", start_time: "", due_date: "", due_time: "", domain: "edutins", how_to_do: "", expected_output: "", submission_requirements: "" });
     setStudentId(""); setProgram("");
     load();
   };
@@ -270,11 +270,13 @@ export default function ManagerDashboard() {
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               <label htmlFor="m-task-start" style={{ fontSize: "11px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", color: "#5f625f" }}>Starting Date</label>
               <input id="m-task-start" name="m-task-start" type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} />
+              <input id="m-task-start-time" name="m-task-start-time" type="time" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })} />
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               <label htmlFor="m-task-due" style={{ fontSize: "11px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", color: "#5f625f" }}>Ending Date</label>
               <input id="m-task-due" name="m-task-due" type="date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} />
+              <input id="m-task-due-time" name="m-task-due-time" type="time" value={form.due_time} onChange={e => setForm({ ...form, due_time: e.target.value })} />
             </div>
 
             <textarea id="m-task-desc" name="m-task-desc" placeholder="Description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />

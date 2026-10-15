@@ -30,6 +30,18 @@ const STATUS = ["Draft","Scheduled","Assigned","Acknowledged","In Progress","Sub
 const priorityValues = new Set(["low","medium","high","critical"]);
 
 function toId(id) { try { return new ObjectId(id); } catch { return id; } }
+function combineTaskDateTime(date, time, defaultTime) {
+  if (!date) return null;
+  const t = time || defaultTime;
+  try { return new Date(`${date}T${t}:00`).toISOString(); } catch { return null; }
+}
+function taskStartAt(task) {
+  return task?.start_at || combineTaskDateTime(task?.start_date, task?.start_time, "00:00");
+}
+function taskEndAt(task) {
+  return task?.due_at || combineTaskDateTime(task?.due_date, task?.due_time, "23:59");
+}
+
 
 function legacyStatus(workflow) {
   if (["Approved","Archived"].includes(workflow)) return "completed";
@@ -692,8 +704,15 @@ router.post("/", authenticateToken, authorizeRoles("admin", "ceo", "manager"), a
     const workflow = String(b.workflow_status || "Assigned");
     if (!STATUS.includes(workflow)) return res.status(400).json({ success: false, message: "Invalid task workflow status" });
 
-    if (b.start_date && b.due_date && b.start_date > b.due_date) {
-      return res.status(400).json({ success: false, message: "Starting Date cannot be after Ending Date" });
+    const startTime = b.start_time ? String(b.start_time).trim() : null;
+    const endTime = (b.due_time || b.end_time) ? String(b.due_time || b.end_time).trim() : null;
+    if (b.start_date && b.due_date) {
+      if (b.start_date > b.due_date) {
+        return res.status(400).json({ success: false, message: "Starting Date cannot be after Ending Date" });
+      }
+      if (b.start_date === b.due_date && startTime && endTime && startTime > endTime) {
+        return res.status(400).json({ success: false, message: "Starting time cannot be after ending time" });
+      }
     }
 
     const taskCode = await nextTaskCode(db);
@@ -727,7 +746,11 @@ router.post("/", authenticateToken, authorizeRoles("admin", "ceo", "manager"), a
       workflow_status: workflow,
       priority,
       start_date: b.start_date || null,
+      start_time: startTime,
+      start_at: combineTaskDateTime(b.start_date, startTime, "00:00"),
       due_date: b.due_date || null,
+      due_time: endTime,
+      due_at: combineTaskDateTime(b.due_date, endTime, "23:59"),
       completed_at: null,
       feedback: null,
       outcome: null,
@@ -790,7 +813,9 @@ router.get("/:id", authenticateToken, async (req, res) => {
     if (!allowed) return res.status(403).json({ success: false, message: "Access denied" });
 
     const history = await db.collection("task_status_history").find({ task_id: String(task._id) }).sort({ created_at: 1 }).toArray();
-    const submissions = await db.collection("submissions").find({ task_id: String(task._id) }).sort({ version: -1 }).toArray();
+    const subFilter = { task_id: String(task._id) };
+    if (["student", "member"].includes(req.user.role)) subFilter.student_id = req.user.id;
+    const submissions = await db.collection("submissions").find(subFilter).sort({ version: -1 }).toArray();
 
     const historyWithNames = await Promise.all(history.map(async h => {
       const u = await db.collection("users").findOne({ _id: toId(h.changed_by) }, { projection: { name: 1 } });
@@ -872,6 +897,13 @@ router.patch("/:id/status", authenticateToken, async (req, res) => {
 
     if (!studentOwner && !managerOwner && !admin) return res.status(403).json({ success: false, message: "Access denied" });
     if (studentOwner && !["Acknowledged", "In Progress"].includes(toStatus)) return res.status(403).json({ success: false, message: "Students cannot directly approve or review tasks" });
+    // Enforce start/end window for student-driven status changes.
+    if (studentOwner && (toStatus === "In Progress" || toStatus === "Acknowledged")) {
+      const now = new Date();
+      const sa = taskStartAt(task); const ea = taskEndAt(task);
+      if (sa && now < new Date(sa)) return res.status(409).json({ success: false, message: "Task has not started yet" });
+      if (ea && now > new Date(ea)) return res.status(409).json({ success: false, message: "The task deadline has passed" });
+    }
     if ((admin || managerOwner) && toStatus === "Approved" && !["Under Review", "Resubmitted", "Submitted", "Revision Required"].includes(task.workflow_status)) {
       return res.status(409).json({ success: false, message: "Task must have a submission before approval" });
     }
@@ -882,19 +914,10 @@ router.patch("/:id/status", authenticateToken, async (req, res) => {
       await updateAssignment(db, String(task._id), req.user.id, { status: "in_progress" });
     }
     if (toStatus === "In Progress") await notify(db, task.assigned_by, "task_started", "Task started", `${task.title} was marked in progress.`, String(task._id));
-    if (toStatus === "Approved") {
-      // Notify every student assigned to this task (batch tasks have many)
-      const { listAssignmentsForTask } = require("../models/TaskAssignment");
-      const assignees = await listAssignmentsForTask(db, String(task._id));
-      for (const a of assignees) {
-        await notify(db, a.student_id, "task_approved", "Task approved", `${task.title} has been approved.`, String(task._id));
-      }
-      // Mark every student assignment on this task as approved
-      await db.collection("task_assignments").updateMany(
-        { task_id: String(task._id) },
-        { $set: { status: "approved", progress: 100, updated_at: new Date().toISOString() } }
-      );
-    }
+    // Per-student approval side-effects are handled by the caller that knows
+    // the owning student (e.g. POST /review updates that student's assignment
+    // and notifies them). transition() must never bulk-update every
+    // assignment, because one student's submission must not change another's.
 
     res.json({ success: true, message: "Task status updated", workflow_status: toStatus });
   } catch (e) { console.error("Update status:", e); res.status(500).json({ success: false, message: "Unable to update status" }); }
@@ -913,6 +936,17 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
     const legacyOwner = task.assigned_to === req.user.id;
     if (!assignment && !legacyOwner) return res.status(403).json({ success: false, message: "Access denied" });
     if (["Approved", "Cancelled", "Archived"].includes(task.workflow_status)) return res.status(409).json({ success: false, message: "This task cannot accept a submission" });
+
+    // Enforce configured start/end date-time window server-side.
+    const now = new Date();
+    const startAt = taskStartAt(task);
+    const endAt = taskEndAt(task);
+    if (startAt && now < new Date(startAt)) {
+      return res.status(409).json({ success: false, message: `Task has not started yet. Starts on ${new Date(startAt).toLocaleString()}` });
+    }
+    if (endAt && now > new Date(endAt)) {
+      return res.status(409).json({ success: false, message: "The task deadline has passed." });
+    }
 
     // Reject empty submissions: at least one file or a comment is required
     // (mirrors the student UI validation so API clients get the same rule).
@@ -1101,24 +1135,31 @@ router.get("/:id/my-submission-status", authenticateToken, checkStudentRegistrat
       return res.status(403).json({ success: false, message: "Access denied" });
     }
     
-    // Determine the workflow status for THIS student
+    // Determine the workflow status for THIS student (per-student only).
     let studentWorkflowStatus = null;
     if (submission) {
-      // Student has submitted - use submission status
+      // Student has submitted - use THEIR submission status.
       studentWorkflowStatus = submission.status;
     } else if (assignment) {
-      // No submission yet - use assignment status or task status
-      if (assignment.status === "revision_required") {
-        studentWorkflowStatus = "Revision Required";
-      } else if (assignment.status === "approved") {
-        studentWorkflowStatus = "Approved";
+      switch (assignment.status) {
+        case "approved": studentWorkflowStatus = "Approved"; break;
+        case "revision_required": studentWorkflowStatus = "Revision Required"; break;
+        case "submitted": studentWorkflowStatus = "Submitted"; break;
+        case "in_progress": studentWorkflowStatus = "In Progress"; break;
+        case "assigned":
+        default: studentWorkflowStatus = "Assigned"; break;
       }
+    }
+    // Respect a cancelled/archived task for everyone.
+    if (task?.workflow_status === "Cancelled" || task?.workflow_status === "Archived") {
+      studentWorkflowStatus = task.workflow_status;
     }
     
     res.json({
       success: true,
       has_submission: !!submission,
       workflow_status: studentWorkflowStatus,
+      assignment_status: assignment?.status || null,
       latest_submission: submission ? {
         id: String(submission._id),
         version: submission.version,

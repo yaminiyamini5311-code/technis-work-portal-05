@@ -110,7 +110,7 @@ export default function MyTasks() {
         })
       );
       
-      const approved = tasksWithSubmissionStatus.filter((task) => task.workflow_status === "Approved" || task.status === "completed").length;
+      const approved = tasksWithSubmissionStatus.filter((task) => (task.student_workflow_status || task.workflow_status) === "Approved" || task.status === "completed").length;
       previousApproved.current = approved;
       setTasks(tasksWithSubmissionStatus);
       setError("");
@@ -216,10 +216,11 @@ export default function MyTasks() {
     }
   };
 
-  const completed = tasks.filter((t) => t.workflow_status === "Approved" || t.status === "completed").length;
-  const pending = tasks.filter((t) => ["Assigned", "Scheduled", "pending"].includes(t.workflow_status) || t.status === "pending").length;
-  const inProgress = tasks.filter((t) => ["In Progress", "Acknowledged", "Revision Required"].includes(t.workflow_status) || t.status === "in_progress").length;
-  const review = tasks.filter((t) => ["Submitted", "Under Review", "Resubmitted"].includes(t.workflow_status)).length;
+  const ts = (t) => t.student_workflow_status || t.workflow_status;
+  const completed = tasks.filter((t) => ts(t) === "Approved" || t.status === "completed").length;
+  const pending = tasks.filter((t) => ["Assigned", "Scheduled", "pending"].includes(ts(t)) || t.status === "pending").length;
+  const inProgress = tasks.filter((t) => ["In Progress", "Acknowledged", "Revision Required"].includes(ts(t)) || t.status === "in_progress").length;
+  const review = tasks.filter((t) => ["Submitted", "Under Review", "Resubmitted"].includes(ts(t))).length;
   const percent = tasks.length ? Math.round((completed / tasks.length) * 100) : 0;
 
   if (loading && !tasks.length) return <div className="portal-loading"><div className="loader-dot" /><h2>Loading your tasks</h2><p>Syncing your latest assignments.</p></div>;
@@ -278,14 +279,16 @@ export default function MyTasks() {
             const hasStudentSubmission = task.has_submission === true;
             const studentStatus = task.student_workflow_status || workflow;
             
-            // Student can submit if the task still accepts work. A student
-            // who already submitted may submit AGAIN only when the reviewer
-            // requested a revision — that creates the next version
-            // ("Resubmitted"). Previously any prior submission permanently
-            // hid the submit UI, so revise-and-resubmit was impossible.
-            const needsRevision = workflow === "Revision Required" || task.student_workflow_status === "Revision Required";
-            const canSubmit = ["In Progress", "Revision Required", "Acknowledged", "Assigned"].includes(workflow) && (!hasStudentSubmission || needsRevision);
+            const needsRevision = studentStatus === "Revision Required";
+            const startAt = task.start_at || (task.start_date ? `${task.start_date}T${task.start_time || "00:00"}:00` : null);
+            const endAt = task.due_at || (task.due_date ? `${task.due_date}T${task.due_time || "23:59"}:00` : null);
+            const nowDate = new Date();
+            const beforeStart = !!startAt && nowDate < new Date(startAt);
+            const expired = !!endAt && nowDate > new Date(endAt);
+            const isClosed = ["Approved", "Cancelled", "Archived"].includes(studentStatus) || ["Cancelled", "Archived"].includes(workflow) || expired;
+            const canSubmit = !isClosed && (!hasStudentSubmission || needsRevision) && (hasStudentSubmission ? needsRevision : true);
             
+
             // Show "awaiting review" only if this student actually submitted
             const showAwaitingReview = hasStudentSubmission && ["Submitted", "Under Review", "Resubmitted"].includes(studentStatus);
             
@@ -315,13 +318,13 @@ export default function MyTasks() {
                 <div className="task-meta-grid">
                   <div><span>Priority</span><strong className={`priority ${task.priority}`}>{task.priority || "medium"}</strong></div>
                   {task.domain && <div><span>Domain</span><strong style={{ textTransform: 'capitalize' }}>{task.domain}</strong></div>}
-                  {task.start_date && <div><span>Start</span><strong>{formatDate(task.start_date)}</strong></div>}
-                  <div><span>End</span><strong>{task.due_date ? formatDate(task.due_date) : "No deadline"}</strong></div>
+                  {task.start_date && <div><span>Start</span><strong>{formatDate(task.start_date)}{task.start_time ? ` ${task.start_time}` : ""}</strong></div>}
+                  <div><span>End</span><strong>{task.due_date ? `${formatDate(task.due_date)}${task.due_time ? ` ${task.due_time}` : ""}` : "No deadline"}</strong></div>
                   <div><span>Assigned by</span><strong>{task.assigned_by_name || "Management"}</strong></div>
                   <div><span>Versions</span><strong>{task.latest_version || 0}</strong></div>
                 </div>
                 <div className="task-actions">
-                  {(workflow === "Assigned" || task.status === "pending") && <button className="action-progress" disabled={busy === task.id} onClick={() => startTask(task.id)}>{busy === task.id ? "Updating…" : "Start Task"}</button>}
+                  {(!hasStudentSubmission && (studentStatus === "Assigned" || task.status === "pending" || studentStatus === null)) && (beforeStart ? <div className="completed-label">Starts on {startAt ? new Date(startAt).toLocaleString() : "scheduled time"}</div> : <button className="action-progress" disabled={busy === task.id || expired} onClick={() => startTask(task.id)}>{busy === task.id ? "Updating…" : "Start Task"}</button>)}
                   {showAwaitingReview ? <div className="completed-label">Submission received · awaiting review</div> : null}
                   {hasStudentSubmission && (
                     <button className="action-progress" onClick={() => toggleHistory(task)} aria-expanded={!!history[task.id]}>
@@ -330,7 +333,7 @@ export default function MyTasks() {
                       {task.latest_version ? `(v${task.latest_version})` : ""}
                     </button>
                   )}
-                  {workflow === "Approved" && <div className="completed-label"><TechinsIcon name="check" size={16} variant="light" /> Task approved and recorded</div>}
+                  {studentStatus === "Approved" && <div className="completed-label"><TechinsIcon name="check" size={16} variant="light" /> Task approved and recorded</div>}
                 </div>
                 {hasStudentSubmission && history[task.id] && (
                   <div className="submission-history">

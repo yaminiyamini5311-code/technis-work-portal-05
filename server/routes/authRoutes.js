@@ -475,7 +475,7 @@ router.post("/signup", async (req, res) => {
     // previous behaviour (inactive until an admin activates the account).
     const requiresApproval = role === "student" || role === "manager";
     const active = requiresApproval ? 0 : 1;
-    const registrationStatus = role === "student" ? "pending" : "approved";
+    const registrationStatus = "pending";
 
     const result = await db.collection("users").insertOne({
       name, email, password: passwordHash, role, phone, active, registration_status: registrationStatus,
@@ -491,12 +491,12 @@ router.post("/signup", async (req, res) => {
       await createAssignmentsForStudent(db, insertedId, String(batchRecord._id));
     }
 
-    // Notify CEO/Admin users about new student registration (with authorization check)
-    if (role === "student") {
+    // Notify CEO/Admin users about new registration (with authorization check)
+    if (role === "student" || role === "manager") {
       await createCeoNotification(db, email, {
         type: "registration_pending",
-        title: "New Student Registration",
-        message: `${name} (${email}) has registered and is awaiting approval.`
+        title: role === "student" ? "New Student Registration" : "New Manager Registration",
+        message: `${name} (${email}) has registered as ${role} and is awaiting approval.`
       });
     }
 

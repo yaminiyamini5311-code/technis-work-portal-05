@@ -145,7 +145,7 @@ export default function StudentDashboard(){
           {data.tasks.recent.length?data.tasks.recent.map(t=>
             <div className="professional-task-row" key={t.id}>
               <div className="task-index"><TechinsIcon name="clipboard" size={18} variant="light" className="portal-icon" /></div>
-              <div className="task-row-content"><strong>{t.title}</strong><small>{t.start_date ? `${formatDate(t.start_date)} - ` : ''}{t.due_date ? formatDate(t.due_date) : "No deadline"}</small></div>
+              <div className="task-row-content"><strong>{t.title}</strong><small>{t.start_date ? `${formatDate(t.start_date)}${t.start_time ? ` ${t.start_time}` : ""} - ` : ""}{t.due_date ? `${formatDate(t.due_date)}${t.due_time ? ` ${t.due_time}` : ""}` : "No deadline"}</small></div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 {t.domain && <span className="domain-chip" style={{
                   padding: '3px 8px',

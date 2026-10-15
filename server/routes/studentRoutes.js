@@ -35,8 +35,16 @@ router.get("/dashboard", authenticateToken, authorizeRoles("student", "member"),
 router.get("/feedback", authenticateToken, authorizeRoles("student", "member"), async (req, res) => {
   try {
     const db = req.db;
-    const feedback = await db.collection("performance").find({ user_id: req.user.id }).sort({ created_at: -1 }).limit(20).toArray();
-    const taskFeedback = await db.collection("tasks").find({ assigned_to: req.user.id, feedback: { $exists: true, $ne: null } }, { projection: { task_code: 1, title: 1, feedback: 1, updated_at: 1 } }).sort({ updated_at: -1 }).limit(20).toArray();
+    const feedback = await db.collection("performance").find({ user_id: String(req.user.id) }).sort({ created_at: -1 }).limit(20).toArray();
+    // Task feedback should follow the student's assignments (batch tasks are
+    // not stored under assigned_to), not a single legacy owner field.
+    const { getStudentTaskIds } = require("../models/TaskAssignment");
+    const taskIds = await getStudentTaskIds(db, req.user.id);
+    const taskObjectIds = taskIds.map(id => { try { return toId(id); } catch { return id; } });
+    const taskFeedback = await db.collection("tasks").find(
+      { _id: { $in: taskObjectIds }, feedback: { $exists: true, $ne: null } },
+      { projection: { task_code: 1, title: 1, feedback: 1, updated_at: 1 } }
+    ).sort({ updated_at: -1 }).limit(20).toArray();
     const fbWithNames = await Promise.all(feedback.map(async p => {
       const r = p.reviewed_by ? await db.collection("users").findOne({ _id: toId(p.reviewed_by) }, { projection: { name: 1 } }) : null;
       return { ...p, id: String(p._id), reviewer_name: r?.name };
