@@ -124,6 +124,9 @@ async function ensureIndexes(db) {
     await db.collection("performance").createIndex({ user_id: 1 });
     await db.collection("audit_logs").createIndex({ created_at: -1 });
     await db.collection("task_status_history").createIndex({ task_id: 1 });
+    await db.collection("drive_folders").createIndex({ key: 1 }, { unique: true });
+    await db.collection("drive_orphans").createIndex({ created_at: -1 });
+    await db.collection("submission_files").createIndex({ drive_file_id: 1 }, { sparse: true });
     
     // Authorized users collection indexes
     await db.collection("authorized_users").createIndex({ email: 1 }, { unique: true });

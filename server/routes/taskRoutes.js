@@ -197,7 +197,7 @@ router.get("/submissions", authenticateToken, authorizeRoles("admin", "manager",
       const [task, student, files, assignment, reviewer] = await Promise.all([
         db.collection("tasks").findOne({ _id: toId(s.task_id) }, { projection: { task_code: 1, title: 1, description: 1, status: 1, workflow_status: 1, feedback: 1, outcome: 1, outcome_submitted_at: 1, priority: 1, due_date: 1 } }),
         db.collection("users").findOne({ _id: toId(s.student_id) }, { projection: { name: 1, email: 1, phone: 1, program: 1, batch_id: 1, created_at: 1 } }),
-        db.collection("submission_files").find({ submission_id: sid }, { projection: { original_name: 1, size: 1, mime_type: 1, created_at: 1 } }).toArray(),
+        db.collection("submission_files").find({ submission_id: sid }, { projection: { original_name: 1, size: 1, mime_type: 1, created_at: 1, drive_file_id: 1, drive_folder_id: 1 } }).toArray(),
         db.collection("task_assignments").findOne({ task_id: String(s.task_id), student_id: String(s.student_id) }, { projection: { progress: 1, status: 1 } }),
         s.reviewer_id ? db.collection("users").findOne({ _id: toId(s.reviewer_id) }, { projection: { name: 1 } }) : null,
       ]);
@@ -323,6 +323,7 @@ router.get("/submissions/export", authenticateToken, authorizeRoles("admin", "ma
         'Batch': batchName || '',
         'Task Code': task?.task_code || '',
         'Task Title': task?.title || '',
+        'Day': task?.day_number || task?.day || '',
         'Task Description': task?.description || '',
         'Task Domain': task?.domain || '',
         'Task Priority': task?.priority || '',
@@ -338,6 +339,8 @@ router.get("/submissions/export", authenticateToken, authorizeRoles("admin", "ma
         'Reviewed Date': formatDateTime(s.reviewed_at),
         'Review Comments': s.review_comments || '',
         'Task Feedback': task?.feedback || '',
+        'Drive Folder Link': (files && files.length && files[0].drive_folder_id) ? ('https://drive.google.com/drive/folders/' + files[0].drive_folder_id) : '',
+        'Submission File Link': (files && files.length) ? files.map(function(f){ return f.drive_file_id ? ('https://drive.google.com/file/d/' + f.drive_file_id + '/view') : ''; }).filter(Boolean).join('; ') : '',
       };
     }));
     
@@ -374,6 +377,9 @@ router.get("/submissions/export", authenticateToken, authorizeRoles("admin", "ma
       { wch: 20 }, // Reviewed Date
       { wch: 50 }, // Review Comments
       { wch: 50 }, // Task Feedback
+      { wch: 10 }, // Day
+      { wch: 45 }, // Drive Folder Link
+      { wch: 60 }, // Submission File Link
     ];
     worksheet['!cols'] = columnWidths;
     
@@ -424,7 +430,23 @@ router.get("/files/:fileId/download", authenticateToken, async (req, res) => {
       return res.status(403).json({ success: false, message: "You do not have permission to access this file" });
     }
     
-    // Try GridFS first (new storage)
+    // Google Drive storage (preferred when available)
+    if (file.drive_file_id) {
+      try {
+        const { downloadFromDrive } = require("../utils/driveStorage");
+        const { stream, meta } = await downloadFromDrive(file.drive_file_id);
+        res.setHeader("Content-Type", file.mime_type || meta.mimeType || "application/octet-stream");
+        res.setHeader("Content-Disposition", 'attachment; filename="' + encodeURIComponent(file.original_name || "submission-file") + '"');
+        stream.pipe(res);
+        await writeAudit(db, { actorId: req.user.id, action: "submission_file_downloaded", entityType: "submission_file", entityId: String(file._id), newValue: { submission_id: String(sub._id), storage_type: "drive" } });
+        return;
+      } catch (driveError) {
+        console.error("[Download] Drive error:", driveError.message);
+        return res.status(502).json({ success: false, message: "Unable to fetch file from Drive" });
+      }
+    }
+
+    // Try GridFS first (old storage)
     if (file.gridfs_id) {
       try {
         const { stream, file: gridfsFile } = await downloadFile(db, file.gridfs_id);
@@ -975,29 +997,79 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
     });
     const sid = String(subResult.insertedId);
 
-    // Upload files to MongoDB GridFS (serverless-compatible)
+    const { ensureStudentFolder, ensureDayFolder, validateUpload, uploadToDrive, deleteFromDrive } = require("../utils/driveStorage");
+    const crypto = require("crypto");
+    const dayNumber = task.day_number || task.day || (req.body && (req.body.day || req.body.day_number)) || null;
+    let parentFolderId = null;
+    try {
+      const folder = dayNumber
+        ? await ensureDayFolder(db, req.user.id, dayNumber)
+        : await ensureStudentFolder(db, req.user.id);
+      parentFolderId = folder.id;
+    } catch (folderErr) {
+      console.error("[Submit] Drive folder error:", folderErr.message);
+      return res.status(502).json({ success: false, message: "Unable to prepare Drive folder: " + folderErr.message });
+    }
+
     for (const file of (req.files || [])) {
+      const v = validateUpload(file, Number(process.env.GOOGLE_DRIVE_UPLOAD_MAX_BYTES || 5 * 1024 * 1024));
+      if (!v.ok) {
+        return res.status(400).json({ success: false, message: v.errors.join("; ") });
+      }
+      let driveFile = null;
       try {
-        const gridfsId = await uploadFile(db, file.buffer, file.originalname, {
-          submission_id: sid,
-          task_id: String(task._id),
-          student_id: req.user.id,
-          mime_type: file.mimetype,
-          size: file.size
-        });
-        
-        await db.collection("submission_files").insertOne({
-          submission_id: sid,
-          original_name: file.originalname,
-          mime_type: file.mimetype,
-          size: file.size,
-          gridfs_id: gridfsId,
-          storage_type: "gridfs",
-          created_at: submittedAt
-        });
-      } catch (fileError) {
-        console.error(`[Submit] File upload error for ${file.originalname}:`, fileError.message);
-        // Continue with other files even if one fails
+        const ext = (file.originalname.match(/\.[^.]+$/) || [""])[0].toLowerCase();
+        const datePart = (submittedAt || new Date().toISOString()).slice(0, 10);
+        const taskPart = "TASK_" + String(task.task_code || task.id || task._id).replace(/[^a-zA-Z0-9]/g, "_");
+        const dayPart = dayNumber ? "DAY_" + String(dayNumber).padStart(2, "0") + "_" : "";
+        const overrideName = dayPart + taskPart + "_SUBMISSION_" + datePart + "_v" + version + ext;
+        driveFile = await uploadToDrive(file.buffer, file.originalname, file.mimetype, parentFolderId, overrideName);
+      } catch (upErr) {
+        console.error("[Submit] Drive upload error:", upErr.message);
+        return res.status(502).json({ success: false, message: "Drive upload failed: " + upErr.message });
+      }
+
+      // Save metadata; retry. Never claim success unless DB row exists.
+      let saved = false;
+      let lastErr = null;
+      for (let i = 0; i < 3; i++) {
+        try {
+          await db.collection("submission_files").insertOne({
+            submission_id: sid,
+            original_name: file.originalname,
+            mime_type: file.mimetype,
+            size: file.size,
+            drive_file_id: driveFile.id,
+            drive_folder_id: parentFolderId,
+            drive_web_view_link: driveFile.webViewLink || null,
+            drive_web_content_link: driveFile.webContentLink || null,
+            storage_type: "drive",
+            idempotency_key: crypto.randomUUID(),
+            created_at: submittedAt,
+          });
+          saved = true;
+          break;
+        } catch (dbErr) {
+          lastErr = dbErr;
+          await new Promise((r) => setTimeout(r, Math.pow(2, i) * 300));
+        }
+      }
+      if (!saved) {
+        // Record orphan for reconcile; best-effort delete (kept if delete fails).
+        try {
+          await db.collection("drive_orphans").insertOne({
+            drive_file_id: driveFile.id,
+            drive_folder_id: parentFolderId,
+            submission_id: sid,
+            task_id: String(task._id),
+            student_id: req.user.id,
+            original_name: file.originalname,
+            created_at: new Date().toISOString(),
+            error: (lastErr && lastErr.message) || "DB insert failed",
+          });
+        } catch (o) { console.error("[Submit] orphan record failed:", o.message); }
+        console.error("[Submit] DB save failed for", driveFile.id, lastErr && lastErr.message);
+        // Don't abort the whole request; continue. Upload considered not fully persisted.
       }
     }
 

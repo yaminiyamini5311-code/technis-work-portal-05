@@ -885,4 +885,33 @@ router.post("/reject-manager-registration/:id", authenticateToken, authorizeRole
   }
 });
 
+
+/* ─── GOOGLE DRIVE HEALTH ────────────────────────────────────────────── */
+router.get("/drive/verify", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
+  try {
+    const { verifyRootAccess, authType } = require("../utils/driveStorage");
+    const result = await verifyRootAccess();
+    res.json({ success: result.ok, authType: authType(), ...result });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.post("/drive/reconcile", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+    const orphans = await db.collection("drive_orphans").find({}).limit(100).toArray();
+    let reconciled = 0;
+    for (const o of orphans) {
+      const exists = await db.collection("submission_files").findOne({ drive_file_id: o.drive_file_id });
+      if (exists) {
+        await db.collection("drive_orphans").deleteOne({ _id: o._id });
+        reconciled++;
+      }
+    }
+    res.json({ success: true, checked: orphans.length, reconciled });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 module.exports = router;
