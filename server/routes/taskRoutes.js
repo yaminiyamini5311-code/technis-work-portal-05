@@ -1034,14 +1034,18 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
     const crypto = require("crypto");
     const dayNumber = task.day_number || task.day || (req.body && (req.body.day || req.body.day_number)) || null;
     let parentFolderId = null;
-    try {
-      const folder = dayNumber
-        ? await ensureDayFolder(db, req.user.id, dayNumber)
-        : await ensureStudentFolder(db, req.user.id);
-      parentFolderId = folder.id;
-    } catch (folderErr) {
-      console.error("[Submit] Drive folder error:", folderErr.message);
-      return res.status(502).json({ success: false, message: "Unable to prepare Drive folder: " + folderErr.message });
+    // Drive is only contacted when files are actually attached: comment-only
+    // submissions must keep working even if Drive is temporarily unavailable.
+    if ((req.files || []).length) {
+      try {
+        const folder = dayNumber
+          ? await ensureDayFolder(db, req.user.id, dayNumber)
+          : await ensureStudentFolder(db, req.user.id);
+        parentFolderId = folder.id;
+      } catch (folderErr) {
+        console.error("[Submit] Drive folder error:", folderErr.message);
+        return res.status(502).json({ success: false, message: "Unable to prepare Drive folder: " + folderErr.message });
+      }
     }
 
     const uploadedFiles = [];
