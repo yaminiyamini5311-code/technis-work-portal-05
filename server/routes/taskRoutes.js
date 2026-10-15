@@ -253,34 +253,26 @@ router.get("/submissions/export", authenticateToken, authorizeRoles("admin", "ma
     
     // Build filter from query params
     const filter = {};
+    let batchStudentIds = [];
     if (req.query.task_id) filter.task_id = String(req.query.task_id);
     if (req.query.student_id) filter.student_id = String(req.query.student_id);
     if (req.query.status) filter.status = String(req.query.status);
     if (req.query.batch_name) {
-      // Need to find batch ID from name
       const batch = await db.collection("batches").findOne({ name: String(req.query.batch_name) }, { projection: { _id: 1 } });
       if (batch) {
-        // Filter students by batch, then submissions by those students
         const batchStudents = await db.collection("users").find(
           { batch_id: String(batch._id) },
           { projection: { _id: 1 } }
         ).toArray();
-        const studentIds = batchStudents.map(s => String(s._id));
-        if (studentIds.length > 0) {
-          filter.student_id = { $in: studentIds };
-        } else {
-          // No students in this batch, return empty
-          return res.json({ success: true, submissions: [] });
+        batchStudentIds = batchStudents.map(s => String(s._id));
+        if (batchStudentIds.length > 0) {
+          filter.student_id = { $in: batchStudentIds };
         }
       }
     }
     
     // Fetch all matching submissions without limit
     const subs = await db.collection("submissions").find(filter).sort({ submitted_at: -1 }).toArray();
-    
-    if (subs.length === 0) {
-      return res.status(404).json({ success: false, message: "No submissions found matching the filters" });
-    }
     
     // Build complete dataset with all details
     const rows = await Promise.all(subs.map(async s => {
@@ -344,6 +336,42 @@ router.get("/submissions/export", authenticateToken, authorizeRoles("admin", "ma
       };
     }));
     
+    // Include students who have NOT submitted (Pending) so the export is complete.
+    const submittedKeys = new Set(rows.map(r => (r['Task Code'] || '') + '|' + (r['Student ID'] || '')));
+    const assignmentFilter = {};
+    if (filter.task_id) assignmentFilter.task_id = filter.task_id;
+    if (filter.student_id) assignmentFilter.student_id = filter.student_id;
+    if (batchStudentIds.length) assignmentFilter.student_id = { $in: batchStudentIds };
+    const pendingAssignments = await db.collection("task_assignments").find(assignmentFilter).toArray();
+    const pendingRows = [];
+    for (const a of pendingAssignments) {
+      const key = String(a.task_id) + '|' + String(a.student_id);
+      if (submittedKeys.has(key)) continue;
+      const [task, student] = await Promise.all([
+        db.collection("tasks").findOne({ _id: toId(a.task_id) }, { projection: { task_code: 1, title: 1, description: 1, feedback: 1, due_date: 1, start_date: 1 } }),
+        db.collection("users").findOne({ _id: toId(a.student_id) }, { projection: { name: 1, email: 1, student_id: 1 } }),
+      ]);
+      pendingRows.push({
+        'Submission Code': '', 'Submission Version': '', 'Submission Status': 'Pending', 'Submission Date': '',
+        'Student Name': student?.name || '', 'Student ID': student?.student_id || String(a.student_id),
+        'Student Email': student?.email || '', 'Student Phone': '', 'Department': '', 'Program': '',
+        'Batch': '', 'Task Code': task?.task_code || '', 'Task Title': task?.title || '',
+        'Task Description': task?.description || '', 'Task Domain': '', 'Task Priority': '',
+        'Task Start Date': task?.start_date ? new Date(task?.start_date).toISOString().split('T')[0] : '',
+        'Task Due Date': task?.due_date ? new Date(task?.due_date).toISOString().split('T')[0] : '',
+        'Task Workflow Status': task?.workflow_status || '',
+        'Day': task?.day_number || task?.day || '',
+        'Student Response/Comment': '', 'Uploaded Files': '', 'File Count': 0,
+        'Assignment Progress (%)': a.progress ?? '', 'Assignment Status': a.status || '',
+        'Reviewer Name': '', 'Reviewed Date': '', 'Review Comments': '', 'Task Feedback': task?.feedback || '',
+        'Drive Folder Link': '', 'Submission File Link': '',
+      });
+    }
+    rows.push(...pendingRows);
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: "No records found matching the filters" });
+    }
+
     // Create Excel workbook
     const worksheet = XLSX.utils.json_to_sheet(rows);
     
@@ -722,6 +750,10 @@ router.post("/", authenticateToken, authorizeRoles("admin", "ceo", "manager"), a
 
     const priority = String(b.priority || "medium").toLowerCase();
     if (!priorityValues.has(priority)) return res.status(400).json({ success: false, message: "Invalid priority" });
+    const dayNumber = b.day_number !== undefined && b.day_number !== null && b.day_number !== "" ? Number(b.day_number) : null;
+    if (dayNumber !== null && (!Number.isInteger(dayNumber) || dayNumber < 1 || dayNumber > 60)) {
+      return res.status(400).json({ success: false, message: "Day must be an integer between 1 and 60" });
+    }
 
     const workflow = String(b.workflow_status || "Assigned");
     if (!STATUS.includes(workflow)) return res.status(400).json({ success: false, message: "Invalid task workflow status" });
@@ -767,6 +799,7 @@ router.post("/", authenticateToken, authorizeRoles("admin", "ceo", "manager"), a
       status: legacyStatus(workflow),
       workflow_status: workflow,
       priority,
+      day_number: dayNumber,
       start_date: b.start_date || null,
       start_time: startTime,
       start_at: combineTaskDateTime(b.start_date, startTime, "00:00"),
@@ -977,8 +1010,8 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
       return res.status(400).json({ success: false, message: "Add at least one file or a submission comment before submitting." });
     }
 
-    const lastSub = await db.collection("submissions").find({ task_id: String(task._id) }).sort({ version: -1 }).limit(1).toArray();
-    const version = (lastSub[0]?.version || 0) + 1;
+    const priorSubCount = await db.collection("submissions").countDocuments({ task_id: String(task._id), student_id: req.user.id });
+    const version = priorSubCount + 1;
     const submissionCode = await nextSubmissionCode(db);
     const submittedAt = new Date().toISOString();
 
@@ -1011,11 +1044,11 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
       return res.status(502).json({ success: false, message: "Unable to prepare Drive folder: " + folderErr.message });
     }
 
+    const uploadedFiles = [];
+    let uploadError = null;
     for (const file of (req.files || [])) {
       const v = validateUpload(file, Number(process.env.GOOGLE_DRIVE_UPLOAD_MAX_BYTES || 5 * 1024 * 1024));
-      if (!v.ok) {
-        return res.status(400).json({ success: false, message: v.errors.join("; ") });
-      }
+      if (!v.ok) { uploadError = v.errors.join("; "); break; }
       let driveFile = null;
       try {
         const ext = (file.originalname.match(/\.[^.]+$/) || [""])[0].toLowerCase();
@@ -1026,15 +1059,15 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
         driveFile = await uploadToDrive(file.buffer, file.originalname, file.mimetype, parentFolderId, overrideName);
       } catch (upErr) {
         console.error("[Submit] Drive upload error:", upErr.message);
-        return res.status(502).json({ success: false, message: "Drive upload failed: " + upErr.message });
+        uploadError = "Drive upload failed: " + upErr.message;
+        break;
       }
 
-      // Save metadata; retry. Never claim success unless DB row exists.
       let saved = false;
       let lastErr = null;
       for (let i = 0; i < 3; i++) {
         try {
-          await db.collection("submission_files").insertOne({
+          const ins = await db.collection("submission_files").insertOne({
             submission_id: sid,
             original_name: file.originalname,
             mime_type: file.mimetype,
@@ -1048,6 +1081,7 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
             created_at: submittedAt,
           });
           saved = true;
+          uploadedFiles.push({ driveFile: driveFile, fileId: ins.insertedId, saved: true });
           break;
         } catch (dbErr) {
           lastErr = dbErr;
@@ -1055,22 +1089,34 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
         }
       }
       if (!saved) {
-        // Record orphan for reconcile; best-effort delete (kept if delete fails).
-        try {
-          await db.collection("drive_orphans").insertOne({
-            drive_file_id: driveFile.id,
-            drive_folder_id: parentFolderId,
-            submission_id: sid,
-            task_id: String(task._id),
-            student_id: req.user.id,
-            original_name: file.originalname,
-            created_at: new Date().toISOString(),
-            error: (lastErr && lastErr.message) || "DB insert failed",
-          });
-        } catch (o) { console.error("[Submit] orphan record failed:", o.message); }
-        console.error("[Submit] DB save failed for", driveFile.id, lastErr && lastErr.message);
-        // Don't abort the whole request; continue. Upload considered not fully persisted.
+        uploadedFiles.push({ driveFile: driveFile, fileId: null, saved: false, error: (lastErr && lastErr.message) || "DB insert failed" });
+        uploadError = "Database save failed for " + file.originalname + ": " + ((lastErr && lastErr.message) || "unknown");
+        break;
       }
+    }
+
+    if (uploadError) {
+      // Roll back: never leave a partial submission. Remove DB rows and Drive files.
+      try { await db.collection("submission_files").deleteMany({ submission_id: sid }); } catch (e) { console.error("[Submit] rollback files error:", e.message); }
+      try { await db.collection("submissions").deleteOne({ _id: subResult.insertedId }); } catch (e) { console.error("[Submit] rollback submission error:", e.message); }
+      for (const uf of uploadedFiles) {
+        if (uf.driveFile && uf.driveFile.id) {
+          try { await deleteFromDrive(uf.driveFile.id); } catch (e) { console.error("[Submit] rollback drive delete failed:", e.message); }
+        }
+      }
+      // Record orphans for reconcile (best effort)
+      for (const uf of uploadedFiles) {
+        if (uf.driveFile && uf.driveFile.id) {
+          try {
+            await db.collection("drive_orphans").insertOne({
+              drive_file_id: uf.driveFile.id, drive_folder_id: parentFolderId, submission_id: sid,
+              task_id: String(task._id), student_id: req.user.id, original_name: uf.driveFile.name || "unknown",
+              created_at: new Date().toISOString(), error: uploadError, rolled_back: true,
+            });
+          } catch (e) { console.error("[Submit] orphan record failed:", e.message); }
+        }
+      }
+      return res.status(502).json({ success: false, message: uploadError });
     }
 
     await transition(db, task, version > 1 ? "Resubmitted" : "Submitted", req.user.id, "Submission received");

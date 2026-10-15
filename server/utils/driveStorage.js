@@ -8,6 +8,8 @@ const { Readable } = require("stream");
 const crypto = require("crypto");
 
 const ROOT_FOLDER_ID = () => String(process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID || "18F5yTfw0ceaZX1z3phu74cg2dJGo47-0").trim();
+const MOCK_DRIVE = process.env.GOOGLE_DRIVE_MOCK === "true";
+const MOCK_DIR = require("path").join(require("os").tmpdir(), "techins-drive-mock");
 
 const ALLOWED_EXTENSIONS = new Set([
   ".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip",
@@ -25,6 +27,7 @@ const MIME_BY_EXT = {
 };
 
 function authType() {
+  if (MOCK_DRIVE) return "mock";
   if (process.env.GOOGLE_DRIVE_REFRESH_TOKEN && process.env.GOOGLE_DRIVE_CLIENT_ID && process.env.GOOGLE_DRIVE_CLIENT_SECRET) {
     return "oauth2";
   }
@@ -81,6 +84,9 @@ async function retry(fn, attempts) {
 
 async function verifyRootAccess() {
   const type = authType();
+  if (type === "mock") {
+    return { ok: true, authType: type, folder: { id: ROOT_FOLDER_ID(), name: "MOCK" } };
+  }
   if (type === "none") {
     return { ok: false, authType: type, error: "No Google Drive credentials configured" };
   }
@@ -134,6 +140,13 @@ async function createFolder(parentId, name) {
 }
 
 async function ensureFolder(db, key, parentId, name) {
+  if (MOCK_DRIVE) {
+    const stored = await getStoredFolder(db, key);
+    if (stored) return { id: stored, webViewLink: null, created: false };
+    const id = "mock-folder-" + key;
+    await storeFolder(db, key, parentId, id, name);
+    return { id: id, webViewLink: "https://drive.google.com/drive/folders/" + id, created: true };
+  }
   const stored = await getStoredFolder(db, key);
   if (stored) {
     try {
@@ -199,6 +212,14 @@ function validateUpload(file, maxSizeBytes) {
 }
 
 async function uploadToDrive(buffer, originalname, mimeType, parentFolderId, nameOverride) {
+  if (MOCK_DRIVE) {
+    const id = "mock-file-" + crypto.randomUUID();
+    const fs = require("fs");
+    const path = require("path");
+    fs.mkdirSync(MOCK_DIR, { recursive: true });
+    fs.writeFileSync(path.join(MOCK_DIR, id), buffer);
+    return { id: id, name: nameOverride || originalname, mimeType: mimeType || "application/octet-stream", size: buffer.length, webViewLink: "https://drive.google.com/file/d/" + id + "/view", webContentLink: "https://drive.google.com/uc?id=" + id };
+  }
   const drive = getDriveClient();
   const parts = splitExt(originalname || "file");
   const finalName = nameOverride || sanitizeBaseName(parts.base) + parts.ext;
@@ -214,6 +235,15 @@ async function uploadToDrive(buffer, originalname, mimeType, parentFolderId, nam
 }
 
 async function downloadFromDrive(fileId) {
+  if (MOCK_DRIVE) {
+    const fs = require("fs");
+    const path = require("path");
+    const filePath = path.join(MOCK_DIR, fileId);
+    if (!fs.existsSync(filePath)) throw new Error("Mock file not found: " + fileId);
+    const stream = fs.createReadStream(filePath);
+    const stat = fs.statSync(filePath);
+    return { stream: stream, meta: { id: fileId, name: fileId, mimeType: "application/octet-stream", size: stat.size } };
+  }
   const drive = getDriveClient();
   const meta = await retry(function () { return drive.files.get({ fileId: fileId, fields: "id,name,mimeType,size,webViewLink", supportsAllDrives: true }); });
   const resp = await retry(function () { return drive.files.get({ fileId: fileId, alt: "media", supportsAllDrives: true }, { responseType: "stream" }); });
@@ -221,6 +251,13 @@ async function downloadFromDrive(fileId) {
 }
 
 async function deleteFromDrive(fileId) {
+  if (MOCK_DRIVE) {
+    const fs = require("fs");
+    const path = require("path");
+    const filePath = path.join(MOCK_DIR, fileId);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    return;
+  }
   const drive = getDriveClient();
   await retry(function () { return drive.files.delete({ fileId: fileId, supportsAllDrives: true }); });
 }

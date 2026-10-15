@@ -57,6 +57,7 @@ export default function Tasks() {
     start_time: "",
     due_date: "",
     due_time: "",
+    day_number: "",
     domain: "edutins",
     how_to_do: "",
     expected_output: "",
@@ -151,6 +152,7 @@ export default function Tasks() {
         start_time: "",
         due_date: "",
         due_time: "",
+        day_number: "",
         domain: "edutins",
         how_to_do: "",
         expected_output: "",
@@ -364,6 +366,11 @@ export default function Tasks() {
               <option key={d.value} value={d.value}>{d.label}</option>
             ))}
           </select>
+        </div>
+
+        <div className="field">
+          <label className="field-label" htmlFor="task-day">Day (1-60)</label>
+          <input id="task-day" name="task-day" type="number" min="1" max="60" value={form.day_number} onChange={e => setForm({ ...form, day_number: e.target.value })} autoComplete="off" />
         </div>
 
         <div className="field">
