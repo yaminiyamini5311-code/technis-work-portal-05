@@ -326,8 +326,64 @@
   cursor: pointer;
   border: 1px solid rgba(0, 0, 0, 0.15);
   background: #fff;
+  color: #182018;
+  font-weight: 600;
+  font-size: 13px;
+  transition: background .2s ease, color .2s ease, border-color .2s ease, transform .15s ease, box-shadow .2s ease;
 }
 
+.perf-expand:hover {
+  background: #0C120C;
+  border-color: #0C120C;
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(12, 18, 12, 0.22);
+}
+
+.perf-expand:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.perf-expand:focus-visible {
+  outline: 2px solid #FA9A02;
+  outline-offset: 2px;
+}
+
+.perf-expand:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.perf-search-bar button {
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #fff;
+  color: #182018;
+  font-weight: 600;
+  transition: background .2s ease, color .2s ease, border-color .2s ease, transform .15s ease, box-shadow .2s ease;
+}
+
+.perf-search-bar button:hover {
+  background: #0C120C;
+  border-color: #0C120C;
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(12, 18, 12, 0.22);
+}
+
+.perf-search-bar button:active { transform: translateY(0); box-shadow: none; }
+
+.perf-search-bar button:focus-visible {
+  outline: 2px solid #FA9A02;
+  outline-offset: 2px;
+}
+
+.perf-search-bar button:disabled { opacity: .55; cursor: not-allowed; transform: none; box-shadow: none; }
 .perf-empty { padding: 12px 0; color: #6b7280; font-size: 13px; }
 
 .perf-table-wrap { overflow-x: auto; margin-top: 10px; }

@@ -10,7 +10,7 @@
    ========================================================= */
 :root {
   --sidebar-width: 290px;
-  --header-height: 78px;
+  --header-height: 84px;
 }
 
 /* Hamburger Button - in-header, ALWAYS visible with high contrast */
@@ -374,7 +374,7 @@
 /* Mobile Responsiveness */
 @media (max-width: 520px) {
   :root {
-    --header-height: 68px;
+    --header-height: 72px;
   }
 
   .navbar-hamburger {

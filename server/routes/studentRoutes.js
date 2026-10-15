@@ -35,23 +35,80 @@ router.get("/dashboard", authenticateToken, authorizeRoles("student", "member"),
 router.get("/feedback", authenticateToken, authorizeRoles("student", "member"), async (req, res) => {
   try {
     const db = req.db;
-    const feedback = await db.collection("performance").find({ user_id: String(req.user.id) }).sort({ created_at: -1 }).limit(20).toArray();
+    const sid = String(req.user.id);
+    const feedback = await db.collection("performance").find({ user_id: sid }).sort({ created_at: -1 }).limit(20).toArray();
     // Task feedback should follow the student's assignments (batch tasks are
     // not stored under assigned_to), not a single legacy owner field.
     const { getStudentTaskIds } = require("../models/TaskAssignment");
     const taskIds = await getStudentTaskIds(db, req.user.id);
     const taskObjectIds = taskIds.map(id => { try { return toId(id); } catch { return id; } });
-    const taskFeedback = await db.collection("tasks").find(
-      { _id: { $in: taskObjectIds }, feedback: { $exists: true, $ne: null } },
-      { projection: { task_code: 1, title: 1, feedback: 1, updated_at: 1 } }
-    ).sort({ updated_at: -1 }).limit(20).toArray();
+    const taskFeedback = taskObjectIds.length
+      ? await db.collection("tasks").find(
+          { _id: { $in: taskObjectIds }, feedback: { $exists: true, $ne: null } },
+          { projection: { task_code: 1, title: 1, feedback: 1, updated_at: 1 } }
+        ).sort({ updated_at: -1 }).limit(20).toArray()
+      : [];
+    // Enrich performance entries with reviewer + linked task details so the
+    // student sees the same task-specific context as the CEO feedback page.
+    const linkedTaskIds = [...new Set(feedback.map(p => p.task_id).filter(Boolean).map(String))];
+    const linkedTasks = linkedTaskIds.length
+      ? await db.collection("tasks").find(
+          { _id: { $in: linkedTaskIds.map(id => { try { return toId(id); } catch { return id; } }) } },
+          { projection: { task_code: 1, title: 1, day_number: 1, day: 1 } }
+        ).toArray()
+      : [];
+    const taskById = new Map(linkedTasks.map(t => [String(t._id), t]));
     const fbWithNames = await Promise.all(feedback.map(async p => {
       const r = p.reviewed_by ? await db.collection("users").findOne({ _id: toId(p.reviewed_by) }, { projection: { name: 1 } }) : null;
-      return { ...p, id: String(p._id), reviewer_name: r?.name };
+      const linked = p.task_id ? taskById.get(String(p.task_id)) : null;
+      return {
+        ...p,
+        id: String(p._id),
+        reviewer_name: r?.name || null,
+        task_id: p.task_id ? String(p.task_id) : null,
+        task_code: linked?.task_code || p.task_code || null,
+        task_title: linked?.title || p.task_title || null,
+        task_day: linked ? (linked.day_number ?? linked.day ?? null) : null,
+      };
     }));
     res.json({ success: true, feedback: fbWithNames, taskFeedback: taskFeedback.map(t => ({ ...t, id: String(t._id), type: "task" })) });
   } catch (e) {
     res.status(500).json({ success: false, message: "Unable to fetch feedback" });
+  }
+});
+
+/* ─── OWN TASK-WISE PERFORMANCE REPORT ──────────────────────────
+ * Same builder as the CEO performance page (utils/studentReport.js) but
+ * scoped to the authenticated student, so the Student Performance page can
+ * match the CEO visual language and numbers without seeing other students.
+ */
+router.get("/report", authenticateToken, authorizeRoles("student", "member"), async (req, res) => {
+  try {
+    const db = req.db;
+    const { buildStudentReport } = require("../utils/studentReport");
+    const student = await db.collection("users").findOne({ _id: toId(req.user.id) });
+    if (!student) return res.status(404).json({ success: false, message: "Student account not found" });
+    const report = await buildStudentReport(db, student);
+    const missions = await db.collection("missions").find({ assigned_to: String(req.user.id) }).toArray();
+    const completedMissions = missions.filter(m => String(m.status || "").toLowerCase() === "completed").length;
+    const totalMissions = missions.length;
+    const progress = report.counts.total + totalMissions > 0
+      ? Math.round(((report.counts.approved + completedMissions) / (report.counts.total + totalMissions)) * 100)
+      : 0;
+    const latestReview = await db.collection("performance")
+      .findOne({ user_id: String(req.user.id) }, { sort: { created_at: -1 } });
+    res.json({
+      success: true,
+      ...report,
+      completedMissions,
+      totalMissions,
+      progress,
+      score: latestReview?.score ?? null,
+      lastReviewed: latestReview?.created_at ?? null,
+    });
+  } catch (e) {
+    console.error("Student report error:", e);
+    res.status(500).json({ success: false, message: "Unable to load performance report" });
   }
 });
 
