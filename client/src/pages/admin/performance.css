@@ -268,3 +268,101 @@
 .role-layout.ceo-dark .performance-error {
   color: var(--ceo-rose) !important;
 }
+/* ── Task-wise performance report (CEO → Student Report → Performance) ── */
+.perf-search-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.perf-search-bar input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+  font-size: 14px;
+}
+.perf-search-bar button {
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.perf-card { margin-bottom: 18px; }
+
+.perf-score-block {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 12px 0 4px;
+}
+.perf-score-block small { display: block; color: #6b7280; font-size: 12px; }
+.perf-score-block strong { font-size: 26px; }
+.perf-score-block strong.muted { font-size: 15px; color: #6b7280; font-weight: 600; }
+.perf-score-basis { margin-top: 2px; }
+.perf-eval-score { text-align: right; }
+.perf-eval-score strong { font-size: 20px; color: #FA9A02; }
+
+.perf-counts { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.perf-chip {
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.04);
+}
+.perf-chip.approved { border-color: rgba(22, 163, 74, 0.35); background: rgba(22, 163, 74, 0.08); }
+.perf-chip.submitted { border-color: rgba(37, 99, 235, 0.35); background: rgba(37, 99, 235, 0.08); }
+.perf-chip.pending { border-color: rgba(180, 83, 9, 0.35); background: rgba(180, 83, 9, 0.08); }
+.perf-chip.revision { border-color: rgba(190, 24, 93, 0.35); background: rgba(190, 24, 93, 0.08); }
+.perf-chip.overdue { border-color: rgba(220, 38, 38, 0.4); background: rgba(220, 38, 38, 0.08); }
+
+.perf-expand {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #fff;
+}
+
+.perf-empty { padding: 12px 0; color: #6b7280; font-size: 13px; }
+
+.perf-table-wrap { overflow-x: auto; margin-top: 10px; }
+.perf-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 560px; }
+.perf-table th,
+.perf-table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+  vertical-align: top;
+}
+.perf-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: #6b7280; }
+.perf-table td small { display: block; color: #6b7280; font-size: 11px; }
+.perf-table tr.overdue td { background: rgba(220, 38, 38, 0.05); }
+
+.perf-state {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  margin-right: 4px;
+}
+.perf-state.approved { background: rgba(22, 163, 74, 0.14); color: #15803d; }
+.perf-state.submitted { background: rgba(37, 99, 235, 0.14); color: #1d4ed8; }
+.perf-state.revision_required { background: rgba(190, 24, 93, 0.14); color: #be185d; }
+.perf-state.in_progress { background: rgba(180, 83, 9, 0.14); color: #b45309; }
+.perf-state.overdue { background: rgba(220, 38, 38, 0.14); color: #b91c1c; }
+.perf-score-cell { font-weight: 700; }
+.perf-table .muted,
+.muted { color: #6b7280; }
+
+@media (max-width: 640px) {
+  .perf-score-block { flex-direction: column; }
+  .perf-eval-score { text-align: left; }
+  .perf-search-bar { flex-direction: column; }
+}

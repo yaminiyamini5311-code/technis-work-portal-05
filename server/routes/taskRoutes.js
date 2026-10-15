@@ -1155,10 +1155,50 @@ router.post("/review", authenticateToken, authorizeRoles("admin", "ceo", "manage
     const comment = String(req.body?.comment || "").trim();
     if (!["approve", "revision"].includes(decision) || !comment) return res.status(400).json({ success: false, message: "Decision and review comment are required" });
 
+    // OPTIONAL scoring. The schema has no mandatory score/max_marks pair, so
+    // scoring stays opt-in: when both are supplied they are validated and
+    // stored on the submission (and mirrored on the assignment). When they
+    // are omitted the task is simply left "awaiting evaluation" — no score
+    // is invented and no division by zero can occur downstream.
+    const rawScore = req.body?.score;
+    const rawMax = req.body?.max_marks;
+    const hasScoreInput = rawScore !== undefined && rawScore !== null && rawScore !== "";
+    const hasMaxInput = rawMax !== undefined && rawMax !== null && rawMax !== "";
+    let scoreValue = null, maxMarksValue = null;
+    if (hasScoreInput || hasMaxInput) {
+      if (!hasScoreInput || !hasMaxInput) {
+        return res.status(400).json({ success: false, message: "Provide both score and max_marks when scoring a submission" });
+      }
+      scoreValue = Number(rawScore);
+      maxMarksValue = Number(rawMax);
+      if (!Number.isFinite(scoreValue) || scoreValue < 0) {
+        return res.status(400).json({ success: false, message: "Score must be a non-negative number" });
+      }
+      if (!Number.isFinite(maxMarksValue) || maxMarksValue <= 0) {
+        return res.status(400).json({ success: false, message: "Max marks must be a number greater than zero" });
+      }
+      if (scoreValue > maxMarksValue) {
+        return res.status(400).json({ success: false, message: "Score cannot exceed max marks" });
+      }
+    }
+
     const next = decision === "approve" ? "Approved" : "Revision Required";
     const now = new Date().toISOString();
 
-    await db.collection("submissions").updateOne({ _id: sub._id }, { $set: { status: next, reviewer_id: req.user.id, reviewed_at: now, review_comments: comment } });
+    const submissionUpdate = {
+      status: next,
+      reviewer_id: req.user.id,
+      reviewed_at: now,
+      review_comments: comment,
+    };
+    if (scoreValue !== null) {
+      submissionUpdate.score = scoreValue;
+      submissionUpdate.earned_score = scoreValue;
+      submissionUpdate.max_marks = maxMarksValue;
+      submissionUpdate.scored_at = now;
+      submissionUpdate.scored_by = req.user.id;
+    }
+    await db.collection("submissions").updateOne({ _id: sub._id }, { $set: submissionUpdate });
     await transition(db, task, next, req.user.id, comment);
     // Mirror the decision onto the submitting student's assignment
     const { updateAssignment } = require("../models/TaskAssignment");
@@ -1169,7 +1209,7 @@ router.post("/review", authenticateToken, authorizeRoles("admin", "ceo", "manage
     await notify(db, sub.student_id, decision === "approve" ? "task_approved" : "revision_required", decision === "approve" ? "Task approved" : "Revision required", `${task.title}: ${comment}`, sub.task_id);
     await writeAudit(db, { actorId: req.user.id, action: decision === "approve" ? "submission_approved" : "revision_requested", entityType: "submission", entityId: String(sub._id), previousValue: { status: sub.status }, newValue: { status: next, review_comments: comment } });
 
-    res.json({ success: true, message: decision === "approve" ? "Submission approved" : "Revision requested", status: next });
+    res.json({ success: true, message: decision === "approve" ? "Submission approved" : "Revision requested", status: next, score: scoreValue, max_marks: maxMarksValue });
   } catch (e) { console.error("Review error:", e); res.status(500).json({ success: false, message: "Unable to review submission" }); }
 });
 

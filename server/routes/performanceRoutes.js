@@ -21,10 +21,17 @@ router.get("/me", authenticateToken, checkStudentRegistrationStatus, authorizeRo
   }
 });
 
-/* GET / - Aggregated student performance with scorecards (admin/manager/CEO) */
+/* GET / - Aggregated student performance with scorecards (admin/manager/CEO)
+ *
+ * Extends the existing per-student card with task-wise data built by
+ * utils/studentReport.js (task states, submission/review metadata and the
+ * optional score / max_marks pair). Every figure is derived from real
+ * records — no task counts or scores are invented.
+ */
 router.get("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), async (req, res) => {
   try {
     const db = req.db;
+    const { buildStudentReport } = require("../utils/studentReport");
     
     // Get all active students
     const students = await db.collection("users").find({ role: "student", active: 1 }).toArray();
@@ -33,55 +40,35 @@ router.get("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), as
     const studentPerformance = await Promise.all(students.map(async (student) => {
       const studentId = String(student._id);
       
-      // Get tasks assigned to this student
-      const assignments = await db.collection("task_assignments").find({ student_id: studentId }).toArray();
-      const taskIds = assignments.map(a => a.task_id);
-      
-      // Get submission data for student's tasks
-      const submissions = await db.collection("submissions").find({ 
-        student_id: studentId,
-        task_id: { $in: taskIds }
-      }).toArray();
-      
-      // Count completed tasks (approved SUBMISSIONS).
-      // Root cause of the always-zero scorecard: the submissions collection
-      // stores the decision in `status` with capitalized values
-      // ("Submitted" | "Approved" | "Revision Required"). This code used to
-      // read a non-existent `review_status` field with a lowercase value, so
-      // completedTasks was 0 for every student no matter how much real work
-      // existed. Compare case-insensitively against the real field.
-      const completedTasks = submissions.filter(s => String(s.status || "").toLowerCase() === "approved").length;
-      const totalTasks = assignments.length;
-      
       // Get missions assigned to this student
       const missions = await db.collection("missions").find({ 
         assigned_to: studentId 
       }).toArray();
       
+      // Get latest performance review score (overall evaluator score, kept
+      // for backward compatibility; task scores live on the report below).
+      const latestReview = await db.collection("performance")
+        .findOne({ user_id: studentId }, { sort: { created_at: -1 } });
+
+      // Task-wise report (per student + task only).
+      const report = await buildStudentReport(db, student);
+
+      // Keep the legacy aggregate fields so existing consumers keep working.
+      const completedTasks = report.counts.approved;
+      const totalTasks = report.counts.total;
+
       // Mission statuses are stored lowercase ("completed"); the previous
       // capitalized comparison never matched.
       const completedMissions = missions.filter(m => String(m.status || "").toLowerCase() === "completed").length;
       const totalMissions = missions.length;
-      
-      // Calculate overall progress percentage
-      const taskProgress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
-      const missionProgress = totalMissions > 0 ? (completedMissions / totalMissions) * 100 : 0;
-      const progress = totalTasks + totalMissions > 0 
+
+      // Progress: authoritative approval-based completion across tasks + missions.
+      const progress = totalTasks + totalMissions > 0
         ? Math.round(((completedTasks + completedMissions) / (totalTasks + totalMissions)) * 100)
         : 0;
-      
-      // Get latest performance review score
-      const latestReview = await db.collection("performance")
-        .findOne({ user_id: studentId }, { sort: { created_at: -1 } });
-      
+
       return {
-        student: {
-          id: studentId,
-          name: student.name,
-          email: student.email,
-          program: student.program,
-          batch: student.batch_id
-        },
+        ...report,
         completedTasks,
         totalTasks,
         completedMissions,
@@ -91,11 +78,26 @@ router.get("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), as
         lastReviewed: latestReview?.created_at ?? null
       };
     }));
-    
+
     res.json({ success: true, students: studentPerformance });
   } catch (e) {
     console.error("Performance GET:", e);
     res.status(500).json({ success: false, message: "Unable to fetch performance data" });
+  }
+});
+
+/* GET /students/:id - Single student report (task-wise detail) */
+router.get("/students/:id", authenticateToken, authorizeRoles("ceo", "admin", "manager"), async (req, res) => {
+  try {
+    const db = req.db;
+    const { buildStudentReport } = require("../utils/studentReport");
+    const student = await db.collection("users").findOne({ _id: toId(req.params.id), role: "student" });
+    if (!student) return res.status(404).json({ success: false, message: "Student not found" });
+    const report = await buildStudentReport(db, student);
+    res.json({ success: true, ...report });
+  } catch (e) {
+    console.error("Performance GET /students/:id:", e);
+    res.status(500).json({ success: false, message: "Unable to fetch student report" });
   }
 });
 

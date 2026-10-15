@@ -698,27 +698,128 @@ router.get("/feedback", authenticateToken, authorizeRoles("admin", "manager", "c
 router.post("/feedback", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
   try {
     const db = req.db;
-    const { user_id, score, strengths, improvements, feedback } = req.body || {};
+    const { user_id, score, strengths, improvements, feedback, task_id, submission_id } = req.body || {};
     if (!user_id || !feedback) return res.status(400).json({ success: false, message: "Student and feedback are required" });
 
     const student = await db.collection("users").findOne({ _id: toId(user_id), role: "student", active: 1 });
     if (!student) return res.status(404).json({ success: false, message: "Student not found" });
 
+    // OPTIONAL task association. When a task is supplied it must exist and
+    // the student must actually have an assignment for it — feedback is never
+    // attached to a task by array position or by guesswork.
+    let linkedTaskId = null;
+    if (task_id) {
+      const task = await db.collection("tasks").findOne({ _id: toId(task_id) });
+      if (!task) return res.status(404).json({ success: false, message: "Task not found" });
+      const { getAssignment } = require("../models/TaskAssignment");
+      const assignment = await getAssignment(db, String(task._id), String(user_id));
+      const legacyOwner = String(task.assigned_to) === String(user_id);
+      if (!assignment && !legacyOwner) {
+        return res.status(400).json({ success: false, message: "This task is not assigned to the selected student" });
+      }
+      linkedTaskId = String(task._id);
+    }
+
+    // OPTIONAL submission link, validated against BOTH student and task.
+    let linkedSubmissionId = null;
+    if (submission_id) {
+      const sub = await db.collection("submissions").findOne({ _id: toId(submission_id) });
+      if (!sub) return res.status(404).json({ success: false, message: "Submission not found" });
+      if (String(sub.student_id) !== String(user_id)) {
+        return res.status(400).json({ success: false, message: "Submission does not belong to the selected student" });
+      }
+      if (linkedTaskId && String(sub.task_id) !== linkedTaskId) {
+        return res.status(400).json({ success: false, message: "Submission does not belong to the selected task" });
+      }
+      linkedSubmissionId = String(sub._id);
+      if (!linkedTaskId) linkedTaskId = String(sub.task_id);
+    }
+
     const period = new Date().toISOString().slice(0, 7);
     const result = await db.collection("performance").insertOne({
       user_id: String(user_id),
       period,
-      score: score ? Number(score) : null,
+      score: score !== undefined && score !== null && score !== "" ? Number(score) : null,
       strengths: Array.isArray(strengths) ? strengths.join(", ") : (strengths || ""),
       improvements: Array.isArray(improvements) ? improvements.join(", ") : (improvements || ""),
       feedback: String(feedback).trim(),
       reviewed_by: req.user.id,
-      created_at: new Date().toISOString()
+      // Task linkage (nullable): records created before this change keep
+      // task_id === null and are reported under "Unassigned task".
+      task_id: linkedTaskId,
+      submission_id: linkedSubmissionId,
+      status: "recorded",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     });
-    res.status(201).json({ success: true, message: "Feedback saved successfully", feedbackId: String(result.insertedId) });
+    await writeAudit(db, { actorId: req.user.id, action: "feedback_created", entityType: "performance", entityId: String(result.insertedId), newValue: { user_id: String(user_id), task_id: linkedTaskId, submission_id: linkedSubmissionId } });
+    res.status(201).json({ success: true, message: "Feedback saved successfully", feedbackId: String(result.insertedId), task_id: linkedTaskId, submission_id: linkedSubmissionId });
   } catch (error) {
     console.error("Create feedback error:", error);
     res.status(500).json({ success: false, message: "Unable to save feedback" });
+  }
+});
+
+/* ─── TASK-WISE FEEDBACK (CEO → Student Report → Feedback) ─────────────────
+ * Feedback grouped by student, then by task. Entries without a stored
+ * task_id (legacy records) are preserved and reported under
+ * "unassigned_task" — they are never mapped onto a task by position.
+ */
+router.get("/feedback/tasks", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+    const filter = {};
+    if (req.query.student_id) filter.user_id = String(req.query.student_id);
+    if (req.query.task_id) filter.task_id = String(req.query.task_id);
+
+    const records = await db.collection("performance").find(filter).sort({ created_at: -1 }).toArray();
+
+    const studentIds = [...new Set(records.map((r) => String(r.user_id)))];
+    const taskIds = [...new Set(records.map((r) => r.task_id).filter(Boolean).map(String))];
+    const reviewerIds = [...new Set(records.map((r) => r.reviewed_by).filter(Boolean).map(String))];
+
+    const [students, tasks, reviewers] = await Promise.all([
+      studentIds.length ? db.collection("users").find({ _id: { $in: studentIds.map(toId) } }, { projection: { name: 1, email: 1, student_id: 1, program: 1, department: 1 } }).toArray() : [],
+      taskIds.length ? db.collection("tasks").find({ _id: { $in: taskIds.map(toId) } }, { projection: { title: 1, task_code: 1, day_number: 1, day: 1 } }).toArray() : [],
+      reviewerIds.length ? db.collection("users").find({ _id: { $in: reviewerIds.map(toId) } }, { projection: { name: 1 } }).toArray() : [],
+    ]);
+    const studentById = new Map(students.map((s) => [String(s._id), s]));
+    const taskById = new Map(tasks.map((t) => [String(t._id), t]));
+    const reviewerById = new Map(reviewers.map((r) => [String(r._id), r.name]));
+
+    const entries = records.map((r) => {
+      const student = studentById.get(String(r.user_id));
+      const task = r.task_id ? taskById.get(String(r.task_id)) : null;
+      return {
+        id: String(r._id),
+        student_id: String(r.user_id),
+        student_name: student?.name || null,
+        student_code: student?.student_id || String(r.user_id),
+        student_email: student?.email || null,
+        task_id: r.task_id ? String(r.task_id) : null,
+        task_code: task?.task_code || null,
+        task_title: task?.title || null,
+        task_day: task ? (task.day_number ?? task.day ?? null) : null,
+        // A task_id that no longer resolves (deleted task) is kept visible
+        // rather than silently dropped.
+        task_missing: Boolean(r.task_id) && !task,
+        submission_id: r.submission_id || null,
+        feedback: r.feedback || "",
+        strengths: r.strengths || "",
+        improvements: r.improvements || "",
+        score: r.score ?? null,
+        reviewer_name: r.reviewed_by ? (reviewerById.get(String(r.reviewed_by)) || null) : null,
+        status: r.status || "recorded",
+        period: r.period || null,
+        created_at: r.created_at || null,
+        updated_at: r.updated_at || r.created_at || null,
+      };
+    });
+
+    res.json({ success: true, entries, count: entries.length });
+  } catch (error) {
+    console.error("Task-wise feedback error:", error);
+    res.status(500).json({ success: false, message: "Unable to fetch task feedback" });
   }
 });
 
