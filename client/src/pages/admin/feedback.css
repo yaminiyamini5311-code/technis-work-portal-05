@@ -1,0 +1,84 @@
+/* Task-wise feedback report (CEO → Student Report → Feedback) */
+.fb-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0 12px;
+  align-items: center;
+}
+.fb-toolbar input[type="search"] {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+  font-size: 14px;
+}
+.fb-toolbar button {
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #fff;
+}
+
+.field-hint { display: block; margin-top: 4px; font-size: 11px; color: #6b7280; }
+
+.fb-students { display: flex; flex-direction: column; gap: 16px; }
+.fb-student { padding: 16px; }
+.fb-student-head h3 { margin: 0 0 2px; font-size: 17px; }
+.fb-student-head small { color: #6b7280; font-size: 12px; }
+
+.fb-task {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+.fb-task h4 { margin: 0 0 8px; font-size: 14px; }
+.fb-task h4 small { font-weight: 400; color: #6b7280; }
+.fb-warn {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}
+
+.fb-empty { color: #6b7280; font-size: 13px; margin: 0; }
+
+.fb-entry {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: rgba(250, 154, 2, 0.05);
+}
+.fb-entry p { margin: 0 0 6px; font-size: 13px; line-height: 1.6; }
+.fb-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  color: #6b7280;
+}
+.fb-score { font-weight: 700; color: #b45309; }
+.fb-status {
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.fb-line { margin-top: 5px; font-size: 12px; color: #4b5563; }
+
+@media (max-width: 640px) {
+  .fb-toolbar { flex-direction: column; align-items: stretch; }
+}
+/* Explicit colours so the report stays readable in both the light admin
+   theme and the CEO dark theme (where inherited text colour is dark). */
+.fb-task h4 { color: #182018; }
+.fb-task h4 small { color: #6b7280; }
+.fb-entry p { color: #182018; }
+.fb-line { color: #4b5563; }
