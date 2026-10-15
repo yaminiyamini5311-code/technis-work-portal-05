@@ -40,7 +40,7 @@ router.get("/", async (req, res) => {
   try {
     const db = req.db;
     const batches = await db.collection("batches")
-      .find({ active: true }, { projection: { name: 1, created_at: 1 } })
+      .find({ active: { $nin: [false, 0, "false"] } }, { projection: { name: 1, created_at: 1 } })
       .sort({ name: 1 })
       .toArray();
     res.json({

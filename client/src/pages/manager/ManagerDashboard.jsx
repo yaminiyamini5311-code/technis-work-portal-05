@@ -65,7 +65,7 @@ export default function ManagerDashboard() {
   // Task form state
   const [form, setForm] = useState({
     title: "", description: "", priority: "medium",
-    start_date: "", start_time: "", due_date: "", due_time: "", domain: "edutins",
+    start_date: "", start_time: "", due_date: "", due_time: "", day_number: "", domain: "edutins",
     how_to_do: "", expected_output: "", submission_requirements: ""
   });
   const [assignMode, setAssignMode] = useState("student"); // "student" | "program"
@@ -119,7 +119,7 @@ export default function ManagerDashboard() {
     const data = await res.json();
     if (!res.ok) return setError(data.message || "Unable to create task");
     setMessage(`Task ${data.taskCode} assigned successfully.`);
-    setForm({ title: "", description: "", priority: "medium", start_date: "", start_time: "", due_date: "", due_time: "", domain: "edutins", how_to_do: "", expected_output: "", submission_requirements: "" });
+    setForm({ title: "", description: "", priority: "medium", start_date: "", start_time: "", due_date: "", due_time: "", day_number: "", domain: "edutins", how_to_do: "", expected_output: "", submission_requirements: "" });
     setStudentId(""); setProgram("");
     load();
   };
@@ -265,6 +265,11 @@ export default function ManagerDashboard() {
               <select id="m-task-domain" name="m-task-domain" value={form.domain} onChange={e => setForm({ ...form, domain: e.target.value })} required>
                 {DOMAINS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
               </select>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <label htmlFor="m-task-day" style={{ fontSize: "11px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", color: "#5f625f" }}>Day (1-60)</label>
+              <input id="m-task-day" name="m-task-day" type="number" min="1" max="60" value={form.day_number} onChange={e => setForm({ ...form, day_number: e.target.value })} />
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
