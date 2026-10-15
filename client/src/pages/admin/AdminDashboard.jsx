@@ -57,7 +57,8 @@ export default function AdminDashboard() {
   const [period,setPeriod]=useState("week");
   const [chart,setChart]=useState({labels:[],values:[]});
   const [submissions,setSubmissions]=useState([]);
-  const [pendingRegistrations,setPendingRegistrations]=useState([]);
+  const [studentApprovals,setStudentApprovals]=useState([]);
+  const [managerApprovals,setManagerApprovals]=useState([]);
   const [loading,setLoading]=useState(true);
   // { kind: "network" | "auth" | "forbidden" | "http", message, status? }
   const [error,setError]=useState(null);
@@ -95,19 +96,20 @@ export default function AdminDashboard() {
     try{
       setError(null);
       setLoading(true);
-      const [stats,progress,sub,pending]=await Promise.all([
+      const [stats,progress,sub,pendingStudents,pendingManagers]=await Promise.all([
         fetch(`${API_URL}/api/admin/stats`,{headers: liveHeaders, signal: ctrl.signal}),
         fetch(`${API_URL}/api/admin/progress?period=${period}`,{headers: liveHeaders, signal: ctrl.signal}),
         fetch(`${API_URL}/api/tasks/submissions`,{headers: liveHeaders, signal: ctrl.signal}),
-        fetch(`${API_URL}/api/admin/pending-registrations`,{headers: liveHeaders, signal: ctrl.signal})
+        fetch(`${API_URL}/api/admin/pending-registrations`,{headers: liveHeaders, signal: ctrl.signal}),
+        fetch(`${API_URL}/api/admin/pending-managers`,{headers: liveHeaders, signal: ctrl.signal})
       ]);
 
       // Resilient: render every endpoint that succeeded instead of failing
       // the whole dashboard when only one call errors. Real data only —
       // failed endpoints keep their previous (or empty) state.
       const httpError = classifyHttp([stats,progress,sub,pending]);
-      const settled = await Promise.all([stats.json(),progress.json(),sub.json(),pending.json()].map((p) => p.catch(() => null)));
-      const [a,b,c,d]=settled;
+      const settled = await Promise.all([stats.json(),progress.json(),sub.json(),pendingStudents.json(),pendingManagers.json()].map((p) => p.catch(() => null)));
+      const [a,b,c,d,e]=settled;
 
       if(stats.ok && a?.success) {
         setData(a.stats);
@@ -131,8 +133,11 @@ export default function AdminDashboard() {
         setSubmissions(c.submissions||[]);
       }
 
-      if(pending.ok && d?.success) {
-        setPendingRegistrations(d.pending||[]);
+      if(pendingStudents.ok && d?.success) {
+        setStudentApprovals(d.pending||[]);
+      }
+      if(pendingManagers.ok && e?.success) {
+        setManagerApprovals(e.pending||[]);
       }
 
       // Surface HTTP errors only when nothing usable rendered.
@@ -172,45 +177,35 @@ export default function AdminDashboard() {
   const hasLoaded = data !== null;
   const hasFailed = error !== null;
   
-  const handleApprove = async (userId) => {
+  const handleApprove = async (userId, kind = 'student') => {
     try {
-      const response = await fetch(`${API_URL}/api/admin/approve-registration/${userId}`, {
-        method: 'POST',
-        headers
-      });
+      const url = kind === 'manager'
+        ? `${API_URL}/api/admin/approve-manager/${userId}`
+        : `${API_URL}/api/admin/approve-registration/${userId}`;
+      const response = await fetch(url, { method: 'POST', headers });
       const result = await response.json();
-      if (response.ok) {
-        // Reload dashboard to refresh pending list
-        load();
-      } else {
-        alert(result.message || 'Failed to approve registration');
-      }
+      if (response.ok) { load(); } else { alert(result.message || 'Failed to approve registration'); }
     } catch (error) {
       console.error('Approve error:', error);
       alert('Failed to approve registration');
     }
   };
 
-  const handleReject = async (userId) => {
+  
+  const handleReject = async (userId, kind = 'student') => {
     if (!confirm('Are you sure you want to reject this registration?')) return;
     try {
-      const response = await fetch(`${API_URL}/api/admin/reject-registration/${userId}`, {
-        method: 'POST',
-        headers
-      });
+      const url = kind === 'manager'
+        ? `${API_URL}/api/admin/reject-manager/${userId}`
+        : `${API_URL}/api/admin/reject-registration/${userId}`;
+      const response = await fetch(url, { method: 'POST', headers });
       const result = await response.json();
-      if (response.ok) {
-        // Reload dashboard to refresh pending list
-        load();
-      } else {
-        alert(result.message || 'Failed to reject registration');
-      }
+      if (response.ok) { load(); } else { alert(result.message || 'Failed to reject registration'); }
     } catch (error) {
       console.error('Reject error:', error);
       alert('Failed to reject registration');
     }
   };
-  
   if(loading&&!data)return <div className="portal-loading"><div className="loader-dot"/><h2>Loading CEO workspace</h2><p>Syncing the latest team data.</p></div>;
 
   if(error && !data) return <div className="portal-loading"><div className="error-icon"><TechinsIcon name="alert" size={28} ariaLabel="Error" /></div><h2>Unable to load dashboard</h2><p>{error.message}</p>{error.kind === "network" && <p style={{marginTop:"0.5rem",fontSize:"0.9rem",opacity:0.8}}>Check that the backend API is running and VITE_API_URL is configured correctly.</p>}<button onClick={() => { setLoading(true); load({ force: true }); }} disabled={loading} style={{marginTop:"1rem",padding:"0.75rem 1.5rem",fontSize:"1rem"}}>{loading ? "Retrying…" : "Retry"}</button></div>;
@@ -220,48 +215,64 @@ export default function AdminDashboard() {
     {loading && data ? <div className="dashboard-sync" role="status">Syncing latest data…</div> : null}
     {error && data ? <div className="dashboard-error" role="alert" style={{padding:"1rem",margin:"1rem 0",background:"#fff3cd",border:"1px solid #ffc107",borderRadius:"8px",display:"flex",alignItems:"center",gap:"1rem"}}><TechinsIcon name="alert" size={22} ariaLabel="Warning" /><div style={{flex:1}}><strong>Partial data loaded</strong><p style={{margin:"0.25rem 0 0",fontSize:"0.9rem"}}>{error.message}</p></div><button onClick={() => load({ force: true })} disabled={loading} style={{padding:"0.5rem 1rem"}}>{loading ? "Retrying…" : "Retry"}</button></div> : null}
 
-    {/* Pending Registrations Panel */}
-    {pendingRegistrations.length > 0 && (
+    {/* Student Approval Panel */}
+    {studentApprovals.length > 0 && (
       <section className="panel pending-registrations-panel">
         <div className="panel-head">
           <div>
-            <span className="section-kicker">REGISTRATION REQUESTS</span>
+            <span className="section-kicker">STUDENT APPROVAL</span>
             <h3>Pending Student Approvals</h3>
-            <p>{pendingRegistrations.length} student{pendingRegistrations.length===1?'':'s'} waiting for approval.</p>
+            <p>{studentApprovals.length} student{studentApprovals.length===1?'':'s'} waiting for approval.</p>
           </div>
         </div>
         <div className="pending-registrations-list">
-          {pendingRegistrations.map(student => (
+          {studentApprovals.map(student => (
             <div className="pending-registration-item" key={student.id}>
-              <div className="pending-student-avatar">
-                {student.name.charAt(0).toUpperCase()}
-              </div>
+              <div className="pending-student-avatar">{student.name.charAt(0).toUpperCase()}</div>
               <div className="pending-student-info">
                 <strong>{student.name}</strong>
                 <small>{student.email}</small>
-                <small className="registration-date">
-                  Registered: {new Date(student.created_at).toLocaleString()}
-                </small>
+                <small className="registration-date">Registered: {new Date(student.created_at).toLocaleString()}</small>
               </div>
               <div className="pending-actions">
-                <button 
-                  className="approve-btn"
-                  onClick={() => handleApprove(student.id)}
-                >
-                  Approve
-                </button>
-                <button 
-                  className="reject-btn"
-                  onClick={() => handleReject(student.id)}
-                >
-                  Reject
-                </button>
+                <button className="approve-btn" onClick={() => handleApprove(student.id, 'student')}>Approve</button>
+                <button className="reject-btn" onClick={() => handleReject(student.id, 'student')}>Reject</button>
               </div>
             </div>
           ))}
         </div>
       </section>
     )}
+
+    {/* Manager Approval Panel */}
+    {managerApprovals.length > 0 && (
+      <section className="panel pending-registrations-panel">
+        <div className="panel-head">
+          <div>
+            <span className="section-kicker">MANAGER APPROVAL</span>
+            <h3>Pending Manager Approvals</h3>
+            <p>{managerApprovals.length} manager{managerApprovals.length===1?'':'s'} waiting for approval.</p>
+          </div>
+        </div>
+        <div className="pending-registrations-list">
+          {managerApprovals.map(mgr => (
+            <div className="pending-registration-item" key={mgr.id}>
+              <div className="pending-student-avatar">{mgr.name.charAt(0).toUpperCase()}</div>
+              <div className="pending-student-info">
+                <strong>{mgr.name}</strong>
+                <small>{mgr.email}</small>
+                <small className="registration-date">Registered: {new Date(mgr.created_at).toLocaleString()}</small>
+              </div>
+              <div className="pending-actions">
+                <button className="approve-btn" onClick={() => handleApprove(mgr.id, 'manager')}>Accept</button>
+                <button className="reject-btn" onClick={() => handleReject(mgr.id, 'manager')}>Reject</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    )}
+
 
     <div className="admin-stat-grid">
       {[['Students',data?.students||0,'01'],['Tasks',data?.tasks||0,'02'],['Completed',data?.completedTasks||0,'03'],['Pending',data?.pendingTasks||0,'04'],['Missions',data?.missions||0,'05'],["Today's activity",data?.activitiesToday||0,'06']].map(([label,value,no])=><div className="admin-stat" key={label}><small>{no}</small><span>{label}</span><StatNumber value={value} /></div>)}

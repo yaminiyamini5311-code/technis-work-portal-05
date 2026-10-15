@@ -54,7 +54,9 @@ export default function Tasks() {
     description: "",
     priority: "medium",
     start_date: "",
+    start_time: "",
     due_date: "",
+    due_time: "",
     domain: "edutins",
     how_to_do: "",
     expected_output: "",
@@ -111,9 +113,10 @@ export default function Tasks() {
       return setError("Select a batch");
     }
 
-    // Validate start/end dates
-    if (form.start_date && form.due_date && form.start_date > form.due_date) {
-      return setError("Starting Date cannot be after Ending Date");
+    // Validate start/end dates + times
+    if (form.start_date && form.due_date) {
+      if (form.start_date > form.due_date) return setError("Starting Date cannot be after Ending Date");
+      if (form.start_date === form.due_date && form.start_time && form.due_time && form.start_time > form.due_time) return setError("Starting time cannot be after ending time");
     }
 
     // IDs are ObjectId STRINGS — never convert to Number (that was the bug)
@@ -145,7 +148,9 @@ export default function Tasks() {
         description: "",
         priority: "medium",
         start_date: "",
+        start_time: "",
         due_date: "",
+        due_time: "",
         domain: "edutins",
         how_to_do: "",
         expected_output: "",
@@ -363,26 +368,14 @@ export default function Tasks() {
 
         <div className="field">
           <label className="field-label" htmlFor="task-start-date">Starting Date</label>
-          <input
-            id="task-start-date"
-            name="task-start-date"
-            type="date"
-            value={form.start_date}
-            onChange={e => setForm({ ...form, start_date: e.target.value })}
-            autoComplete="off"
-          />
+          <input id="task-start-date" name="task-start-date" type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} autoComplete="off" />
+          <input id="task-start-time" name="task-start-time" type="time" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })} autoComplete="off" style={{ marginTop: "6px" }} />
         </div>
 
         <div className="field">
           <label className="field-label" htmlFor="task-due-date">Ending Date</label>
-          <input
-            id="task-due-date"
-            name="task-due-date"
-            type="date"
-            value={form.due_date}
-            onChange={e => setForm({ ...form, due_date: e.target.value })}
-            autoComplete="off"
-          />
+          <input id="task-due-date" name="task-due-date" type="date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} autoComplete="off" />
+          <input id="task-due-time" name="task-due-time" type="time" value={form.due_time} onChange={e => setForm({ ...form, due_time: e.target.value })} autoComplete="off" style={{ marginTop: "6px" }} />
         </div>
 
         <div className="field">
@@ -511,8 +504,8 @@ export default function Tasks() {
                   </span>
                 </td>
                 <td>{t.priority}</td>
-                <td>{t.start_date || "—"}</td>
-                <td>{t.due_date || "—"}</td>
+                <td>{t.start_date ? `${t.start_date}${t.start_time ? ` ${t.start_time}` : ""}` : "—"}</td>
+                <td>{t.due_date ? `${t.due_date}${t.due_time ? ` ${t.due_time}` : ""}` : "—"}</td>
                 <td>{t.submission_count || 0}</td>
                 <td>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>

@@ -664,7 +664,7 @@ router.post("/approve-user/:id", authenticateToken, authorizeRoles("admin", "ceo
     // approve-registration/:id is the student-specific variant; this route
     // also covers manager/admin activation.
     const update = { active: 1, updated_at: new Date().toISOString() };
-    if (user.role === "student") update.registration_status = "approved";
+    if (user.role === "student" || user.role === "manager") update.registration_status = "approved";
     await db.collection("users").updateOne({ _id: userId }, { $set: update });
     await writeAudit(db, { actorId: req.user.id, action: "user_approved", entityType: "user", entityId: String(userId), newValue: { name: user.name, email: user.email, role: user.role, active: 1 } });
 
@@ -726,10 +726,11 @@ router.post("/feedback", authenticateToken, authorizeRoles("admin", "manager", "
 router.get("/pending-registrations", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
   try {
     const db = req.db;
-    const pending = await db.collection("users").find(
-      { role: "student", registration_status: "pending" },
-      { projection: { password: 0 } }
-    ).sort({ created_at: -1 }).toArray();
+    const roleFilter = req.query?.role ? String(req.query.role).toLowerCase() : "student";
+    const role = ["student", "manager", "all"].includes(roleFilter) ? roleFilter : "student";
+    const filter = { registration_status: "pending" };
+    if (role !== "all") filter.role = role;
+    const pending = await db.collection("users").find(filter, { projection: { password: 0 } }).sort({ created_at: -1 }).toArray();
     res.json({ success: true, pending: pending.map(fmt) });
   } catch (error) {
     console.error("Pending registrations error:", error);
@@ -796,6 +797,91 @@ router.post("/reject-registration/:id", authenticateToken, authorizeRoles("admin
   } catch (error) {
     console.error("Reject registration error:", error);
     res.status(500).json({ success: false, message: "Unable to reject registration" });
+  }
+});
+
+
+/* ─── PENDING MANAGERS ───────────────────────────────────────────────── */
+router.get("/pending-managers", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+    const pending = await db.collection("users").find(
+      { role: "manager", registration_status: "pending" },
+      { projection: { password: 0 } }
+    ).sort({ created_at: -1 }).toArray();
+    res.json({ success: true, pending: pending.map(fmt) });
+  } catch (error) {
+    console.error("Pending managers error:", error);
+    res.status(500).json({ success: false, message: "Unable to fetch pending managers" });
+  }
+});
+
+/* aliases */
+router.get("/pending-manager-registrations", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res, next) => {
+  req.url = "/pending-managers";
+  // delegate by re-running? Simpler: fetch directly below.
+  try {
+    const db = req.db;
+    const pending = await db.collection("users").find({ role: "manager", registration_status: "pending" }, { projection: { password: 0 } }).sort({ created_at: -1 }).toArray();
+    res.json({ success: true, pending: pending.map(fmt) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Unable to fetch pending managers" });
+  }
+});
+
+/* ─── APPROVE MANAGER ─────────────────────────────────────────────────── */
+router.post("/approve-manager/:id", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+    const userId = req.params.id;
+    const user = await db.collection("users").findOne({ _id: toId(userId) });
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    if (user.role !== "manager") return res.status(400).json({ success: false, message: "Only manager registrations can be approved here" });
+    await db.collection("users").updateOne({ _id: toId(userId) }, { $set: { registration_status: "approved", active: 1, updated_at: new Date().toISOString() } });
+    res.json({ success: true, message: "Manager approved successfully" });
+  } catch (error) {
+    console.error("Approve manager error:", error);
+    res.status(500).json({ success: false, message: "Unable to approve manager" });
+  }
+});
+
+/* aliases for approve manager */
+router.post("/approve-manager-registration/:id", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+    const userId = req.params.id;
+    const user = await db.collection("users").findOne({ _id: toId(userId) });
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    await db.collection("users").updateOne({ _id: toId(userId) }, { $set: { registration_status: "approved", active: 1, updated_at: new Date().toISOString() } });
+    res.json({ success: true, message: "Manager approved successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Unable to approve manager" });
+  }
+});
+
+/* ─── REJECT MANAGER ──────────────────────────────────────────────────── */
+router.post("/reject-manager/:id", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+    const userId = req.params.id;
+    const user = await db.collection("users").findOne({ _id: toId(userId) });
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    await db.collection("users").updateOne({ _id: toId(userId) }, { $set: { registration_status: "rejected", active: 0, updated_at: new Date().toISOString() } });
+    res.json({ success: true, message: "Manager rejected successfully" });
+  } catch (error) {
+    console.error("Reject manager error:", error);
+    res.status(500).json({ success: false, message: "Unable to reject manager" });
+  }
+});
+
+router.post("/reject-manager-registration/:id", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+    const userId = req.params.id;
+    await db.collection("users").updateOne({ _id: toId(userId) }, { $set: { registration_status: "rejected", active: 0, updated_at: new Date().toISOString() } });
+    res.json({ success: true, message: "Manager rejected successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Unable to reject manager" });
   }
 });
 

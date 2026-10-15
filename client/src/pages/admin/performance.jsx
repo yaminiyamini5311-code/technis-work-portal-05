@@ -6,6 +6,7 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function Performance() {
   const [items, setItems] = useState([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -90,8 +91,25 @@ export default function Performance() {
           Scores appear only after evaluation.
         </p>
       </div>
+      <div style={{ marginBottom: "12px", display: "flex", gap: "8px", alignItems: "center" }}>
+        <input
+          type="text"
+          placeholder="Search by student name, email, ID, program..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ flex: 1, padding: "8px 12px" }}
+        />
+        {search && <button onClick={() => setSearch("")}>Clear</button>}
+      </div>
       <div className="performance-admin-grid">
-        {items.map((x) => (
+        {items
+          .filter((x) => {
+            const q = search.trim().toLowerCase();
+            if (!q) return true;
+            const s = `${x.student?.name || ""} ${x.student?.email || ""} ${x.student?.id || ""} ${x.student?.program || ""} ${x.student?.batch || ""}`.toLowerCase();
+            return s.includes(q);
+          })
+          .map((x) => (
           <div className="panel" key={x.student.id}>
             <div className="panel-head">
               <div>
@@ -142,6 +160,14 @@ export default function Performance() {
         <div className="empty-state">
           No student performance data yet. Students will appear here once they are assigned tasks or missions.
         </div>
+      )}
+      {items.length > 0 && items.filter((x) => {
+        const q = search.trim().toLowerCase();
+        if (!q) return true;
+        const s = `${x.student?.name || ""} ${x.student?.email || ""} ${x.student?.id || ""} ${x.student?.program || ""} ${x.student?.batch || ""}`.toLowerCase();
+        return s.includes(q);
+      }).length === 0 && (
+        <div className="empty-state">No matching performance records.</div>
       )}
     </div>
   );

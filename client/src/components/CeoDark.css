@@ -719,3 +719,12 @@
 .role-layout.ceo-dark .review-modal .panel-head button:hover {
   background: rgba(242, 85, 122, 0.24) !important;
 }
+
+/* Scoped: feedback/command box hover keeps readable text (no white-on-white) */
+.role-layout.ceo-dark .feedback-box:hover,
+.role-layout.ceo-dark .feedback-box:hover * {
+  color: var(--ceo-text);
+}
+.role-layout.ceo-dark textarea:hover {
+  color: var(--ceo-text);
+}
