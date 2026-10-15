@@ -47,3 +47,14 @@ client/.env
 # Local database backups / data dumps — never commit
 server/backup/
 backup/
+
+# Google service-account keys / certificates / tokens (never commit)
+service-account*.json
+service_account*.json
+*service-account*.json
+*-credentials.json
+google-credentials*.json
+*.pem
+*.p12
+server/keys/
+server/secrets/

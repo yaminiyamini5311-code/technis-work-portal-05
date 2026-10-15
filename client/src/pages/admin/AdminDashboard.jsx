@@ -107,7 +107,7 @@ export default function AdminDashboard() {
       // Resilient: render every endpoint that succeeded instead of failing
       // the whole dashboard when only one call errors. Real data only —
       // failed endpoints keep their previous (or empty) state.
-      const httpError = classifyHttp([stats,progress,sub,pending]);
+      const httpError = classifyHttp([stats,progress,sub,pendingStudents,pendingManagers]);
       const settled = await Promise.all([stats.json(),progress.json(),sub.json(),pendingStudents.json(),pendingManagers.json()].map((p) => p.catch(() => null)));
       const [a,b,c,d,e]=settled;
 
@@ -172,10 +172,6 @@ export default function AdminDashboard() {
   },[load]);
   const maxStudents = data?.maxStudents || 100;
   const capacity=useMemo(()=>Math.min(((data?.students||0)/maxStudents)*100,100),[data, maxStudents]);
-  
-  // Distinguish between "loading", "failed to load" and "loaded with zeros"
-  const hasLoaded = data !== null;
-  const hasFailed = error !== null;
   
   const handleApprove = async (userId, kind = 'student') => {
     try {

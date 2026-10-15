@@ -728,3 +728,27 @@
 .role-layout.ceo-dark textarea:hover {
   color: var(--ceo-text);
 }
+
+/* ── Task-wise feedback + performance report contrast (CEO dark theme) ──
+ * These are new report surfaces; h4/table cells are not covered by the
+ * generic h2/h3 rule, so they are scoped explicitly here. */
+.role-layout.ceo-dark .fb-student-head h3,
+.role-layout.ceo-dark .fb-task h4 { color: var(--ceo-text) !important; }
+.role-layout.ceo-dark .fb-task h4 small,
+.role-layout.ceo-dark .fb-student-head small,
+.role-layout.ceo-dark .field-hint { color: var(--ceo-text-dim) !important; }
+.role-layout.ceo-dark .fb-entry p { color: var(--ceo-text) !important; }
+.role-layout.ceo-dark .fb-line,
+.role-layout.ceo-dark .fb-meta { color: var(--ceo-text-dim) !important; }
+.role-layout.ceo-dark .perf-table th,
+.role-layout.ceo-dark .perf-table td { color: var(--ceo-text) !important; border-color: rgba(255, 255, 255, 0.1); }
+.role-layout.ceo-dark .perf-table td small,
+.role-layout.ceo-dark .perf-table .muted { color: var(--ceo-text-dim) !important; }
+.role-layout.ceo-dark .perf-score-block strong.muted,
+.role-layout.ceo-dark .perf-empty { color: var(--ceo-text-dim) !important; }
+.role-layout.ceo-dark .perf-chip { border-color: rgba(255, 255, 255, 0.16); background: rgba(255, 255, 255, 0.06); color: var(--ceo-text); }
+.role-layout.ceo-dark .perf-expand,
+.role-layout.ceo-dark .perf-search-bar input,
+.role-layout.ceo-dark .fb-toolbar input { background: rgba(255, 255, 255, 0.06) !important; color: var(--ceo-text) !important; border-color: rgba(255, 255, 255, 0.18) !important; }
+.role-layout.ceo-dark .perf-search-bar input::placeholder,
+.role-layout.ceo-dark .fb-toolbar input::placeholder { color: var(--ceo-placeholder); opacity: 1; }
