@@ -1,38 +1,63 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import TechinsIcon from "../../components/TechinsIcon";
+import "../../styles/admin.css";
+import "../admin/feedback.css";
+import "../admin/performance.css";
 import "./StudentDashboard.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+function fmtDate(value) {
+  if (!value) return "—";
+  try {
+    return new Date(value).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch { return String(value); }
+}
+
+function fmtDateTime(value) {
+  if (!value) return "—";
+  try { return new Date(value).toLocaleString(); } catch { return String(value); }
+}
 
 export default function Feedback() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
+      setLoading(true);
       const res = await fetch(`${API_URL}/api/student/feedback`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
-      const d = await res.json();
+      const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.message || "Unable to load feedback");
 
-      // Combine performance feedback and task feedback
-      const performanceFeedback = (d.feedback || []).map(item => ({
-        ...item,
-        type: 'performance',
-        title: `Performance Review - ${item.period}`,
-        displayTitle: 'Performance Review'
-      }));
+      // Performance entries include task-linked reviews (task_id/task_code);
+      // legacy task.feedback rows are kept as task feedback.
+      const performanceFeedback = (d.feedback || []).map(item => {
+        const isTaskLinked = Boolean(item.task_id || item.task_code || item.task_title);
+        const taskLabel = item.task_title
+          ? `${item.task_code ? `${item.task_code} · ` : ""}${item.task_title}`
+          : item.task_code || 'Task';
+        return {
+          ...item,
+          type: 'performance',
+          displayTitle: isTaskLinked ? taskLabel : `Performance Review${item.period ? ` - ${item.period}` : ""}`,
+          taskLinked: isTaskLinked,
+        };
+      });
 
       const taskFeedback = (d.taskFeedback || []).map(item => ({
         ...item,
         type: 'task',
-        displayTitle: item.task_code || 'Task'
+        displayTitle: item.title ? `${item.task_code ? `${item.task_code} · ` : ""}${item.title}` : (item.task_code || 'Task'),
+        feedback: item.feedback,
+        taskLinked: true,
       }));
 
       const allFeedback = [...performanceFeedback, ...taskFeedback]
-        .sort((a, b) => new Date(b.created_at || b.updated_at) - new Date(a.created_at || a.updated_at));
+        .sort((a, b) => new Date(b.created_at || b.updated_at || 0) - new Date(a.created_at || a.updated_at || 0));
 
       setItems(allFeedback);
       setError("");
@@ -41,27 +66,26 @@ export default function Feedback() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
-
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "";
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
-  };
+  }, [load]);
 
   return (
     <div className="student-dashboard-page page-enter">
       <div className="simple-head">
         <span>PRIVATE FEEDBACK</span>
         <h2>My Feedback</h2>
-        <p>Feedback shared with your student account.</p>
+        <p>Feedback shared with your student account, grouped with the same card design as your performance.</p>
       </div>
 
-      {error && <div className="error-msg">{error}</div>}
+      <div className="fb-toolbar">
+        <button type="button" onClick={load} disabled={loading}>{loading ? "Loading…" : "Refresh"}</button>
+        {items.length > 0 && <span className="fb-count">{items.length} entr{items.length === 1 ? "y" : "ies"}</span>}
+      </div>
+
+      {error && <div className="error-msg" role="alert">{error} <button type="button" onClick={load}>Retry</button></div>}
 
       {loading ? (
         <div className="portal-loading small">
@@ -69,70 +93,25 @@ export default function Feedback() {
           <p>Loading feedback...</p>
         </div>
       ) : items.length ? (
-        <div className="workspace-card">
-          {items.map(x => (
-            <article className="feedback-item" key={`${x.type}-${x.id}`} style={{
-              padding: '16px',
-              borderBottom: '1px solid var(--border-light)',
-              display: 'flex',
-              gap: '12px',
-              alignItems: 'flex-start'
-            }}>
-              <div className="feedback-item-icon" style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '8px',
-                background: 'rgba(250,154,2,0.12)',
-                color: '#FA9A02',
-                display: 'grid',
-                placeItems: 'center',
-                flex: 'none'
-              }}>
-                <TechinsIcon name="comment" size={18} variant="light" className="portal-icon" />
-              </div>
-              <div className="feedback-item-content" style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ marginBottom: '8px' }}>
-                  <strong style={{ display: 'block', fontSize: '13px', color: '#FFFFFF' }}>
-                    {x.displayTitle}
-                  </strong>
-                  <small style={{ color: '#C0C0C0', fontSize: '11px' }}>
-                    {formatDate(x.created_at || x.updated_at)}
-                  </small>
+        <div className="fb-students">
+          <section className="panel fb-student perf-card" aria-label="My feedback entries">
+            {items.map(x => (
+              <article className="fb-entry" key={`${x.type}-${x.id}`}>
+                <p><strong>{x.taskLinked ? "Task feedback" : "Performance review"}</strong> · {x.displayTitle}</p>
+                <p>{x.feedback || "No feedback text recorded."}</p>
+                <div className="fb-meta">
+                  <span>{x.reviewer_name ? `By ${x.reviewer_name}` : "Reviewer unknown"}</span>
+                  <span>{fmtDateTime(x.created_at || x.updated_at)}</span>
+                  {x.updated_at && x.updated_at !== x.created_at && <span>Updated {fmtDateTime(x.updated_at)}</span>}
+                  {x.score != null && <span className="fb-score">Score {x.score}</span>}
+                  <span className="fb-status">{x.status || (x.taskLinked ? "task" : "recorded")}</span>
                 </div>
-                <p style={{ color: '#C0C0C0', fontSize: '12px', lineHeight: '1.6', margin: '0 0 8px 0' }}>
-                  {x.feedback}
-                </p>
-                {x.score != null && (
-                  <span className="score-chip" style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '4px 10px',
-                    background: 'rgba(250,154,2,0.15)',
-                    borderRadius: '20px',
-                    color: '#FA9A02',
-                    fontSize: '11px',
-                    fontWeight: '700'
-                  }}>
-                    <TechinsIcon name="trophy" size={14} variant="light" className="portal-icon" />
-                    Score {x.score}%
-                  </span>
-                )}
-                {x.strengths && (
-                  <div style={{ marginTop: '8px' }}>
-                    <small style={{ color: '#FA9A02', fontSize: '10px', fontWeight: '700', textTransform: 'uppercase' }}>Strengths:</small>
-                    <p style={{ color: '#C0C0C0', fontSize: '11px', margin: '4px 0 0 0' }}>{x.strengths}</p>
-                  </div>
-                )}
-                {x.improvements && (
-                  <div style={{ marginTop: '8px' }}>
-                    <small style={{ color: '#FA9A02', fontSize: '10px', fontWeight: '700', textTransform: 'uppercase' }}>Improvement areas:</small>
-                    <p style={{ color: '#C0C0C0', fontSize: '11px', margin: '4px 0 0 0' }}>{x.improvements}</p>
-                  </div>
-                )}
-              </div>
-            </article>
-          ))}
+                {x.strengths && <div className="fb-line"><b>Strengths:</b> {Array.isArray(x.strengths) ? x.strengths.join(", ") : x.strengths}</div>}
+                {(x.improvements || x.improvement) && <div className="fb-line"><b>Improvement areas:</b> {Array.isArray(x.improvements || x.improvement) ? (x.improvements || x.improvement).join(", ") : (x.improvements || x.improvement)}</div>}
+                <div className="fb-line"><small>{fmtDate(x.created_at || x.updated_at)}</small></div>
+              </article>
+            ))}
+          </section>
         </div>
       ) : (
         <div className="workspace-empty">

@@ -3,15 +3,34 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
 import { useScrollReveal } from "../../components/useScrollReveal";
+import "../../styles/admin.css";
+import "../admin/performance.css";
 import "./Performance.css";
 
 const API_URL =
   import.meta.env.VITE_API_URL || "http://localhost:5000";
 
+/* Same task states as the CEO performance page (utils/studentReport.js) so
+   both portals can never disagree on what a state means. */
+const STATE_LABELS = {
+  approved: "Approved",
+  submitted: "Submitted",
+  revision_required: "Revision Required",
+  in_progress: "In Progress",
+  not_started: "Not Started",
+};
+
+function fmtDate(value) {
+  if (!value) return "—";
+  try { return new Date(value).toLocaleString(); } catch { return String(value); }
+}
+
 function Performance() {
   const navigate = useNavigate();
 
   const [performance, setPerformance] = useState(null);
+  const [report, setReport] = useState(null);
+  const [showTasks, setShowTasks] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -29,51 +48,50 @@ function Performance() {
     initialBlur: 0
   });
 
-  useEffect(() => {
-    const loadPerformance = async () => {
-      if (!token) {
+  const loadPerformance = async () => {
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError("");
+      // Summary (progress, score, missions, strengths, feedback) comes from
+      // /api/student/dashboard; the task-wise breakdown uses the same
+      // builder as the CEO page via /api/student/report (own data only).
+      const headers = { Authorization: `Bearer ${token}` };
+      const [dashRes, reportRes] = await Promise.all([
+        axios.get(`${API_URL}/api/student/dashboard`, { headers }),
+        axios.get(`${API_URL}/api/student/report`, { headers }).catch(() => ({ data: null })),
+      ]);
+
+      setPerformance(dashRes.data);
+      if (reportRes?.data?.success) setReport(reportRes.data);
+      else setReport(null);
+    } catch (err) {
+      console.error("Performance error:", err);
+
+      if (err.response?.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
         navigate("/login");
         return;
       }
 
-      try {
-        // The student summary payload (progress, score, mission completion,
-        // strengths/improvement lists, feedback) is produced by
-        // /api/student/dashboard. /api/performance/me returns the raw review
-        // records array (`records`) — reading dashboard-shaped fields from it
-        // silently rendered 0/empty cards, which is why this page now uses
-        // the dashboard payload.
-        const response = await axios.get(
-          `${API_URL}/api/student/dashboard`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+      setError(
+        err.response?.data?.message ||
+          "Unable to load your performance."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        setPerformance(response.data);
-      } catch (err) {
-        console.error("Performance error:", err);
-
-        if (err.response?.status === 401) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          navigate("/login");
-          return;
-        }
-
-        setError(
-          err.response?.data?.message ||
-            "Unable to load your performance."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
+  useEffect(() => {
     loadPerformance();
-  }, [token, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   if (loading) {
     return (
@@ -100,15 +118,21 @@ function Performance() {
           >
             <TechinsIcon name="chevron" size={14} variant="light" ariaHidden style={{ transform: "rotate(180deg)" }} /> Back to Dashboard
           </button>
+          <button onClick={loadPerformance} className="back-button" style={{ marginLeft: 8 }}>
+            Retry
+          </button>
         </div>
       </div>
     );
   }
 
-  const progress = performance?.progress ?? 0;
-  const score = performance?.score;
-  const completed = performance?.completedMissions ?? 0;
-  const total = performance?.totalMissions ?? 0;
+  const progress = Number(performance?.progress ?? report?.progress ?? 0) || 0;
+  const score = performance?.score ?? report?.score ?? null;
+  const completed = performance?.completedMissions ?? report?.completedMissions ?? 0;
+  const total = performance?.totalMissions ?? report?.totalMissions ?? 0;
+  const counts = report?.counts || {};
+  const scoring = report?.scoring || {};
+  const tasks = report?.tasks || [];
 
   const missionPercentage =
     total > 0
@@ -248,6 +272,102 @@ function Performance() {
           </div>
 
         </section>
+
+        {/* TASK-WISE BREAKDOWN — same visual language as the CEO page */}
+        {report && (
+          <section className="panel perf-card reveal-card" aria-label="Task-wise results">
+            <div className="panel-head">
+              <div>
+                <h3>Task-wise results</h3>
+                <small>
+                  {counts.total || 0} task{(counts.total || 0) === 1 ? "" : "s"} assigned
+                  {scoring.has_scores
+                    ? ` · ${scoring.scored_tasks} scored · ${scoring.total_earned}/${scoring.total_max} marks`
+                    : " · no scores recorded yet"}
+                </small>
+              </div>
+              <strong title="Approval-based completion across tasks and missions">{progress}%</strong>
+            </div>
+
+            <div className="perf-score-block">
+              <div>
+                <small>Overall score</small>
+                {scoring.overall_percentage == null
+                  ? <strong className="muted">Not evaluated</strong>
+                  : <strong>{scoring.overall_percentage}%</strong>}
+              </div>
+            </div>
+
+            <div className="perf-counts">
+              <span className="perf-chip total">Total <b>{counts.total || 0}</b></span>
+              <span className="perf-chip approved">Approved <b>{counts.approved || 0}</b></span>
+              <span className="perf-chip submitted">Submitted <b>{counts.submitted || 0}</b></span>
+              <span className="perf-chip pending">Pending <b>{counts.pending || 0}</b></span>
+              {(counts.revision_required || 0) > 0 && <span className="perf-chip revision">Revision <b>{counts.revision_required}</b></span>}
+              {(counts.overdue || 0) > 0 && <span className="perf-chip overdue">Overdue <b>{counts.overdue}</b></span>}
+            </div>
+
+            <div className="perf-line"><span>Missions</span><b>{completed}/{total}</b></div>
+            <div className="admin-progress"><i style={{ width: `${progress}%` }} /></div>
+
+            <button
+              className="perf-expand"
+              type="button"
+              onClick={() => setShowTasks((v) => !v)}
+              aria-expanded={showTasks}
+            >
+              {showTasks ? "Hide task-wise results" : `View task-wise results (${tasks.length})`}
+            </button>
+
+            {showTasks && (
+              tasks.length === 0 ? (
+                <div className="perf-empty">No tasks assigned to you yet.</div>
+              ) : (
+                <div className="perf-table-wrap">
+                  <table className="perf-table">
+                    <thead>
+                      <tr>
+                        <th>Task</th><th>Status</th><th>Score</th><th>Submitted</th><th>Reviewed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tasks.map((t) => (
+                        <tr key={t.task_id} className={t.overdue ? "overdue" : ""}>
+                          <td>
+                            <strong>{t.title || "Untitled task"}</strong>
+                            <small>{t.task_code || t.task_id}{t.day != null ? ` · Day ${String(t.day).padStart(2, "0")}` : ""}</small>
+                          </td>
+                          <td>
+                            <span className={`perf-state ${t.state}`}>
+                              {STATE_LABELS[t.state] || t.state}
+                            </span>
+                            {t.overdue && <span className="perf-state overdue">Overdue</span>}
+                          </td>
+                          <td>
+                            {t.has_score
+                              ? <span className="perf-score-cell">{t.score}/{t.max_marks}</span>
+                              : <span className="muted" title="No score has been recorded for this task">
+                                  {t.awaiting_evaluation ? "Awaiting evaluation" : "—"}
+                                </span>}
+                          </td>
+                          <td>{fmtDate(t.submission?.submitted_at)}</td>
+                          <td>
+                            {t.submission?.reviewed_at ? (
+                              <span title={t.submission?.review_comments || ""}>
+                                {fmtDate(t.submission.reviewed_at)}
+                                {t.submission?.reviewer_name ? ` · ${t.submission.reviewer_name}` : ""}
+                              </span>
+                            ) : <span className="muted">—</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            )}
+          </section>
+        )}
 
 
         {/* DETAILS */}

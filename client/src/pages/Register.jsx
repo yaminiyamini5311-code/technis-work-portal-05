@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
+import TechinsIcon from "../components/TechinsIcon";
 import "./Login.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -30,7 +31,9 @@ export default function Register() {
   // dedicated success panel — the student is never stranded on a message.
   const [submitted, setSubmitted] = useState(false);
 
-  // Load active batches from the public API (id + name only)
+  // Load active batches from the public API (id + name only).
+  // Accepts {batches:[...]}, {data:[...]} or a bare array so backend
+  // envelope changes cannot silently empty the dropdown.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -38,7 +41,14 @@ export default function Register() {
         setBatchesLoading(true);
         const { data } = await axios.get(`${API_URL}/api/batches`);
         if (cancelled) return;
-        setBatches(data.batches || []);
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.batches)
+            ? data.batches
+            : Array.isArray(data?.data)
+              ? data.data
+              : [];
+        setBatches(list.filter((b) => b && (b.id || b._id) && (b.name || b.batch_name)));
         setBatchesError("");
       } catch (err) {
         if (!cancelled) setBatchesError(err.response?.data?.message || "Unable to load batches. Please try again.");
@@ -47,7 +57,28 @@ export default function Register() {
       }
     })();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const retryBatches = async () => {
+    try {
+      setBatchesLoading(true);
+      const { data } = await axios.get(`${API_URL}/api/batches`);
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.batches)
+          ? data.batches
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
+      setBatches(list.filter((b) => b && (b.id || b._id) && (b.name || b.batch_name)));
+      setBatchesError("");
+    } catch (err) {
+      setBatchesError(err.response?.data?.message || "Unable to load batches. Please try again.");
+    } finally {
+      setBatchesLoading(false);
+    }
+  };
 
   // Scroll error into view when it appears
   useEffect(() => {
@@ -236,29 +267,51 @@ export default function Register() {
             <select
               id="register-role"
               value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value })}
+              onChange={(e) => setForm({ ...form, role: e.target.value, batchId: e.target.value === "student" ? form.batchId : "" })}
               required
             >
               <option value="student">Student</option>
               <option value="manager">Manager</option>
             </select>
 
-            <label htmlFor="register-batch">Batch (required for students)</label>
-            <select
-              id="register-batch"
-              value={form.batchId}
-              onChange={(e) => setForm({ ...form, batchId: e.target.value })}
-              disabled={batchesLoading}
-              required={form.role === "student"}
-            >
-              <option value="">{batchesLoading ? "Loading batches..." : "Select a batch"}</option>
-              {batches.map((b) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
-            {batchesError && <small className="field-error">{batchesError}</small>}
-            {!batchesLoading && !batchesError && batches.length === 0 && (
-              <small className="field-error">No batches available. Contact your administrator.</small>
+            {form.role === "student" && (
+              <>
+                <label htmlFor="register-batch">Batch (required for students)</label>
+                <select
+                  id="register-batch"
+                  value={form.batchId}
+                  onChange={(e) => setForm({ ...form, batchId: e.target.value })}
+                  disabled={batchesLoading}
+                  required
+                  aria-describedby="register-batch-help"
+                  aria-busy={batchesLoading}
+                >
+                  <option value="">{batchesLoading ? "Loading batches..." : "Select a batch"}</option>
+                  {batches.map((b) => {
+                    const id = b.id || b._id;
+                    const name = b.name || b.batch_name;
+                    return (
+                      <option key={String(id)} value={String(id)}>{name}</option>
+                    );
+                  })}
+                </select>
+                <small id="register-batch-help" className="field-hint">
+                  {batchesLoading
+                    ? "Loading available batches…"
+                    : batchesError
+                      ? "Batch list failed to load. "
+                      : batches.length
+                        ? `${batches.length} batch(es) available`
+                        : "No batches available. Contact your administrator."}
+                  {batchesError && !batchesLoading && (
+                    <button type="button" className="link-button" onClick={retryBatches}>Retry</button>
+                  )}
+                </small>
+                {batchesError && <small className="field-error" role="alert">{batchesError}</small>}
+                {!batchesLoading && !batchesError && batches.length === 0 && (
+                  <small className="field-error">No batches available. Contact your administrator.</small>
+                )}
+              </>
             )}
 
             <label htmlFor="register-password">Password</label>
@@ -272,8 +325,8 @@ export default function Register() {
                 autoComplete="new-password"
                 required
               />
-              <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? "Hide password" : "Show password"}>
-                {showPassword ? "Hide" : "Show"}
+              <button type="button" className="password-toggle" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? "Hide password" : "Show password"} title={showPassword ? "Hide password" : "Show password"}>
+                <TechinsIcon name={showPassword ? "eye" : "eyeOff"} size={18} variant="dark" ariaHidden />
               </button>
             </div>
 
@@ -288,8 +341,8 @@ export default function Register() {
                 autoComplete="new-password"
                 required
               />
-              <button type="button" onClick={() => setShowConfirm((v) => !v)} aria-label={showConfirm ? "Hide confirm password" : "Show confirm password"}>
-                {showConfirm ? "Hide" : "Show"}
+              <button type="button" className="password-toggle" onClick={() => setShowConfirm((v) => !v)} aria-label={showConfirm ? "Hide confirm password" : "Show confirm password"} title={showConfirm ? "Hide confirm password" : "Show confirm password"}>
+                <TechinsIcon name={showConfirm ? "eye" : "eyeOff"} size={18} variant="dark" ariaHidden />
               </button>
             </div>
 

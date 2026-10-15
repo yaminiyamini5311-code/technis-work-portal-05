@@ -117,9 +117,16 @@ function WorkHistory() {
 
     const historyItems = useMemo(() => {
 
+        const seen = new Set();
+        const dedupe = (key) => {
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        };
+
         const activityItems = activities.map(
             (activity) => ({
-                id: `activity-${activity.id}`,
+                id: `activity-${activity.id || activity._id}`,
                 type: "activity",
                 title:
                     activity.work_title ||
@@ -135,13 +142,13 @@ function WorkHistory() {
                     activity.created_at ||
                     "",
                 hours:
-                    activity.hours_worked || 0
+                    activity.hours_worked ?? activity.hours ?? 0
             })
-        );
+        ).filter((item) => dedupe(item.id));
 
         const taskItems = tasks.map(
             (task) => ({
-                id: `task-${task.id}`,
+                id: `task-${task.id || task._id}`,
                 type: "task",
                 title:
                     task.title ||
@@ -150,20 +157,21 @@ function WorkHistory() {
                     task.description ||
                     "No description available.",
                 status:
-                    task.status ||
+                    task.student_workflow_status || task.workflow_status || task.status ||
                     "pending",
                 date:
                     task.completed_at ||
+                    task.updated_at ||
                     task.due_date ||
                     task.created_at ||
                     "",
                 hours: null
             })
-        );
+        ).filter((item) => dedupe(item.id));
 
         const missionItems = missions.map(
             (mission) => ({
-                id: `mission-${mission.id}`,
+                id: `mission-${mission.id || mission._id}`,
                 type: "mission",
                 title:
                     mission.title ||
@@ -176,6 +184,7 @@ function WorkHistory() {
                     "assigned",
                 date:
                     mission.completed_at ||
+                    mission.updated_at ||
                     mission.due_date ||
                     mission.created_at ||
                     "",
@@ -183,7 +192,7 @@ function WorkHistory() {
                     mission.progress || 0,
                 hours: null
             })
-        );
+        ).filter((item) => dedupe(item.id));
 
         return [
             ...activityItems,
@@ -228,12 +237,13 @@ function WorkHistory() {
         }
     );
 
+    const isTaskCompleted = (task) => {
+        const s = String(task.student_workflow_status || task.workflow_status || task.status || "").toLowerCase();
+        return s === "approved" || s === "completed";
+    };
+
     const completedTasks =
-        tasks.filter(
-            (task) =>
-                String(task.status).toLowerCase() ===
-                "completed"
-        ).length;
+        tasks.filter(isTaskCompleted).length;
 
     const completedMissions =
         missions.filter(
@@ -247,7 +257,7 @@ function WorkHistory() {
         activities.reduce(
             (total, activity) =>
                 total +
-                Number(activity.hours_worked || 0),
+                Number(activity.hours_worked ?? activity.hours ?? 0),
             0
         );
 
@@ -285,7 +295,7 @@ function WorkHistory() {
                 .toLowerCase()
                 .replaceAll(" ", "_");
 
-        if (value === "completed") {
+        if (value === "completed" || value === "approved") {
             return "completed";
         }
 

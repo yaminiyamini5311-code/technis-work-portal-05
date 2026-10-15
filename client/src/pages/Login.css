@@ -210,25 +210,34 @@
   box-shadow:0 0 0 4px rgba(250,154,2,.12);
 }
 .password-field{position:relative}
-.password-field input{padding-right:76px}
-.password-field button{
+.password-field input{padding-right:52px}
+.password-field button,.password-field .password-toggle{
   position:absolute;
   right:7px;
-  top:8px;
+  top:50%;
+  transform:translateY(-50%);
+  width:38px;
   height:38px;
+  min-width:38px;
+  display:grid;
+  place-items:center;
   border:1px solid #CDD3DB;
   background:#fff !important;
   color:#0C120C !important;
   border-radius:8px;
-  padding:0 11px;
-  font-size:11px;
-  font-weight:600;
+  padding:0;
+  cursor:pointer;
+  transition:background .2s,color .2s,border-color .2s,transform .15s;
 }
-.password-field button:hover{background:#F1F3F5 !important;color:#0C120C !important}
+.password-field button:hover,.password-field .password-toggle:hover{background:#F1F3F5 !important;color:#0C120C !important;border-color:#FA9A02}
 .password-field button:focus-visible{
   outline:2px solid #FA9A02;
   outline-offset:2px;
 }
+.password-field .password-toggle:active{transform:translateY(-50%) scale(.96)}
+.password-field .password-toggle svg{pointer-events:none}
+.field-hint{display:block;margin-top:4px;font-size:11px;color:#5b6475}
+.link-button{background:none;border:0;color:#FA9A02;font-weight:700;cursor:pointer;padding:0 4px;text-decoration:underline}
 .login-submit{
   width:100%;
   min-height:54px;

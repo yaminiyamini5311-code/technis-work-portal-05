@@ -1,6 +1,6 @@
 .role-layout{min-height:100vh;display:flex;background:#F3F3F3;color:#111827;position:relative;overflow-x:clip}
-.role-main{margin-left:0;width:100%;min-width:0;padding-top:var(--header-height,78px);position:relative;z-index:1}
-.role-topbar{height:var(--header-height,78px);background:rgba(255,255,255,0.88);backdrop-filter:blur(8px);border-bottom:1px solid #E6E6E6;padding:0 30px 0 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:fixed;top:0;left:0;right:0;z-index:60;box-shadow:0 2px 8px rgba(12,18,12,0.06)}
+.role-main{margin-left:0;width:100%;min-width:0;padding-top:var(--header-height,84px);position:relative;z-index:1}
+.role-topbar{position:sticky;position:fixed;top:0;left:0;right:0;min-height:var(--header-height,84px);height:var(--header-height,84px);background:rgba(255,255,255,0.88);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid #E6E6E6;padding:6px 30px 6px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:60;box-shadow:0 2px 8px rgba(12,18,12,0.06)}
 .role-topbar-lead{display:flex;align-items:center;gap:14px;min-width:0;flex:1}
 .role-topbar-lead>div:last-child{min-width:0}
 .role-eyebrow{font-size:10px;letter-spacing:1.6px;color:#FA9A02;font-weight:900}
@@ -50,8 +50,8 @@
 }
 
 @media(max-width:520px){
-  .role-topbar{padding:0 16px 0 12px}
-  .role-main{padding-top:var(--header-height,68px)}
+  .role-topbar{padding:2px 16px 2px 12px}
+  .role-main{padding-top:var(--header-height,72px)}
   .role-content{padding:12px}
   .role-topbar h1{font-size:17px}
   .role-eyebrow{font-size:9px}

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import axios from "axios";
 import { useNavigate, Link, useLocation } from "react-router-dom";
+import TechinsIcon from "../components/TechinsIcon";
 import "./Login.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -117,8 +118,8 @@ export default function Login() {
                 autoComplete="current-password"
                 required
               />
-              <button type="button" onClick={() => setShow((value) => !value)} aria-label={show ? "Hide password" : "Show password"}>
-                {show ? "Hide" : "Show"}
+              <button type="button" className="password-toggle" onClick={() => setShow((value) => !value)} aria-label={show ? "Hide password" : "Show password"} title={show ? "Hide password" : "Show password"}>
+                <TechinsIcon name={show ? "eye" : "eyeOff"} size={18} variant="dark" ariaHidden />
               </button>
             </div>
 

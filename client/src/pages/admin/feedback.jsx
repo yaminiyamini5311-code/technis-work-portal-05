@@ -222,7 +222,7 @@ export default function Feedback() {
       ) : (
         <div className="fb-students">
           {grouped.map((g) => (
-            <section className="panel fb-student" key={g.student.student_id}>
+            <section className="panel fb-student perf-card" key={g.student.student_id}>
               <header className="fb-student-head">
                 <div>
                   <h3>{g.student.student_name || "Unknown student"}</h3>
@@ -231,6 +231,9 @@ export default function Feedback() {
                     {g.student.student_email ? ` · ${g.student.student_email}` : ""}
                   </small>
                 </div>
+                <span className="fb-count" title="Feedback entries for this student">
+                  {[...g.tasks.values()].reduce((n, t) => n + t.entries.length, 0)} entries
+                </span>
               </header>
 
               {[...g.tasks.values()]
