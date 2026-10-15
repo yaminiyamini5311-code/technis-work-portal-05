@@ -800,3 +800,105 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+/* ── Submission Success Popup ───────────────────────────────────────────── */
+.submit-success-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease;
+}
+
+.submit-success-popup {
+    background: rgba(10, 18, 40, 0.95);
+    border: 1px solid rgba(250, 154, 2, 0.4);
+    border-radius: 20px;
+    padding: 32px;
+    max-width: 420px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.submit-success-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #10B981, #059669);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+}
+
+.submit-success-popup h2 {
+    margin: 0 0 8px;
+    font-size: 22px;
+    font-weight: 800;
+    color: #FFFFFF;
+}
+
+.submit-success-popup > p {
+    margin: 0 0 20px;
+    color: #C0C0C0;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.submit-success-details {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    text-align: left;
+}
+
+.submit-success-details div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.submit-success-details div:last-child {
+    border-bottom: none;
+}
+
+.submit-success-details strong {
+    color: #C0C0C0;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.submit-success-details > div > *:last-child {
+    color: #FFFFFF;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: right;
+    word-break: break-all;
+}
+
+.submit-success-popup .gold-btn {
+    width: 100%;
+    padding: 14px 24px;
+    font-size: 15px;
+    font-weight: 700;
+}

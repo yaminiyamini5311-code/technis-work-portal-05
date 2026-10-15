@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Fragment } from "react";
 import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
 import { useScrollReveal } from "../../components/useScrollReveal";
@@ -63,6 +63,8 @@ export default function MyTasks() {
   const [domainFilter, setDomainFilter] = useState("");
   // Submission history per task (fetched on demand, never in the list call)
   const [history, setHistory] = useState({});
+  // Success popup state
+  const [submitSuccess, setSubmitSuccess] = useState(null);
   const previousApproved = useRef(null);
   // Synchronous guards: React state updates are async, so a fast second
   // click could still observe stale `busy`/`loading` values and fire a
@@ -184,10 +186,18 @@ export default function MyTasks() {
       const form = new FormData();
       files.forEach((file) => form.append("files", file));
       if (comment) form.append("comment", comment);
-      await axios.post(`${API_URL}/api/tasks/${task.id}/submit`, form, { headers: auth() });
+      const response = await axios.post(`${API_URL}/api/tasks/${task.id}/submit`, form, { headers: auth() });
       setSelectedFiles((value) => ({ ...value, [task.id]: [] }));
       setComments((value) => ({ ...value, [task.id]: "" }));
-      setMessage("Submission recorded with a server timestamp.");
+      // Show professional success popup with actual submission details
+      const submissionData = response.data;
+      setSubmitSuccess({
+        taskTitle: task.title,
+        submissionCode: submissionData.submissionCode,
+        version: submissionData.version,
+        submittedAt: submissionData.submittedAt,
+        status: "Submitted"
+      });
       await load();
     } catch (err) {
       setError(err.response?.data?.message || "Unable to submit the task.");
@@ -226,10 +236,11 @@ export default function MyTasks() {
   if (loading && !tasks.length) return <div className="portal-loading"><div className="loader-dot" /><h2>Loading your tasks</h2><p>Syncing your latest assignments.</p></div>;
 
   return (
-    <div className="my-tasks-page page-enter">
-      <div className="tasks-container">
-        <div className="page-header">
-          <div><p className="page-label">STUDENT WORKSPACE</p><h1>My Tasks</h1><p className="page-description">Execute assignments, submit proof and follow every review step.</p></div>
+    <Fragment>
+      <div className="my-tasks-page page-enter">
+        <div className="tasks-container">
+          <div className="page-header">
+            <div><p className="page-label">STUDENT WORKSPACE</p><h1>My Tasks</h1><p className="page-description">Execute assignments, submit proof and follow every review step.</p></div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <select
               value={domainFilter}
@@ -383,5 +394,28 @@ export default function MyTasks() {
         </div>
       </div>
     </div>
+
+      {submitSuccess && (
+        <div className="submit-success-overlay" onClick={() => setSubmitSuccess(null)}>
+          <div className="submit-success-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="submit-success-icon">
+              <TechinsIcon name="check" size={40} variant="light" />
+            </div>
+            <h2>Task Submitted Successfully!</h2>
+            <p>Your task submission has been saved successfully.</p>
+            <div className="submit-success-details">
+              <div><strong>Task:</strong> {submitSuccess.taskTitle}</div>
+              <div><strong>Submission Status:</strong> {submitSuccess.status}</div>
+              <div><strong>Submission Code:</strong> {submitSuccess.submissionCode}</div>
+              <div><strong>Version:</strong> v{submitSuccess.version}</div>
+              <div><strong>Submitted At:</strong> {new Date(submitSuccess.submittedAt).toLocaleString()}</div>
+            </div>
+            <button className="gold-btn" onClick={() => setSubmitSuccess(null)}>
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+  </Fragment>
   );
 }
