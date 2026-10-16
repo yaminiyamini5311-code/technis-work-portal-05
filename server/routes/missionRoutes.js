@@ -36,8 +36,61 @@ router.get("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), as
 router.post("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), async (req, res) => {
   try {
     const db = req.db;
-    const { title, description, assigned_to, due_date } = req.body || {};
-    if (!title || !assigned_to) return res.status(400).json({ success: false, message: "Title and student are required" });
+    const { title, description, assigned_to, batch_id, due_date } = req.body || {};
+    if (!title) return res.status(400).json({ success: false, message: "Mission title is required" });
+
+    // Group/batch assignment: assign to all active students in the batch
+    if (batch_id) {
+      let batchOid;
+      try { batchOid = new ObjectId(batchId); } catch { return res.status(400).json({ success: false, message: "Invalid batch id" }); }
+      const batch = await db.collection("batches").findOne({ _id: batchOid });
+      if (!batch) return res.status(404).json({ success: false, message: "Batch not found" });
+      if (batch.active === false) return res.status(400).json({ success: false, message: "Batch is deactivated" });
+
+      const batchStudents = await db.collection("users")
+        .find({ batch_id: String(batchOid), role: "student", active: 1 })
+        .toArray();
+      if (batchStudents.length === 0) return res.status(404).json({ success: false, message: "No active students in this batch" });
+
+      // Check for existing assignments (prevent duplicates)
+      const existingAssignments = await db.collection("missions")
+        .find({ title: String(title).trim(), assigned_to: { $in: batchStudents.map(s => String(s._id)) } })
+        .toArray();
+      const existingStudentIds = new Set(existingAssignments.map(a => String(a.assigned_to)));
+      const newStudents = batchStudents.filter(s => !existingStudentIds.has(String(s._id)));
+
+      // Create missions for new students
+      const now = new Date().toISOString();
+      const missionDocs = newStudents.map(s => ({
+        title: String(title).trim(),
+        description: String(description || "").trim(),
+        assigned_to: String(s._id),
+        assigned_by: req.user.id,
+        status: "assigned",
+        progress: 0,
+        due_date: due_date || null,
+        completed_at: null,
+        feedback: null,
+        created_at: now,
+      }));
+
+      let insertedCount = 0;
+      if (missionDocs.length > 0) {
+        const result = await db.collection("missions").insertMany(missionDocs);
+        insertedCount = result.insertedCount;
+      }
+
+      return res.status(201).json({
+        success: true,
+        message: `Mission assigned to ${insertedCount} new student(s). ${existingStudentIds.size} already had this mission.`,
+        assigned_count: insertedCount,
+        skipped_count: existingStudentIds.size,
+        total_in_batch: batchStudents.length,
+      });
+    }
+
+    // Individual assignment
+    if (!assigned_to) return res.status(400).json({ success: false, message: "Title and student are required" });
     const student = await db.collection("users").findOne({ _id: toId(assigned_to), role: "student", active: 1 });
     if (!student) return res.status(404).json({ success: false, message: "Student not found" });
     const result = await db.collection("missions").insertOne({
@@ -47,7 +100,7 @@ router.post("/", authenticateToken, authorizeRoles("ceo", "admin", "manager"), a
       completed_at: null, feedback: null, created_at: new Date().toISOString()
     });
     res.status(201).json({ success: true, message: "Mission created successfully", missionId: String(result.insertedId) });
-  } catch (e) { res.status(500).json({ success: false, message: "Unable to create mission" }); }
+  } catch (e) { console.error("Create mission error:", e); res.status(500).json({ success: false, message: "Unable to create mission" }); }
 });
 
 router.patch("/:id/progress", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), async (req, res) => {
