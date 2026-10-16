@@ -127,7 +127,7 @@
 }
 
 .role-layout.ceo-dark .role-topbar {
-  background: rgba(8, 11, 20, 0.86) !important;
+  background: #080b14 !important;
   backdrop-filter: none;
   border-bottom: 1px solid var(--ceo-border) !important;
   color: var(--ceo-text) !important;

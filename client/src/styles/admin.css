@@ -498,6 +498,83 @@
   transition: all 0.2s ease;
 }
 
+/* Student actions (Section 3) */
+.student-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.student-actions button {
+  border: 1px solid #D0D0D0;
+  background: #FFFFFF;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #0C120C;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.student-actions button:hover {
+  border-color: #FA9A02;
+  background: rgba(250, 154, 2, 0.08);
+}
+.student-actions button:focus-visible {
+  outline: 2px solid #FA9A02;
+  outline-offset: 2px;
+}
+
+/* Student details modal */
+.student-details {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.details-section h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0C120C;
+  border-bottom: 1px solid #E6E6E6;
+  padding-bottom: 6px;
+}
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 16px;
+}
+.details-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.details-grid span {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.details-grid strong {
+  font-size: 13px;
+  color: #182018;
+}
+.details-section ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: #182018;
+}
+.details-section li {
+  margin: 6px 0;
+  line-height: 1.5;
+}
+.details-section .empty-text {
+  color: #6b7280;
+  font-size: 13px;
+  font-style: italic;
+}
+
 .quick-actions button:not(.gold-btn) {
   border: 1px solid #D0D0D0;
   background: #FFFFFF;

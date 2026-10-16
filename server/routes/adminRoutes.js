@@ -633,6 +633,188 @@ router.delete("/students/:id", authenticateToken, authorizeRoles("admin", "ceo")
   }
 });
 
+/* ─── STUDENT DETAILS (View Details) ─────────────────────────────────────
+ * Returns full student profile: info, batch, missions, tasks, submissions.
+ * Server-side role check: only admin/ceo/manager may view.
+ */
+router.get("/students/:id/details", authenticateToken, authorizeRoles("admin", "ceo", "manager"), async (req, res) => {
+  try {
+    const db = req.db;
+    const userId = toId(req.params.id);
+    if (!userId) return res.status(400).json({ success: false, message: "Invalid student id" });
+    const user = await db.collection("users").findOne({ _id: userId }, { projection: { password: 0 } });
+    if (!user) return res.status(404).json({ success: false, message: "Student not found" });
+
+    const sid = String(userId);
+
+    // Batch info
+    let batch = null;
+    if (user.batch_id) {
+      const b = await db.collection("batches").findOne({ _id: toId(user.batch_id) }, { projection: { name: 1 } });
+      batch = b?.name || null;
+    }
+
+    // Missions assigned to this student
+    const missions = await db.collection("missions")
+      .find({ assigned_to: sid })
+      .sort({ created_at: -1 })
+      .toArray();
+
+    // Tasks: from task_assignments + legacy assigned_to
+    const { getStudentTaskIds } = require("../models/TaskAssignment");
+    const assignedTaskIds = await getStudentTaskIds(db, sid);
+    const taskObjectIds = assignedTaskIds.map(id => { try { return toId(id); } catch { return id; } });
+    const tasks = taskObjectIds.length
+      ? await db.collection("tasks").find({ _id: { $in: taskObjectIds } }).toArray()
+      : [];
+    const legacyTasks = await db.collection("tasks").find({ assigned_to: sid }).toArray();
+    const seenTaskIds = new Set(tasks.map(t => String(t._id)));
+    const allTasks = tasks.concat(legacyTasks.filter(t => !seenTaskIds.has(String(t._id))));
+
+    // Submissions for this student
+    const submissions = await db.collection("submissions")
+      .find({ student_id: sid })
+      .sort({ submitted_at: -1 })
+      .limit(50)
+      .toArray();
+
+    // Enrich submissions with task info
+    const taskIds = [...new Set(submissions.map(s => String(s.task_id)))];
+    const taskDocs = taskIds.length
+      ? await db.collection("tasks").find({ _id: { $in: taskIds.map(id => { try { return toId(id); } catch { return id; } }) } }, { projection: { title: 1, task_code: 1 } }).toArray()
+      : [];
+    const taskMap = new Map(taskDocs.map(t => [String(t._id), t]));
+    const enrichedSubs = submissions.map(s => ({
+      id: String(s._id),
+      task_id: String(s.task_id),
+      task_title: taskMap.get(String(s.task_id))?.title || "Unknown task",
+      task_code: taskMap.get(String(s.task_id))?.task_code || null,
+      status: s.status,
+      submitted_at: s.submitted_at,
+      version: s.version,
+    }));
+
+    res.json({
+      success: true,
+      student: {
+        id: sid,
+        name: user.name,
+        email: user.email,
+        student_id: user.student_id || null,
+        phone: user.phone || null,
+        department: user.department || null,
+        program: user.program || null,
+        batch,
+        batch_id: user.batch_id || null,
+        active: user.active,
+        registration_status: user.registration_status || null,
+        created_at: user.created_at || null,
+      },
+      missions: missions.map(m => ({
+        id: String(m._id),
+        title: m.title,
+        status: m.status,
+        progress: m.progress,
+        due_date: m.due_date,
+        created_at: m.created_at,
+      })),
+      tasks: allTasks.map(t => ({
+        id: String(t._id),
+        title: t.title,
+        task_code: t.task_code,
+        status: t.status,
+        workflow_status: t.workflow_status,
+        due_date: t.due_date,
+      })),
+      submissions: enrichedSubs,
+    });
+  } catch (error) {
+    console.error("Student details error:", error);
+    res.status(500).json({ success: false, message: "Unable to fetch student details" });
+  }
+});
+
+/* ─── STUDENT REQUIREMENT ────────────────────────────────────────────────
+ * Creates a requirement record for a student and notifies CEO/admin users.
+ */
+router.post("/students/:id/requirements", authenticateToken, authorizeRoles("admin", "ceo", "manager"), async (req, res) => {
+  try {
+    const db = req.db;
+    const userId = toId(req.params.id);
+    if (!userId) return res.status(400).json({ success: false, message: "Invalid student id" });
+    const user = await db.collection("users").findOne({ _id: userId });
+    if (!user) return res.status(404).json({ success: false, message: "Student not found" });
+
+    const { description } = req.body || {};
+    if (!description || !String(description).trim()) {
+      return res.status(400).json({ success: false, message: "Description is required" });
+    }
+    const cleanDesc = String(description).trim();
+    if (cleanDesc.length > 1000) {
+      return res.status(400).json({ success: false, message: "Description must be 1000 characters or fewer" });
+    }
+
+    const result = await db.collection("requirements").insertOne({
+      student_id: String(userId),
+      student_name: user.name,
+      student_email: user.email,
+      description: cleanDesc,
+      status: "open",
+      created_by: req.user.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    // Notify CEO/admin users
+    const { createUserNotification } = require("../utils/ceoNotification");
+    const ceoAdmins = await db.collection("users").find(
+      { role: { $in: ["admin", "ceo"] }, active: 1 },
+      { projection: { _id: 1 } }
+    ).toArray();
+    for (const admin of ceoAdmins) {
+      await createUserNotification(db, String(admin._id), {
+        type: "student_requirement",
+        title: "Student Requirement",
+        message: `New requirement for ${user.name}: ${cleanDesc.substring(0, 100)}`,
+        related_task_id: null,
+      });
+    }
+
+    await writeAudit(db, { actorId: req.user.id, action: "requirement_created", entityType: "requirement", entityId: String(result.insertedId), newValue: { student_id: String(userId), description: cleanDesc } });
+
+    res.status(201).json({ success: true, message: "Requirement created", requirementId: String(result.insertedId) });
+  } catch (error) {
+    console.error("Create requirement error:", error);
+    res.status(500).json({ success: false, message: "Unable to create requirement" });
+  }
+});
+
+/* ─── LIST REQUIREMENTS FOR A STUDENT ─────────────────────────────────── */
+router.get("/students/:id/requirements", authenticateToken, authorizeRoles("admin", "ceo", "manager"), async (req, res) => {
+  try {
+    const db = req.db;
+    const userId = toId(req.params.id);
+    if (!userId) return res.status(400).json({ success: false, message: "Invalid student id" });
+    const requirements = await db.collection("requirements")
+      .find({ student_id: String(userId) })
+      .sort({ created_at: -1 })
+      .toArray();
+    res.json({
+      success: true,
+      requirements: requirements.map(r => ({
+        id: String(r._id),
+        description: r.description,
+        status: r.status,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+      })),
+    });
+  } catch (error) {
+    console.error("List requirements error:", error);
+    res.status(500).json({ success: false, message: "Unable to fetch requirements" });
+  }
+});
+
 /* ─── PENDING APPROVALS ─────────────────────────────────────────────────── */
 router.get("/pending-approvals", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
   try {
@@ -836,6 +1018,177 @@ router.get("/feedback/tasks", authenticateToken, authorizeRoles("admin", "manage
   } catch (error) {
     console.error("Task-wise feedback error:", error);
     res.status(500).json({ success: false, message: "Unable to fetch task feedback" });
+  }
+});
+
+/* ─── TASK-WISE EXCEL EXPORT ─────────────────────────────────────────────
+ * One row per student, one column per task. CEO/management-only.
+ * Uses the existing xlsx library. Escapes formula injection.
+ */
+router.get("/export/task-wise", authenticateToken, authorizeRoles("admin", "ceo", "manager"), async (req, res) => {
+  try {
+    const XLSX = require("xlsx");
+    const db = req.db;
+
+    // Optional batch filter
+    const batchFilter = req.query?.batch ? String(req.query.batch).trim() : null;
+    let batchIdFilter = null;
+    if (batchFilter) {
+      const batchOid = toId(batchFilter);
+      if (!batchOid) return res.status(400).json({ success: false, message: "Invalid batch id" });
+      batchIdFilter = String(batchOid);
+    }
+
+    // Get students (optionally filtered by batch)
+    const studentFilter = { role: "student", active: 1 };
+    if (batchIdFilter) studentFilter.batch_id = batchIdFilter;
+    const students = await db.collection("users")
+      .find(studentFilter, { projection: { password: 0 } })
+      .sort({ name: 1 })
+      .toArray();
+
+    if (students.length === 0) {
+      return res.status(404).json({ success: false, message: "No students found" });
+    }
+
+    // Get all tasks (sorted by day/task_code)
+    const tasks = await db.collection("tasks")
+      .find({})
+      .sort({ day_number: 1, task_code: 1 })
+      .toArray();
+
+    // Get all submissions for these students (batch query — no N+1)
+    const studentIds = students.map(s => String(s._id));
+    const submissions = await db.collection("submissions")
+      .find({ student_id: { $in: studentIds } })
+      .toArray();
+
+    // Build a map: studentId -> taskId -> latest submission
+    const submissionMap = new Map();
+    for (const sub of submissions) {
+      const sid = String(sub.student_id);
+      const tid = String(sub.task_id);
+      const key = `${sid}:${tid}`;
+      const existing = submissionMap.get(key);
+      if (!existing || (sub.version || 0) > (existing.version || 0)) {
+        submissionMap.set(key, sub);
+      }
+    }
+
+    // Get task assignments to know which students are assigned to which tasks
+    const assignments = await db.collection("task_assignments")
+      .find({ student_id: { $in: studentIds } })
+      .toArray();
+    const assignmentSet = new Set(assignments.map(a => `${String(a.student_id)}:${String(a.task_id)}`));
+
+    // Escape formula injection
+    const escapeCell = (val) => {
+      const s = String(val || "");
+      if (/^[=+\-@]/.test(s)) return "'" + s;
+      return s;
+    };
+
+    // Format date as "15 Oct 2026"
+    const fmtDate = (d) => {
+      if (!d) return "";
+      try {
+        return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+      } catch { return String(d); }
+    };
+
+    // Build header row
+    const header = ["Student ID", "Student Name", "Batch"];
+    for (const t of tasks) {
+      const label = t.task_code
+        ? `${t.task_code} - ${t.title || "Untitled"}`
+        : (t.title || "Untitled");
+      header.push(escapeCell(label));
+    }
+    header.push("Overall Status");
+
+    // Build data rows
+    const rows = students.map(s => {
+      const sid = String(s._id);
+      const row = [
+        escapeCell(s.student_id || sid),
+        escapeCell(s.name),
+        escapeCell(s.batch_id || ""),
+      ];
+
+      let submittedCount = 0;
+      let assignedCount = 0;
+
+      for (const t of tasks) {
+        const tid = String(t._id);
+        const key = `${sid}:${tid}`;
+        const isAssigned = assignmentSet.has(key);
+        const sub = submissionMap.get(key);
+
+        if (sub) {
+          assignedCount++;
+          const status = sub.status || "Submitted";
+          const date = fmtDate(sub.submitted_at);
+          row.push(date ? `${status} — ${date}` : status);
+          if (status === "Submitted" || status === "Approved" || status === "Under Review") {
+            submittedCount++;
+          }
+        } else if (isAssigned) {
+          assignedCount++;
+          row.push("Pending");
+        } else {
+          row.push("Not assigned");
+        }
+      }
+
+      // Overall status
+      if (assignedCount === 0) {
+        row.push("No tasks assigned");
+      } else if (submittedCount === assignedCount) {
+        row.push("All submitted");
+      } else if (submittedCount > 0) {
+        row.push("In Progress");
+      } else {
+        row.push("Pending");
+      }
+
+      return row;
+    });
+
+    // Create worksheet
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+
+    // Set column widths
+    const colWidths = [
+      { wch: 14 }, // Student ID
+      { wch: 22 }, // Student Name
+      { wch: 18 }, // Batch
+    ];
+    for (let i = 0; i < tasks.length; i++) {
+      colWidths.push({ wch: 28 }); // Task columns
+    }
+    colWidths.push({ wch: 18 }); // Overall Status
+    ws["!cols"] = colWidths;
+
+    // Freeze header row and first 3 columns
+    ws["!freeze"] = { xSplit: 3, ySplit: 1 };
+
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Task-wise Report");
+
+    // Generate file
+    const today = new Date().toISOString().split("T")[0];
+    const filename = `TECHINS_Student_Task_Submissions_${today}.xlsx`;
+    const excelBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+    // Set headers for download
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", excelBuffer.length);
+    res.send(excelBuffer);
+  } catch (error) {
+    console.error("Task-wise export error:", error);
+    res.status(500).json({ success: false, message: "Unable to export task-wise report" });
   }
 });
 
