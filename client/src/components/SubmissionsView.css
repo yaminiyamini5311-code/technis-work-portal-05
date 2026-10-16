@@ -185,6 +185,37 @@
   transition: all 0.2s ease;
 }
 
+/* CEO dark theme input overrides */
+.role-layout.ceo-dark .chart-tabs input,
+.role-layout.ceo-dark .chart-tabs select {
+  background: var(--ceo-control-bg);
+  color: var(--ceo-text);
+  border-color: var(--ceo-border);
+  color-scheme: dark;
+}
+
+.role-layout.ceo-dark .chart-tabs input::placeholder {
+  color: var(--ceo-placeholder, #9aa6c2);
+}
+
+.role-layout.ceo-dark .chart-tabs input:focus,
+.role-layout.ceo-dark .chart-tabs select:focus {
+  border-color: var(--ceo-violet);
+  box-shadow: 0 0 0 3px rgba(124, 108, 255, 0.16);
+}
+
+.role-layout.ceo-dark .chart-tabs button {
+  background: var(--ceo-control-bg);
+  color: var(--ceo-text);
+  border-color: var(--ceo-border);
+}
+
+.role-layout.ceo-dark .chart-tabs button:hover:not(:disabled) {
+  background: var(--ceo-violet);
+  color: white;
+  border-color: var(--ceo-violet);
+}
+
 .chart-tabs input {
   min-width: 220px;
   flex: 1;
@@ -280,6 +311,13 @@
   white-space: nowrap;
 }
 
+.submissions-table thead th {
+  position: sticky;
+  top: 84px;
+  z-index: 10;
+  background: #F9FAFB;
+}
+
 .submissions-table tbody tr {
   border-bottom: 1px solid #E5E7EB;
   transition: background-color 0.2s ease;
@@ -327,22 +365,28 @@
 
 /* Student Details Column */
 .student-details {
-  min-width: 240px;
-  max-width: 280px;
+  min-width: 200px;
+  max-width: 240px;
 }
 
 .detail-line {
   display: flex;
-  gap: 6px;
-  margin-bottom: 4px;
-  font-size: 12px;
-  line-height: 1.4;
+  gap: 4px;
+  margin-bottom: 2px;
+  font-size: 11px;
+  line-height: 1.3;
 }
 
 .detail-line .label {
   font-weight: 700;
   color: #6B7280;
-  min-width: 60px;
+  min-width: 50px;
+  flex-shrink: 0;
+}
+
+.detail-line .value {
+  color: #374151;
+  word-break: break-all;
 }
 
 .detail-line:last-child {
@@ -479,26 +523,58 @@
 
 /* Actions Column */
 .actions-column {
-  min-width: 120px;
+  min-width: 200px;
+  max-width: 220px;
 }
 
-.view-details-btn {
-  padding: 8px 16px;
-  background: #FA9A02;
-  color: white;
+.actions-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.view-details-btn,
+.delete-btn,
+.requirement-btn {
+  padding: 6px 12px;
   border: none;
-  border-radius: 8px;
-  font-size: 12px;
+  border-radius: 6px;
+  font-size: 11px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
 }
 
+.view-details-btn {
+  background: #FA9A02;
+  color: white;
+}
+
 .view-details-btn:hover {
   background: #E88C00;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(250, 154, 2, 0.3);
+}
+
+.delete-btn {
+  background: #d32f2f;
+  color: white;
+}
+
+.delete-btn:hover {
+  background: #b71c1c;
+  transform: translateY(-1px);
+}
+
+.requirement-btn {
+  background: #f57c00;
+  color: white;
+}
+
+.requirement-btn:hover {
+  background: #e65100;
+  transform: translateY(-1px);
 }
 
 /* Empty State */

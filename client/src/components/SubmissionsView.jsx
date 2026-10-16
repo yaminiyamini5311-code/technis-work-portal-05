@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import TechinsIcon from "./TechinsIcon";
 import useModalBehavior from "./useModalBehavior";
 import "./SubmissionsView.css";
@@ -15,11 +16,9 @@ function formatBytes(n) {
 
 function formatDateTime(v) {
   if (!v) return "—";
-  try { return new Date(v).toLocaleString(); } catch { return String(v); }
+  try { return new Date(v).toLocaleString("en-US", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }); } catch { return String(v); }
 }
 
-/* Download through fetch so the Authorization header travels with the
-   request (a plain anchor cannot send it). Blob URL is revoked after use. */
 async function downloadFile(file, onError) {
   try {
     const res = await fetch(`${API_URL}${file.download_url}`, { headers: auth() });
@@ -43,10 +42,6 @@ async function downloadFile(file, onError) {
   }
 }
 
-/* Preview file - returns blob URL for image/PDF preview.
-   NOTE: named fetchPreviewUrl (not previewFile) because DetailModal keeps a
-   `previewFile` STATE variable, which shadowed this helper inside the
-   component and made the Preview button call null(...) — it always failed. */
 async function fetchPreviewUrl(file, onError) {
   try {
     const res = await fetch(`${API_URL}${file.download_url}`, { headers: auth() });
@@ -64,7 +59,6 @@ async function fetchPreviewUrl(file, onError) {
   }
 }
 
-/* Check if file type supports preview */
 function canPreview(mime) {
   return mime && (
     mime.startsWith('image/') ||
@@ -82,8 +76,6 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewFile, setPreviewFile] = useState(null);
   const closePreview = () => { setPreviewUrl(null); setPreviewFile(null); };
-  // Shared dialog behavior (Escape, outside-click, focus trap/restore,
-  // scroll lock) for the detail modal and the file preview modal.
   const dialogRef = useModalBehavior(!inline, onClose);
   const previewRef = useModalBehavior(Boolean(previewUrl), closePreview);
 
@@ -141,7 +133,7 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
               {(v.files || []).length ? (
                 <div className="quick-actions" style={{ marginTop: '0.5rem' }}>
                   {v.files.map(f => (
-                    <div key={f.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+                    <div key={f.id} style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginBottom: "0.5rem" }}>
                       <span className="file-name-line"><TechinsIcon name="folder" size={14} variant="light" ariaHidden /> {f.name}</span>
                       {f.size && <span style={{ fontSize: '0.85rem', opacity: 0.7 }}>({formatBytes(f.size)})</span>}
                       {canPreview(f.mime) && (
@@ -168,7 +160,6 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
         ))}
       </section>
 
-      {/* File Preview Modal */}
       {previewUrl && previewFile && (
         <div className="review-modal" ref={previewRef} style={{ zIndex: 2000 }} onClick={(e) => { if (e.target === e.currentTarget) closePreview(); }}>
           <div className="panel" style={{ maxWidth: '90vw', maxHeight: '90vh', overflow: 'auto' }}>
@@ -297,33 +288,33 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
 }
 
 export default function SubmissionsView({ eyebrow, title, subtitle }) {
-  // Data state
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [exporting, setExporting] = useState(false);
-  
-  // View state
   const [selectedSubmission, setSelectedSubmission] = useState(null);
-  
-  // Filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterBatch, setFilterBatch] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
+  // Delete modal state
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  // Requirement modal state
+  const [requirementTarget, setRequirementTarget] = useState(null);
+  const [requirementDesc, setRequirementDesc] = useState("");
+  const [requirementError, setRequirementError] = useState("");
+  const [submittingRequirement, setSubmittingRequirement] = useState(false);
 
-  // Load submissions
   const load = async () => {
     try {
       setLoading(true);
       setError("");
-      
       const res = await fetch(`${API_URL}/api/tasks/submissions?limit=500`, { headers: auth() });
       const data = await res.json();
-      
       if (!res.ok) throw new Error(data.message || "Unable to load submissions");
-      
       setItems(data.submissions || []);
     } catch (e) {
       setError(e.message || "Unable to load submissions. Check your connection.");
@@ -332,51 +323,32 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
     }
   };
 
-  // Export to Excel
   const exportToExcel = async () => {
     if (exporting) return;
-    
     try {
       setExporting(true);
       setError("");
-      
-      // Build query params based on active filters
       const params = new URLSearchParams();
       if (filterStatus !== "all") params.append("status", filterStatus);
       if (filterBatch !== "all") params.append("batch_name", filterBatch);
-      
-      // If search query is active, we can't filter server-side, so we'll download all and mention it
       const queryString = params.toString();
-      const url = `${API_URL}/api/tasks/submissions/export${queryString ? `?${queryString}` : ''}`;
-      
+      const url = `${API_URL}/api/admin/export/task-wise${queryString ? `?${queryString}` : ""}`;
       const res = await fetch(url, { headers: auth() });
-      
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.message || "Unable to export submissions");
       }
-      
-      // Get the blob and trigger download
       const blob = await res.blob();
       const downloadUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = downloadUrl;
-      
-      // Get filename from Content-Disposition header or use default
-      const contentDisposition = res.headers.get('Content-Disposition');
-      let filename = `TECHINS_Student_Submissions_${new Date().toISOString().split('T')[0]}.xlsx`;
-      if (contentDisposition) {
-        const match = contentDisposition.match(/filename="(.+)"/);
-        if (match) filename = match[1];
-      }
-      
-      a.download = filename;
+      const today = new Date().toISOString().split("T")[0];
+      a.download = `TECHINS_Student_Task_Submissions_${today}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(downloadUrl);
-      
-      setNotice(`Excel file downloaded successfully: ${filename}`);
+      setNotice("Excel file downloaded successfully (task-wise report).");
     } catch (e) {
       setError(e.message || "Unable to export submissions. Check your connection.");
     } finally {
@@ -386,22 +358,18 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
 
   useEffect(() => { load(); }, []);
 
-  // Available filter options
-  const statuses = useMemo(() => 
+  const statuses = useMemo(() =>
     ["all", ...new Set(items.map(i => i.status).filter(Boolean))],
     [items]
   );
-  
+
   const batches = useMemo(() => {
     const batchSet = new Set(items.map(i => i.batch_name).filter(Boolean));
     return ["all", ...Array.from(batchSet)];
   }, [items]);
 
-  // Apply filters and sorting
   const filteredSubmissions = useMemo(() => {
     let filtered = [...items];
-    
-    // Filter by search query
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       filtered = filtered.filter(item =>
@@ -413,18 +381,12 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
         (item.student_id || "").toLowerCase().includes(q)
       );
     }
-    
-    // Filter by status
     if (filterStatus !== "all") {
       filtered = filtered.filter(item => item.status === filterStatus);
     }
-    
-    // Filter by batch
     if (filterBatch !== "all") {
       filtered = filtered.filter(item => item.batch_name === filterBatch);
     }
-    
-    // Sort
     const sortFn = {
       newest: (a, b) => new Date(b.submitted_at || 0) - new Date(a.submitted_at || 0),
       oldest: (a, b) => new Date(a.submitted_at || 0) - new Date(b.submitted_at || 0),
@@ -432,12 +394,12 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
       task: (a, b) => (a.task_title || "").localeCompare(b.task_title || ""),
       status: (a, b) => (a.status || "").localeCompare(b.status || ""),
     }[sortBy] || (() => 0);
-    
     return filtered.sort(sortFn);
   }, [items, searchQuery, filterStatus, filterBatch, sortBy]);
 
   const handleViewDetails = (submission) => {
-    setSelectedSubmission(submission);
+    // B-1: Navigate to full-page student details
+    navigate(`/admin/students/${submission.student_id}`);
   };
 
   const handleCloseDetails = () => {
@@ -450,6 +412,67 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
     setNotice(`Review saved (${nextStatus}). List refreshed.`);
     load();
   };
+
+  // B: Delete student
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setError("");
+    setMsg("");
+    try {
+      const res = await fetch(`${API_URL}/api/admin/students/${deleteTarget.student_id}`, {
+        method: "DELETE",
+        headers: auth()
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.message || "Unable to delete student");
+        setDeleteTarget(null);
+        return;
+      }
+      setMsg(`${deleteTarget.student_name} deleted.`);
+      setDeleteTarget(null);
+      await load();
+    } catch (err) {
+      setError(err.message || "An error occurred");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const [msg, setMsg] = useState("");
+
+  // C: Requirement
+  const submitRequirement = async (e) => {
+    e.preventDefault();
+    if (!requirementTarget) return;
+    setSubmittingRequirement(true);
+    setRequirementError("");
+    setError("");
+    setMsg("");
+    try {
+      const res = await fetch(`${API_URL}/api/admin/students/${requirementTarget.student_id}/requirements`, {
+        method: "POST",
+        headers: { ...auth(), "Content-Type": "application/json" },
+        body: JSON.stringify({ description: requirementDesc })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setRequirementError(data.message || "Unable to create requirement");
+        return;
+      }
+      setMsg(`Requirement created for ${requirementTarget.student_name}.`);
+      setRequirementTarget(null);
+      setRequirementDesc("");
+    } catch (err) {
+      setRequirementError(err.message || "An error occurred");
+    } finally {
+      setSubmittingRequirement(false);
+    }
+  };
+
+  const deleteModalRef = useModalBehavior(!!deleteTarget, () => setDeleteTarget(null));
+  const requirementModalRef = useModalBehavior(!!requirementTarget, () => { setRequirementTarget(null); setRequirementDesc(""); setRequirementError(""); });
 
   if (loading) {
     return (
@@ -468,13 +491,13 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
         <h2>{title}</h2>
         <p>{subtitle}</p>
       </div>
-      
+
       {error && (
         <div className="error-msg">
           {error} <button onClick={load}>Retry</button>
         </div>
       )}
-      
+
       {notice && <div className="info-msg">{notice}</div>}
 
       {/* Filters and Controls */}
@@ -485,35 +508,35 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
             <h3>{filteredSubmissions.length} submission{filteredSubmissions.length === 1 ? '' : 's'}</h3>
           </div>
           <div className="chart-tabs">
-            <input 
-              value={searchQuery} 
-              onChange={e => setSearchQuery(e.target.value)} 
-              placeholder="Search student, task, email…" 
+            <input
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search student, task, email…"
               aria-label="Search submissions"
               style={{ minWidth: '200px' }}
             />
-            <select 
-              value={filterBatch} 
-              onChange={e => setFilterBatch(e.target.value)} 
+            <select
+              value={filterBatch}
+              onChange={e => setFilterBatch(e.target.value)}
               aria-label="Filter by batch"
             >
               <option value="all">All batches</option>
-              {batches.filter(b => b !== "all").map(b => 
+              {batches.filter(b => b !== "all").map(b =>
                 <option key={b} value={b}>{b}</option>
               )}
             </select>
-            <select 
-              value={filterStatus} 
-              onChange={e => setFilterStatus(e.target.value)} 
+            <select
+              value={filterStatus}
+              onChange={e => setFilterStatus(e.target.value)}
               aria-label="Filter by status"
             >
-              {statuses.map(s => 
+              {statuses.map(s =>
                 <option key={s} value={s}>{s === "all" ? "All statuses" : s}</option>
               )}
             </select>
-            <select 
-              value={sortBy} 
-              onChange={e => setSortBy(e.target.value)} 
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
               aria-label="Sort by"
             >
               <option value="newest">Newest first</option>
@@ -525,9 +548,9 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
             <button onClick={load} disabled={loading}>
               {loading ? "Loading…" : "Refresh"}
             </button>
-            <button 
+            <button
               className="export-excel-btn"
-              onClick={exportToExcel} 
+              onClick={exportToExcel}
               disabled={exporting || loading}
             >
               {exporting ? "Exporting…" : (
@@ -567,16 +590,16 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
                     </td>
                     <td className="student-details">
                       <div className="detail-line">
-                        <span className="label">Email:</span> {item.student_email || "—"}
+                        <span className="label">Email:</span> <span className="value" title={item.student_email}>{item.student_email ? (item.student_email.length > 25 ? item.student_email.slice(0, 25) + "…" : item.student_email) : "—"}</span>
                       </div>
                       <div className="detail-line">
-                        <span className="label">ID:</span> {item.student_id || "—"}
+                        <span className="label">ID:</span> <span className="value">{item.student_id || "—"}</span>
                       </div>
                       <div className="detail-line">
-                        <span className="label">Program:</span> {item.student_program || "—"}
+                        <span className="label">Program:</span> <span className="value">{item.student_program || "—"}</span>
                       </div>
                       <div className="detail-line">
-                        <span className="label">Batch:</span> {item.batch_name || "—"}
+                        <span className="label">Batch:</span> <span className="value">{item.batch_name || "—"}</span>
                       </div>
                     </td>
                     <td className="task-info">
@@ -620,12 +643,26 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
                       </span>
                     </td>
                     <td className="actions-column">
-                      <button 
-                        className="view-details-btn"
-                        onClick={() => handleViewDetails(item)}
-                      >
-                        View Details
-                      </button>
+                      <div className="actions-buttons">
+                        <button
+                          className="view-details-btn"
+                          onClick={() => handleViewDetails(item)}
+                        >
+                          View Details
+                        </button>
+                        <button
+                          className="delete-btn"
+                          onClick={() => setDeleteTarget(item)}
+                        >
+                          Delete
+                        </button>
+                        <button
+                          className="requirement-btn"
+                          onClick={() => setRequirementTarget(item)}
+                        >
+                          Requirement
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -634,20 +671,79 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
           </div>
         ) : (
           <div className="empty-state">
-            {items.length 
-              ? "No submissions match your filters." 
+            {items.length
+              ? "No submissions match your filters."
               : "No student submissions yet. Submitted work will appear here."}
           </div>
         )}
       </section>
 
-      {/* Detail Modal */}
+      {/* Detail Modal (submission-level review) */}
       {selectedSubmission && (
-        <DetailModal 
-          item={selectedSubmission} 
+        <DetailModal
+          item={selectedSubmission}
           onClose={handleCloseDetails}
           onReviewed={handleReviewed}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div className="review-modal" ref={deleteModalRef} onClick={() => setDeleteTarget(null)}>
+          <div className="panel" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="panel-head">
+              <h3>Delete Student</h3>
+              <button onClick={() => setDeleteTarget(null)}>Close</button>
+            </div>
+            <div style={{ padding: "0 0 16px" }}>
+              <p style={{ fontSize: 14, lineHeight: 1.6, margin: "0 0 16px" }}>
+                Are you sure you want to delete <strong>{deleteTarget.student_name}</strong> ({deleteTarget.student_id || deleteTarget.student_email})?
+                {" "}This action cannot be undone.
+              </p>
+              <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 20px" }}>
+                If the student has related records (tasks, submissions, missions), deletion will be blocked and you will be asked to deactivate instead.
+              </p>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button className="gold-btn" onClick={confirmDelete} disabled={deleting} style={{ background: "#d32f2f", borderColor: "#d32f2f" }}>
+                  {deleting ? "Deleting…" : "Delete"}
+                </button>
+                <button className="gold-btn" onClick={() => setDeleteTarget(null)} style={{ background: "#6b7280", borderColor: "#6b7280" }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Requirement Modal */}
+      {requirementTarget && (
+        <div className="review-modal" ref={requirementModalRef} onClick={() => { setRequirementTarget(null); setRequirementDesc(""); setRequirementError(""); }}>
+          <div className="panel" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="panel-head">
+              <h3>Student Requirement</h3>
+              <button onClick={() => { setRequirementTarget(null); setRequirementDesc(""); setRequirementError(""); }}>Close</button>
+            </div>
+            <form onSubmit={submitRequirement} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <p style={{ fontSize: 14, margin: 0 }}>
+                Student: <strong>{requirementTarget.student_name}</strong> ({requirementTarget.student_id || requirementTarget.student_email})
+              </p>
+              <label>Description <span className="req">*</span></label>
+              <textarea
+                value={requirementDesc}
+                onChange={(e) => setRequirementDesc(e.target.value)}
+                placeholder="Describe the requirement or issue…"
+                rows={4}
+                required
+                maxLength={1000}
+              />
+              {requirementError && <small className="field-error">{requirementError}</small>}
+              <button className="gold-btn" type="submit" disabled={submittingRequirement}>
+                {submittingRequirement ? "Submitting…" : "Submit Requirement"}
+              </button>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
