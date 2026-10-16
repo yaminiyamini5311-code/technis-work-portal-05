@@ -1,0 +1,97 @@
+/* Student Details Page — full-page view */
+
+.student-details-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.details-header {
+  margin-bottom: 20px;
+}
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid rgba(250, 154, 2, 0.3);
+  background: rgba(250, 154, 2, 0.08);
+  color: #FA9A02;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-bottom: 16px;
+  transition: all 0.2s ease;
+}
+
+.back-btn:hover {
+  background: rgba(250, 154, 2, 0.15);
+  border-color: #FA9A02;
+}
+
+.details-section {
+  margin-bottom: 20px;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-item .label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.detail-item strong {
+  font-size: 14px;
+  color: #182018;
+}
+
+.details-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.details-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 13px;
+  color: #182018;
+}
+
+.details-list li:last-child {
+  border-bottom: none;
+}
+
+.details-list li strong {
+  flex: 1;
+  font-weight: 600;
+}
+
+.details-list li small {
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.empty-text {
+  color: #6b7280;
+  font-size: 13px;
+  font-style: italic;
+  padding: 12px 0;
+}

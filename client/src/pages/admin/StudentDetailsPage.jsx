@@ -1,0 +1,206 @@
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import TechinsIcon from "../../components/TechinsIcon";
+import "./StudentDetailsPage.css";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
+
+function fmtDate(value) {
+  if (!value) return "—";
+  try { return new Date(value).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }); } catch { return String(value); }
+}
+
+function fmtDateTime(value) {
+  if (!value) return "—";
+  try { return new Date(value).toLocaleString("en-US", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }); } catch { return String(value); }
+}
+
+export default function StudentDetailsPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const res = await fetch(`${API_URL}/api/admin/students/${id}/details`, { headers: auth() });
+        const json = await res.json();
+        if (!cancelled && res.ok) {
+          setData(json);
+          setError("");
+        } else if (!cancelled) {
+          setError(json.message || "Unable to load student details");
+        }
+      } catch (e) {
+        if (!cancelled) setError("Unable to load student details. Check your connection.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="student-details-page">
+        <div className="portal-loading">
+          <div className="loader-dot" />
+          <h2>Loading student details…</h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="student-details-page">
+        <div className="portal-error">
+          <h2>Unable to load student details</h2>
+          <p>{error}</p>
+          <button onClick={() => navigate("/admin/submissions")} className="back-btn">← Back to Student Submissions</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  const { student, missions, tasks, submissions } = data;
+
+  return (
+    <div className="student-details-page">
+      <div className="details-header">
+        <button onClick={() => navigate("/admin/submissions")} className="back-btn">
+          <TechinsIcon name="chevron" size={16} variant="light" ariaHidden /> Back to Student Submissions
+        </button>
+        <div className="simple-head" style={{ marginBottom: 0 }}>
+          <span>STUDENT PROFILE</span>
+          <h2>{student.name}</h2>
+        </div>
+      </div>
+
+      {/* Profile Section */}
+      <section className="panel details-section">
+        <div className="panel-head">
+          <div>
+            <span className="section-kicker">PROFILE</span>
+            <h3>Student Information</h3>
+          </div>
+        </div>
+        <div className="details-grid">
+          <div className="detail-item">
+            <span className="label">Name</span>
+            <strong>{student.name}</strong>
+          </div>
+          <div className="detail-item">
+            <span className="label">TECHINS ID</span>
+            <strong>{student.student_id || "—"}</strong>
+          </div>
+          <div className="detail-item">
+            <span className="label">Email</span>
+            <strong>{student.email}</strong>
+          </div>
+          <div className="detail-item">
+            <span className="label">Phone</span>
+            <strong>{student.phone || "—"}</strong>
+          </div>
+          <div className="detail-item">
+            <span className="label">Program</span>
+            <strong>{student.program || "—"}</strong>
+          </div>
+          <div className="detail-item">
+            <span className="label">Batch</span>
+            <strong>{student.batch || "—"}</strong>
+          </div>
+          <div className="detail-item">
+            <span className="label">Department</span>
+            <strong>{student.department || "—"}</strong>
+          </div>
+          <div className="detail-item">
+            <span className="label">Status</span>
+            <strong>{student.registration_status || (student.active === 1 ? "Approved" : "Deactivated")}</strong>
+          </div>
+        </div>
+      </section>
+
+      {/* Assigned Missions */}
+      <section className="panel details-section">
+        <div className="panel-head">
+          <div>
+            <span className="section-kicker">MISSIONS</span>
+            <h3>Assigned Missions ({missions.length})</h3>
+          </div>
+        </div>
+        {missions.length === 0 ? (
+          <p className="empty-text">No missions assigned.</p>
+        ) : (
+          <ul className="details-list">
+            {missions.map(m => (
+              <li key={m.id}>
+                <strong>{m.title}</strong>
+                <span className={`pill ${m.status === "completed" ? "approved" : "pending"}`}>{m.status}</span>
+                <span>{m.progress}%</span>
+                {m.due_date && <small>Due: {fmtDate(m.due_date)}</small>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Assigned Tasks */}
+      <section className="panel details-section">
+        <div className="panel-head">
+          <div>
+            <span className="section-kicker">TASKS</span>
+            <h3>Assigned Tasks ({tasks.length})</h3>
+          </div>
+        </div>
+        {tasks.length === 0 ? (
+          <p className="empty-text">No tasks assigned.</p>
+        ) : (
+          <ul className="details-list">
+            {tasks.map(t => (
+              <li key={t.id}>
+                <strong>{t.title || "Untitled"}</strong>
+                {t.task_code && <small>(Task ID: {t.task_code})</small>}
+                <span className={`pill ${t.workflow_status === "Approved" ? "approved" : "pending"}`}>{t.workflow_status || t.status}</span>
+                {t.due_date && <small>Due: {fmtDate(t.due_date)}</small>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Submissions */}
+      <section className="panel details-section">
+        <div className="panel-head">
+          <div>
+            <span className="section-kicker">SUBMISSIONS</span>
+            <h3>All Submissions ({submissions.length})</h3>
+          </div>
+        </div>
+        {submissions.length === 0 ? (
+          <p className="empty-text">Not submitted</p>
+        ) : (
+          <ul className="details-list">
+            {submissions.map(s => (
+              <li key={s.id}>
+                <strong>{s.task_title}</strong>
+                {s.task_code && <small>(Task ID: {s.task_code})</small>}
+                <span className={`pill ${s.status === "Approved" ? "approved" : s.status === "Submitted" ? "pending" : ""}`}>{s.status}</span>
+                <small>{fmtDateTime(s.submitted_at)}</small>
+                {s.version && <small>v{s.version}</small>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}

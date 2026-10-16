@@ -25,6 +25,7 @@ import AdminPerformance from "./pages/admin/performance";
 import AuditLogs from "./pages/admin/AuditLogs";
 import AdminProfile from "./pages/admin/Profile";
 import AdminSubmissions from "./pages/admin/Submissions";
+import StudentDetailsPage from "./pages/admin/StudentDetailsPage";
 import ManagerSubmissions from "./pages/manager/Submissions";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -136,6 +137,7 @@ export default function App() {
           <Route path="/admin/feedback" element={<Feedback />} />
           <Route path="/admin/audit" element={<AuditLogs />} />
           <Route path="/admin/profile" element={<AdminProfile />} />
+          <Route path="/admin/students/:id" element={<StudentDetailsPage />} />
         </Route>
 
         {/* Redirect old CEO routes to Admin */}

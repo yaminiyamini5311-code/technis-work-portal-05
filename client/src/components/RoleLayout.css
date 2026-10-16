@@ -19,6 +19,23 @@ html{scroll-padding-top:var(--header-height,84px)}
   display:none;
 }
 
+/* CEO dark theme watermark logo - purely decorative */
+.ceo-logo-bg{
+  position:fixed;
+  inset:0;
+  display:grid;
+  place-items:center;
+  pointer-events:none;
+  z-index:0;
+}
+.ceo-logo-bg img{
+  width:clamp(260px,62vmin,760px);
+  height:auto;
+  object-fit:contain;
+  opacity:0.08;
+  filter:blur(1px);
+}
+
 @media(prefers-reduced-motion:reduce){
   .role-background-logo img{
     animation:none!important;
