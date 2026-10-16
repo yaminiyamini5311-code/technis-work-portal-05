@@ -127,7 +127,8 @@ function Performance() {
   }
 
   const progress = Number(performance?.progress ?? report?.progress ?? 0) || 0;
-  const score = performance?.score ?? report?.score ?? null;
+  // FIX S-2: Use task-based score from report (consistent with task-wise results card)
+  const score = scoring.overall_percentage ?? null;
   const completed = performance?.completedMissions ?? report?.completedMissions ?? 0;
   const total = performance?.totalMissions ?? report?.totalMissions ?? 0;
   const counts = report?.counts || {};

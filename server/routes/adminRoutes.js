@@ -701,6 +701,14 @@ router.post("/feedback", authenticateToken, authorizeRoles("admin", "manager", "
     const { user_id, score, strengths, improvements, feedback, task_id, submission_id } = req.body || {};
     if (!user_id || !feedback) return res.status(400).json({ success: false, message: "Student and feedback are required" });
 
+    // FIX C-12: validate score range (0-100)
+    if (score !== undefined && score !== null && score !== "") {
+      const numScore = Number(score);
+      if (!Number.isFinite(numScore) || numScore < 0 || numScore > 100) {
+        return res.status(400).json({ success: false, message: "Score must be a number between 0 and 100" });
+      }
+    }
+
     const student = await db.collection("users").findOne({ _id: toId(user_id), role: "student", active: 1 });
     if (!student) return res.status(404).json({ success: false, message: "Student not found" });
 
@@ -790,11 +798,19 @@ router.get("/feedback/tasks", authenticateToken, authorizeRoles("admin", "manage
     const entries = records.map((r) => {
       const student = studentById.get(String(r.user_id));
       const task = r.task_id ? taskById.get(String(r.task_id)) : null;
+      // FIX C-8: never expose raw DB ObjectId — show "—" when student_id is null
+      const studentCode = student?.student_id || "—";
+      // FIX C-11: CEO is not in users collection; resolve name from env
+      const reviewerName = r.reviewed_by
+        ? (String(r.reviewed_by) === "ceo"
+          ? (process.env.CEO_NAME || "TECHINS CEO")
+          : (reviewerById.get(String(r.reviewed_by)) || null))
+        : null;
       return {
         id: String(r._id),
         student_id: String(r.user_id),
         student_name: student?.name || null,
-        student_code: student?.student_id || String(r.user_id),
+        student_code: studentCode,
         student_email: student?.email || null,
         task_id: r.task_id ? String(r.task_id) : null,
         task_code: task?.task_code || null,
@@ -808,7 +824,7 @@ router.get("/feedback/tasks", authenticateToken, authorizeRoles("admin", "manage
         strengths: r.strengths || "",
         improvements: r.improvements || "",
         score: r.score ?? null,
-        reviewer_name: r.reviewed_by ? (reviewerById.get(String(r.reviewed_by)) || null) : null,
+        reviewer_name: reviewerName,
         status: r.status || "recorded",
         period: r.period || null,
         created_at: r.created_at || null,

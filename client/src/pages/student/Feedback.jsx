@@ -7,16 +7,16 @@ import "./StudentDashboard.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
+// FIX S-8: single consistent date format
 function fmtDate(value) {
   if (!value) return "—";
   try {
-    return new Date(value).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+    return new Date(value).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
   } catch { return String(value); }
 }
 
-function fmtDateTime(value) {
-  if (!value) return "—";
-  try { return new Date(value).toLocaleString(); } catch { return String(value); }
+function pluralise(n, word) {
+  return n === 1 ? `${n} ${word}` : `${n} ${word}s`;
 }
 
 export default function Feedback() {
@@ -37,13 +37,14 @@ export default function Feedback() {
       // legacy task.feedback rows are kept as task feedback.
       const performanceFeedback = (d.feedback || []).map(item => {
         const isTaskLinked = Boolean(item.task_id || item.task_code || item.task_title);
-        const taskLabel = item.task_title
-          ? `${item.task_code ? `${item.task_code} · ` : ""}${item.task_title}`
-          : item.task_code || 'Task';
+        // FIX S-9: single clear title — mission/task name or "General feedback"
+        const displayTitle = isTaskLinked
+          ? (item.task_title || item.task_code || "Task feedback")
+          : "General feedback";
         return {
           ...item,
           type: 'performance',
-          displayTitle: isTaskLinked ? taskLabel : `Performance Review${item.period ? ` - ${item.period}` : ""}`,
+          displayTitle,
           taskLinked: isTaskLinked,
         };
       });
@@ -51,7 +52,7 @@ export default function Feedback() {
       const taskFeedback = (d.taskFeedback || []).map(item => ({
         ...item,
         type: 'task',
-        displayTitle: item.title ? `${item.task_code ? `${item.task_code} · ` : ""}${item.title}` : (item.task_code || 'Task'),
+        displayTitle: item.title || item.task_code || "Task feedback",
         feedback: item.feedback,
         taskLinked: true,
       }));
@@ -74,15 +75,16 @@ export default function Feedback() {
 
   return (
     <div className="student-dashboard-page page-enter">
+      {/* FIX S-7: user-facing copy instead of developer text */}
       <div className="simple-head">
         <span>PRIVATE FEEDBACK</span>
         <h2>My Feedback</h2>
-        <p>Feedback shared with your student account, grouped with the same card design as your performance.</p>
+        <p>Feedback from your reviewers on your work.</p>
       </div>
 
       <div className="fb-toolbar">
         <button type="button" onClick={load} disabled={loading}>{loading ? "Loading…" : "Refresh"}</button>
-        {items.length > 0 && <span className="fb-count">{items.length} entr{items.length === 1 ? "y" : "ies"}</span>}
+        {items.length > 0 && <span className="fb-count">{pluralise(items.length, "entry")}</span>}
       </div>
 
       {error && <div className="error-msg" role="alert">{error} <button type="button" onClick={load}>Retry</button></div>}
@@ -93,22 +95,24 @@ export default function Feedback() {
           <p>Loading feedback...</p>
         </div>
       ) : items.length ? (
-        <div className="fb-students">
+        /* FIX S-10: constrain width like the dashboard */
+        <div className="fb-students" style={{ maxWidth: 1100, margin: "0 auto" }}>
           <section className="panel fb-student perf-card" aria-label="My feedback entries">
             {items.map(x => (
               <article className="fb-entry" key={`${x.type}-${x.id}`}>
-                <p><strong>{x.taskLinked ? "Task feedback" : "Performance review"}</strong> · {x.displayTitle}</p>
+                {/* FIX S-9: single clear title */}
+                <p><strong>{x.displayTitle}</strong></p>
                 <p>{x.feedback || "No feedback text recorded."}</p>
                 <div className="fb-meta">
-                  <span>{x.reviewer_name ? `By ${x.reviewer_name}` : "Reviewer unknown"}</span>
-                  <span>{fmtDateTime(x.created_at || x.updated_at)}</span>
-                  {x.updated_at && x.updated_at !== x.created_at && <span>Updated {fmtDateTime(x.updated_at)}</span>}
+                  {/* FIX S-8: show reviewer name or "—" */}
+                  <span>{x.reviewer_name ? `By ${x.reviewer_name}` : "—"}</span>
+                  {/* FIX S-8: single date format */}
+                  <span>{fmtDate(x.created_at || x.updated_at)}</span>
                   {x.score != null && <span className="fb-score">Score {x.score}</span>}
-                  <span className="fb-status">{x.status || (x.taskLinked ? "task" : "recorded")}</span>
+                  <span className="fb-status">{x.status || "recorded"}</span>
                 </div>
                 {x.strengths && <div className="fb-line"><b>Strengths:</b> {Array.isArray(x.strengths) ? x.strengths.join(", ") : x.strengths}</div>}
                 {(x.improvements || x.improvement) && <div className="fb-line"><b>Improvement areas:</b> {Array.isArray(x.improvements || x.improvement) ? (x.improvements || x.improvement).join(", ") : (x.improvements || x.improvement)}</div>}
-                <div className="fb-line"><small>{fmtDate(x.created_at || x.updated_at)}</small></div>
               </article>
             ))}
           </section>
