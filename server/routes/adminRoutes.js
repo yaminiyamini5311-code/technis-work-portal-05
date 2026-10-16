@@ -678,21 +678,43 @@ router.get("/students/:id/details", authenticateToken, authorizeRoles("admin", "
       .limit(50)
       .toArray();
 
-    // Enrich submissions with task info
+    // Enrich submissions with task info and files
     const taskIds = [...new Set(submissions.map(s => String(s.task_id)))];
     const taskDocs = taskIds.length
       ? await db.collection("tasks").find({ _id: { $in: taskIds.map(id => { try { return toId(id); } catch { return id; } }) } }, { projection: { title: 1, task_code: 1 } }).toArray()
       : [];
     const taskMap = new Map(taskDocs.map(t => [String(t._id), t]));
-    const enrichedSubs = submissions.map(s => ({
-      id: String(s._id),
-      task_id: String(s.task_id),
-      task_title: taskMap.get(String(s.task_id))?.title || "Unknown task",
-      task_code: taskMap.get(String(s.task_id))?.task_code || null,
-      status: s.status,
-      submitted_at: s.submitted_at,
-      version: s.version,
-    }));
+    const subIds = submissions.map(s => String(s._id));
+    const subFiles = subIds.length
+      ? await db.collection("submission_files").find({ submission_id: { $in: subIds } }, { projection: { original_name: 1, size: 1, mime_type: 1, created_at: 1, drive_file_id: 1, drive_folder_id: 1 } }).toArray()
+      : [];
+    const filesBySub = new Map();
+    for (const f of subFiles) {
+      const key = String(f.submission_id);
+      if (!filesBySub.has(key)) filesBySub.set(key, []);
+      filesBySub.get(key).push(f);
+    }
+    const enrichedSubs = submissions.map(s => {
+      const sid = String(s._id);
+      const files = (filesBySub.get(sid) || []).map(f => ({
+        id: String(f._id),
+        name: f.original_name,
+        size: f.size,
+        mime: f.mime_type,
+        download_url: `/api/tasks/files/${String(f._id)}/download`,
+      }));
+      return {
+        id: sid,
+        task_id: String(s.task_id),
+        task_title: taskMap.get(String(s.task_id))?.title || "Unknown task",
+        task_code: taskMap.get(String(s.task_id))?.task_code || null,
+        status: s.status,
+        submitted_at: s.submitted_at,
+        version: s.version,
+        comment: s.comment || null,
+        files,
+      };
+    });
 
     res.json({
       success: true,

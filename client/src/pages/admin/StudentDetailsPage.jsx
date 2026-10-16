@@ -188,7 +188,7 @@ export default function StudentDetailsPage() {
           </div>
           <div className="detail-item">
             <span className="label">Department</span>
-            <strong>{student.department || "—"}</strong>
+            <strong>{student.department || "Not provided"}</strong>
           </div>
           <div className="detail-item">
             <span className="label">Status</span>

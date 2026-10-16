@@ -59,6 +59,91 @@
   color: #182018;
 }
 
+/* CEO dark theme overrides for details page */
+.role-layout.ceo-dark .detail-item strong {
+  color: #f0f0f0;
+}
+
+.role-layout.ceo-dark .detail-item .label {
+  color: #94a3b8;
+}
+
+.role-layout.ceo-dark .details-list li {
+  color: #e8e8e8;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.role-layout.ceo-dark .details-list li strong {
+  color: #f0f0f0;
+}
+
+.role-layout.ceo-dark .details-list li small {
+  color: #94a3b8;
+}
+
+.role-layout.ceo-dark .empty-text {
+  color: #94a3b8;
+}
+
+.role-layout.ceo-dark .submission-card {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.role-layout.ceo-dark .submission-card-header strong {
+  color: #f0f0f0;
+}
+
+.role-layout.ceo-dark .submission-card-header small {
+  color: #94a3b8;
+}
+
+.role-layout.ceo-dark .submission-card-meta {
+  color: #94a3b8;
+}
+
+.role-layout.ceo-dark .response-text {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #e8e8e8;
+}
+
+.role-layout.ceo-dark .file-item {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.role-layout.ceo-dark .file-name {
+  color: #e8e8e8;
+}
+
+.role-layout.ceo-dark .submission-review {
+  border-top-color: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+}
+
+.role-layout.ceo-dark .submission-review .review-label {
+  color: #e8e8e8;
+}
+
+/* Consistent status badge colors across all pages */
+.role-layout.ceo-dark .pill.approved,
+.role-layout.ceo-dark .pill.completed {
+  background: rgba(53, 208, 127, 0.16) !important;
+  color: #35d07f !important;
+}
+
+.role-layout.ceo-dark .pill.pending,
+.role-layout.ceo-dark .pill.submitted {
+  background: rgba(245, 165, 36, 0.16) !important;
+  color: #f5a524 !important;
+}
+
+.role-layout.ceo-dark .pill.revision_required {
+  background: rgba(242, 85, 122, 0.16) !important;
+  color: #f2557a !important;
+}
+
 .details-list {
   margin: 0;
   padding: 0;
