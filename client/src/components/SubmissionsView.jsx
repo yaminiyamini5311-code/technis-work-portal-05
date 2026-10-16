@@ -108,11 +108,13 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
 
       <section className="panel">
         <div className="panel-head"><div><span className="section-kicker">STUDENT</span><h3>{item.student_name || "—"}</h3></div><span className={`pill ${(item.status || "").toLowerCase().replace(/\s+/g, "_")}`}>{item.status || "Submitted"}</span></div>
-        <p><strong>Email:</strong> {item.student_email || "—"}<br />
-        <strong>Phone:</strong> {item.student_phone || "—"}<br />
-        <strong>Program:</strong> {item.student_program || "—"}<br />
-        <strong>Batch:</strong> {item.batch_name || "—"}<br />
-        <strong>Student ID:</strong> {item.student_id || "—"}</p>
+        <div className="detail-grid">
+          <div><span>Email:</span> {item.student_email || "—"}</div>
+          <div><span>Phone:</span> {item.student_phone || "—"}</div>
+          <div><span>Program:</span> {item.student_program || "—"}</div>
+          <div><span>Batch:</span> {item.batch_name || "—"}</div>
+          <div><span>Student ID:</span> {item.student_id || "—"}</div>
+        </div>
       </section>
 
       <section className="panel">
@@ -129,7 +131,7 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
             <div>
               <strong>Version {v.version} · {v.submission_code || ""}</strong>
               <small>{formatDateTime(v.submitted_at)} · {v.status}</small>
-              {v.comment ? <p style={{ margin: '0.5rem 0', padding: '0.5rem', background: '#f5f5f5', borderRadius: '4px' }}><strong>Comment:</strong> {v.comment}</p> : null}
+              {v.comment ? <p style={{ margin: '0.5rem 0', padding: '0.5rem', background: '#f5f5f5', borderRadius: '4px', whiteSpace: 'pre-wrap' }}><strong>Comment:</strong> {v.comment}</p> : null}
               {(v.files || []).length ? (
                 <div className="quick-actions" style={{ marginTop: '0.5rem' }}>
                   {v.files.map(f => (
@@ -171,7 +173,7 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
               <button onClick={() => { setPreviewUrl(null); setPreviewFile(null); }}>Close</button>
             </div>
             {previewFile.mime?.startsWith('image/') ? (
-              <img src={previewUrl} alt={previewFile.name} style={{ maxWidth: '100%', height: 'auto' }} />
+              <img src={previewUrl} alt={previewFile.name} style={{ maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain' }} />
             ) : previewFile.mime === 'application/pdf' ? (
               <iframe src={previewUrl} style={{ width: '100%', height: '70vh', border: 'none' }} title={previewFile.name} />
             ) : previewFile.mime?.startsWith('text/') ? (
@@ -299,14 +301,16 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterBatch, setFilterBatch] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
-  // Delete modal state
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
-  // Requirement modal state
   const [requirementTarget, setRequirementTarget] = useState(null);
   const [requirementDesc, setRequirementDesc] = useState("");
   const [requirementError, setRequirementError] = useState("");
   const [submittingRequirement, setSubmittingRequirement] = useState(false);
+  const [expandedRow, setExpandedRow] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewFile, setPreviewFile] = useState(null);
+  const [previewError, setPreviewError] = useState("");
 
   const load = async () => {
     try {
@@ -398,7 +402,6 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
   }, [items, searchQuery, filterStatus, filterBatch, sortBy]);
 
   const handleViewDetails = (submission) => {
-    // B-1: Navigate to full-page student details
     navigate(`/admin/students/${submission.student_id}`);
   };
 
@@ -413,7 +416,6 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
     load();
   };
 
-  // B: Delete student
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -442,7 +444,6 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
 
   const [msg, setMsg] = useState("");
 
-  // C: Requirement
   const submitRequirement = async (e) => {
     e.preventDefault();
     if (!requirementTarget) return;
@@ -471,8 +472,18 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
     }
   };
 
+  const handlePreviewFile = async (file) => {
+    setPreviewError("");
+    const url = await fetchPreviewUrl(file, setPreviewError);
+    if (url) {
+      setPreviewUrl(url);
+      setPreviewFile(file);
+    }
+  };
+
   const deleteModalRef = useModalBehavior(!!deleteTarget, () => setDeleteTarget(null));
   const requirementModalRef = useModalBehavior(!!requirementTarget, () => { setRequirementTarget(null); setRequirementDesc(""); setRequirementError(""); });
+  const previewModalRef = useModalBehavior(Boolean(previewUrl), () => { setPreviewUrl(null); setPreviewFile(null); });
 
   if (loading) {
     return (
@@ -567,10 +578,18 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
         {filteredSubmissions.length > 0 ? (
           <div className="submissions-table-wrapper">
             <table className="submissions-table">
+              <colgroup>
+                <col className="col-student-name" />
+                <col className="col-task" />
+                <col className="col-response" />
+                <col className="col-files" />
+                <col className="col-submitted" />
+                <col className="col-status" />
+                <col className="col-actions" />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Student Name</th>
-                  <th>Student Details</th>
                   <th>Task</th>
                   <th>Response</th>
                   <th>Files</th>
@@ -586,37 +605,26 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
                       <div className="student-avatar">
                         {(item.student_name || "S").charAt(0).toUpperCase()}
                       </div>
-                      <strong>{item.student_name || "Unknown"}</strong>
-                    </td>
-                    <td className="student-details">
-                      <div className="detail-line">
-                        <span className="label">Email:</span> <span className="value" title={item.student_email}>{item.student_email ? (item.student_email.length > 25 ? item.student_email.slice(0, 25) + "…" : item.student_email) : "—"}</span>
-                      </div>
-                      <div className="detail-line">
-                        <span className="label">ID:</span> <span className="value">{item.student_id || "—"}</span>
-                      </div>
-                      <div className="detail-line">
-                        <span className="label">Program:</span> <span className="value">{item.student_program || "—"}</span>
-                      </div>
-                      <div className="detail-line">
-                        <span className="label">Batch:</span> <span className="value">{item.batch_name || "—"}</span>
+                      <div className="student-name-text">
+                        <strong>{item.student_name || "Unknown"}</strong>
+                        <small>{item.student_id || "—"}</small>
                       </div>
                     </td>
                     <td className="task-info">
-                      <strong>{item.task_code || "No code"}</strong>
+                      <div className="task-code">{item.task_code || "No code"}</div>
                       <div className="task-title">{item.task_title || "Untitled task"}</div>
-                      {item.task_description && (
-                        <div className="task-desc">
-                          {item.task_description.slice(0, 80)}
-                          {item.task_description.length > 80 ? '…' : ''}
-                        </div>
-                      )}
                     </td>
                     <td className="response-column">
                       {item.comment ? (
                         <div className="response-text">
-                          {item.comment.slice(0, 100)}
-                          {item.comment.length > 100 ? '…' : ''}
+                          {item.comment.length > 150 ? (
+                            <>
+                              {expandedRow === item.id ? item.comment : `${item.comment.slice(0, 150)}…`}
+                              <button className="expand-btn" onClick={() => setExpandedRow(expandedRow === item.id ? null : item.id)}>
+                                {expandedRow === item.id ? "Show less" : "Show more"}
+                              </button>
+                            </>
+                          ) : item.comment}
                         </div>
                       ) : (
                         <span className="no-response">No written response</span>
@@ -627,11 +635,32 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
                     </td>
                     <td className="files-column">
                       {item.file_count > 0 ? (
-                        <div className="file-count">
-                          <TechinsIcon name="folder" size={13} variant="light" ariaHidden /> {item.file_count} file{item.file_count === 1 ? '' : 's'}
+                        <div className="files-cell">
+                          <div className="file-count">
+                            <TechinsIcon name="folder" size={13} variant="light" ariaHidden />
+                            <span>{item.file_count} file{item.file_count === 1 ? '' : 's'}</span>
+                          </div>
+                          <div className="file-list">
+                            {(item.files || []).slice(0, 3).map(f => (
+                              <div key={f.id} className="file-item">
+                                <span className="file-name" title={f.name}>{f.name.length > 20 ? f.name.slice(0, 20) + "…" : f.name}</span>
+                                <div className="file-actions">
+                                  {canPreview(f.mime) && (
+                                    <button className="file-action-btn" onClick={() => handlePreviewFile(f)} title="Preview">
+                                      <TechinsIcon name="eye" size={12} variant="light" ariaHidden />
+                                    </button>
+                                  )}
+                                  <button className="file-action-btn" onClick={() => downloadFile(f, setError)} title="Download">
+                                    <TechinsIcon name="download" size={12} variant="light" ariaHidden />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                            {item.file_count > 3 && <div className="more-files">+{item.file_count - 3} more</div>}
+                          </div>
                         </div>
                       ) : (
-                        <span className="no-files">No files</span>
+                        <span className="no-files">No attachments</span>
                       )}
                     </td>
                     <td className="timestamp-column">
@@ -685,6 +714,33 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
           onClose={handleCloseDetails}
           onReviewed={handleReviewed}
         />
+      )}
+
+      {/* File Preview Modal */}
+      {previewUrl && previewFile && (
+        <div className="review-modal" ref={previewModalRef} onClick={(e) => { if (e.target === e.currentTarget) { setPreviewUrl(null); setPreviewFile(null); } }}>
+          <div className="panel" style={{ maxWidth: '90vw', maxHeight: '90vh', overflow: 'auto' }}>
+            <div className="panel-head">
+              <div>
+                <span className="section-kicker">FILE PREVIEW</span>
+                <h3>{previewFile.name}</h3>
+              </div>
+              <button onClick={() => { setPreviewUrl(null); setPreviewFile(null); }}>Close</button>
+            </div>
+            {previewError && <div className="error-msg">{previewError}</div>}
+            {previewFile.mime?.startsWith('image/') ? (
+              <img src={previewUrl} alt={previewFile.name} style={{ maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain' }} />
+            ) : previewFile.mime === 'application/pdf' ? (
+              <iframe src={previewUrl} style={{ width: '100%', height: '70vh', border: 'none' }} title={previewFile.name} />
+            ) : previewFile.mime?.startsWith('text/') ? (
+              <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '70vh', overflow: 'auto' }}>
+                {previewFile.name}
+              </pre>
+            ) : (
+              <p>Preview not available for this file type. Please download to view.</p>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Delete Confirmation Modal */}

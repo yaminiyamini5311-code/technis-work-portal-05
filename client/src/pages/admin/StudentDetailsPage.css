@@ -59,6 +59,91 @@
   color: #182018;
 }
 
+/* CEO dark theme overrides for details page */
+.role-layout.ceo-dark .detail-item strong {
+  color: #f0f0f0;
+}
+
+.role-layout.ceo-dark .detail-item .label {
+  color: #94a3b8;
+}
+
+.role-layout.ceo-dark .details-list li {
+  color: #e8e8e8;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.role-layout.ceo-dark .details-list li strong {
+  color: #f0f0f0;
+}
+
+.role-layout.ceo-dark .details-list li small {
+  color: #94a3b8;
+}
+
+.role-layout.ceo-dark .empty-text {
+  color: #94a3b8;
+}
+
+.role-layout.ceo-dark .submission-card {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.role-layout.ceo-dark .submission-card-header strong {
+  color: #f0f0f0;
+}
+
+.role-layout.ceo-dark .submission-card-header small {
+  color: #94a3b8;
+}
+
+.role-layout.ceo-dark .submission-card-meta {
+  color: #94a3b8;
+}
+
+.role-layout.ceo-dark .response-text {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #e8e8e8;
+}
+
+.role-layout.ceo-dark .file-item {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.role-layout.ceo-dark .file-name {
+  color: #e8e8e8;
+}
+
+.role-layout.ceo-dark .submission-review {
+  border-top-color: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+}
+
+.role-layout.ceo-dark .submission-review .review-label {
+  color: #e8e8e8;
+}
+
+/* Consistent status badge colors across all pages */
+.role-layout.ceo-dark .pill.approved,
+.role-layout.ceo-dark .pill.completed {
+  background: rgba(53, 208, 127, 0.16) !important;
+  color: #35d07f !important;
+}
+
+.role-layout.ceo-dark .pill.pending,
+.role-layout.ceo-dark .pill.submitted {
+  background: rgba(245, 165, 36, 0.16) !important;
+  color: #f5a524 !important;
+}
+
+.role-layout.ceo-dark .pill.revision_required {
+  background: rgba(242, 85, 122, 0.16) !important;
+  color: #f2557a !important;
+}
+
 .details-list {
   margin: 0;
   padding: 0;
@@ -94,4 +179,265 @@
   font-size: 13px;
   font-style: italic;
   padding: 12px 0;
+}
+
+/* Submission cards in details page */
+.submissions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.submission-card {
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 16px;
+  background: #FAFAFA;
+}
+
+.submission-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.submission-card-header strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: #182018;
+}
+
+.submission-card-header small {
+  display: block;
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.submission-card-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+
+.submission-response {
+  margin-bottom: 12px;
+}
+
+.response-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+
+.response-text {
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  padding: 10px 12px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #E5E7EB;
+}
+
+.submission-files {
+  margin-bottom: 12px;
+}
+
+.files-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 8px;
+}
+
+.files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #E5E7EB;
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.file-name {
+  font-size: 12px;
+  color: #374151;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-size {
+  font-size: 11px;
+  color: #9CA3AF;
+  flex-shrink: 0;
+}
+
+.file-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.file-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid #D9D9D9;
+  border-radius: 6px;
+  background: white;
+  font-size: 11px;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.file-action-btn:hover {
+  background: #FA9A02;
+  color: white;
+  border-color: #FA9A02;
+}
+
+.submission-review {
+  font-size: 12px;
+  color: #6b7280;
+  padding-top: 8px;
+  border-top: 1px solid #E5E7EB;
+}
+
+.review-label {
+  font-weight: 700;
+  color: #374151;
+}
+
+/* Review modal */
+.review-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 1000;
+  overflow-y: auto;
+}
+
+.review-modal .panel {
+  max-width: 900px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  margin: auto;
+}
+
+.review-modal .panel-head button {
+  padding: 8px 16px;
+  background: #EF4444;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.review-modal .panel-head button:hover {
+  background: #DC2626;
+}
+
+/* Error message */
+.error-msg {
+  background: #FEE2E2;
+  border: 1px solid #EF4444;
+  color: #991B1B;
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Loading state */
+.portal-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 16px;
+}
+
+.loader-dot {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(250, 154, 2, 0.2);
+  border-top-color: #FA9A02;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.portal-loading h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0C120C;
+  margin: 0;
+}
+
+.portal-error {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.portal-error h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0C120C;
+  margin: 0 0 12px;
+}
+
+.portal-error p {
+  font-size: 14px;
+  color: #5F625F;
+  margin: 0 0 20px;
 }
