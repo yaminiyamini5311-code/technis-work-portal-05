@@ -1,6 +1,8 @@
 /* Task-wise feedback report (CEO → Student Report → Feedback)
    Card structure, typography, spacing, radius and shadows match
-   performance.css (.perf-card / .panel) so both pages read as one system. */
+   performance.css (.perf-card / .panel) so both pages read as one system.
+   FIX C-10: dark navy card with light text for WCAG AA contrast. */
+
 .fb-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -12,11 +14,14 @@
   flex: 1 1 260px;
   min-width: 0;
   padding: 10px 12px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 10px;
   font-size: 14px;
-  background: #fff;
-  color: #182018;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e8e8e8;
+}
+.fb-toolbar input[type="search"]::placeholder {
+  color: #888;
 }
 .fb-toolbar input[type="search"]:focus {
   border-color: #FA9A02;
@@ -27,19 +32,19 @@
   padding: 10px 16px;
   border-radius: 10px;
   cursor: pointer;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  background: #fff;
-  color: #182018;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e8e8e8;
   font-weight: 600;
   font-size: 13px;
   transition: background .2s ease, color .2s ease, border-color .2s ease, transform .15s ease, box-shadow .2s ease;
 }
 .fb-toolbar button:hover {
-  background: #0C120C;
-  border-color: #0C120C;
-  color: #fff;
+  background: #FA9A02;
+  border-color: #FA9A02;
+  color: #0C120C;
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(12, 18, 12, 0.22);
+  box-shadow: 0 6px 16px rgba(250, 154, 2, 0.22);
 }
 .fb-toolbar button:active { transform: translateY(0); box-shadow: none; }
 .fb-toolbar button:focus-visible {
@@ -48,73 +53,81 @@
 }
 .fb-toolbar button:disabled { opacity: .55; cursor: not-allowed; transform: none; box-shadow: none; }
 
-.field-hint { display: block; margin-top: 4px; font-size: 11px; color: #6b7280; }
+.field-hint { display: block; margin-top: 4px; font-size: 11px; color: #aaa; }
 
+/* FIX C-10: dark navy card, light text — matches CEO Performance design */
 .fb-students { display: flex; flex-direction: column; gap: 18px; }
-/* Match .perf-card / .panel: white card, 18px radius, 25px padding */
-.fb-student { padding: 25px; border-radius: 18px; background: #fff; border: 1px solid #D9D9D9; }
+.fb-student {
+  padding: 25px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e8e8e8;
+}
 .fb-student-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.fb-student-head h3 { margin: 0 0 2px; font-size: 19px; color: #182018; }
-.fb-student-head small { color: #6b7280; font-size: 12px; }
+.fb-student-head h3 { margin: 0 0 2px; font-size: 19px; color: #f0f0f0; }
+.fb-student-head small { color: #94a3b8; font-size: 12px; }
 .fb-count {
   font-size: 11px;
   font-weight: 700;
   padding: 3px 9px;
   border-radius: 999px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(250, 154, 2, 0.15);
+  color: #FA9A02;
   white-space: nowrap;
 }
 
 .fb-task {
   margin-top: 14px;
   padding-top: 12px;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
-.fb-task h4 { margin: 0 0 8px; font-size: 14px; }
-.fb-task h4 small { font-weight: 400; color: #6b7280; }
+.fb-task h4 { margin: 0 0 8px; font-size: 14px; color: #e8e8e8; }
+.fb-task h4 small { font-weight: 400; color: #94a3b8; }
 .fb-warn {
   margin-left: 6px;
   font-size: 10px;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 999px;
-  background: rgba(220, 38, 38, 0.12);
-  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.2);
+  color: #f87171;
 }
 
-.fb-empty { color: #6b7280; font-size: 13px; margin: 0; padding: 12px 0; }
+.fb-empty { color: #94a3b8; font-size: 13px; margin: 0; padding: 12px 0; }
 
 .fb-entry {
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   padding: 12px 14px;
   margin-bottom: 8px;
-  background: #f6f8fc;
+  background: rgba(255, 255, 255, 0.03);
   transition: border-color .2s ease, box-shadow .2s ease;
 }
 .fb-entry:hover { border-color: rgba(250, 154, 2, 0.45); box-shadow: 0 4px 14px rgba(250, 154, 2, 0.12); }
-.fb-entry p { margin: 0 0 6px; font-size: 13px; line-height: 1.6; }
+.fb-entry p { margin: 0 0 6px; font-size: 13px; line-height: 1.6; color: #e8e8e8; }
 .fb-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
   font-size: 11px;
-  color: #6b7280;
+  color: #94a3b8;
 }
-.fb-score { font-weight: 700; color: #b45309; }
+.fb-score { font-weight: 700; color: #FA9A02; }
 .fb-status {
   text-transform: uppercase;
   letter-spacing: 0.4px;
   font-size: 10px;
   font-weight: 700;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
   padding: 2px 8px;
-  background: rgba(0, 0, 0, 0.04);
+  background: rgba(255, 255, 255, 0.04);
 }
-.fb-line { margin-top: 5px; font-size: 12px; color: #4b5563; }
+.fb-line { margin-top: 5px; font-size: 12px; color: #cbd5e1; }
+.fb-line b { color: #e8e8e8; }
 
 /* Shared form button matches performance actions */
 .gold-btn {
@@ -137,14 +150,14 @@
 .gold-btn:focus-visible { outline: 2px solid #FA9A02; outline-offset: 2px; }
 .gold-btn:disabled { opacity: .55; cursor: not-allowed; }
 
+.field-error {
+  color: #f87171;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 @media (max-width: 640px) {
   .fb-toolbar { flex-direction: column; align-items: stretch; }
   .fb-student { padding: 18px; }
   .fb-student-head { flex-direction: column; }
 }
-/* Explicit colours so the report stays readable in both the light admin
-   theme and the CEO dark theme (where inherited text colour is dark). */
-.fb-task h4 { color: #182018; }
-.fb-task h4 small { color: #6b7280; }
-.fb-entry p { color: #182018; }
-.fb-line { color: #4b5563; }

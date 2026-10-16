@@ -7,11 +7,11 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function StudentDashboard(){
   const [data,setData]=useState(null);
+  const [report,setReport]=useState(null);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
   const [unread,setUnread]=useState(0);
 
-  // Scroll reveal effect for space theme - sophisticated animation
   useScrollReveal('.reveal-card', {
     stagger: 60,
     initialScale: 0.96,
@@ -20,7 +20,6 @@ export default function StudentDashboard(){
     initialBlur: 0
   });
 
-  // Format dates without timezone shift
   const formatDate = (dateStr) => {
     if (!dateStr) return null;
     const d = new Date(dateStr + 'T00:00:00');
@@ -30,15 +29,20 @@ export default function StudentDashboard(){
   const load=async()=>{
     try{
       const h={Authorization:`Bearer ${localStorage.getItem("token")}`};
-      const [dash,notices]=await Promise.all([
+      const [dash,notices,rep]=await Promise.all([
         fetch(`${API_URL}/api/student/dashboard`,{headers:h}),
-        fetch(`${API_URL}/api/notifications`,{headers:h})
+        fetch(`${API_URL}/api/notifications`,{headers:h}),
+        fetch(`${API_URL}/api/student/report`,{headers:h}).catch(()=>null)
       ]);
       const d=await dash.json();
       const n=await notices.json();
       if(!dash.ok) throw new Error(d.message||"Unable to load dashboard");
       setData(d);
       setUnread(n.unread||0);
+      if(rep && rep.ok){
+        const r=await rep.json().catch(()=>null);
+        if(r && r.success) setReport(r);
+      }
       setError("");
     }catch(e){
       setError(e.message);
@@ -50,7 +54,7 @@ export default function StudentDashboard(){
   useEffect(()=>{
     load();
     const id=setInterval(()=>{
-      if (document.hidden) return; // pause polling on hidden tabs
+      if (document.hidden) return;
       load();
     },20000);
     return()=>clearInterval(id);
@@ -66,6 +70,9 @@ export default function StudentDashboard(){
   const taskTotal=data.tasks.total||0;
   const taskCompletion=taskTotal?Math.round(completed/taskTotal*100):0;
   const missionCompletion=data.missions.total?Math.round(data.missions.completed/data.missions.total*100):0;
+
+  const taskScore = report?.scoring?.overall_percentage ?? null;
+  const displayScore = taskScore ?? data.score ?? null;
 
   return <div className="student-dashboard-page page-enter">
     <section className="workspace-hero">
@@ -92,7 +99,6 @@ export default function StudentDashboard(){
               strokeDasharray={`${2 * Math.PI * 40}`}
               strokeDashoffset={`${2 * Math.PI * 40 * (1 - data.progress / 100)}`}
             />
-            {/* Milestone ticks */}
             {[25, 50, 75, 100].map(tick => (
               <line
                 key={tick}
@@ -104,7 +110,6 @@ export default function StudentDashboard(){
                 transform={`rotate(${tick * 3.6} 50 50)`}
               />
             ))}
-            {/* Satellite/particle at tip */}
             <circle
               className="progress-satellite"
               cx="50"
@@ -117,12 +122,15 @@ export default function StudentDashboard(){
             <strong>{data.progress}%</strong>
           </div>
         </div>
-        <div><span>Overall progress</span><small>Based on your current records</small></div>
+        <div>
+          <span>Overall progress</span>
+          <small>Task {taskCompletion}% · Mission {missionCompletion}%</small>
+        </div>
       </div>
     </section>
 
     <section className="workspace-stats" aria-label="Workspace overview">
-      {[/* eslint-disable indent */
+      {[
         ["Total tasks",data.tasks.total,"Assigned work","clipboard"],
         ["Pending",pending,"Needs your attention","clock"],
         ["Completed",completed,"Approved work","check"],
@@ -153,7 +161,7 @@ export default function StudentDashboard(){
                   background: 'rgba(250,154,2,0.15)',
                   color: '#FA9A02',
                   fontSize: '9px',
-                  fontWeight: '700',
+                  fontWeight: 700,
                   textTransform: 'capitalize'
                 }}>{t.domain}</span>}
                 <span className={`workspace-status-badge ${t.status}`}>{String(t.status).replace("_"," ")}</span>
@@ -179,7 +187,7 @@ export default function StudentDashboard(){
           <div><span>Mission completion</span><strong>{missionCompletion}%</strong></div>
           <div className="professional-progress"><i style={{width:`${missionCompletion}%`}}/></div>
         </div>
-        <div className="evaluation-row"><span>Evaluated score</span><strong>{data.score==null?"Not evaluated yet":`${data.score}%`}</strong></div>
+        <div className="evaluation-row"><span>Evaluated score</span><strong>{displayScore==null?"Not evaluated yet":`${displayScore}%`}</strong></div>
       </section>
     </div>
 
@@ -224,5 +232,5 @@ export default function StudentDashboard(){
         <b><TechinsIcon name="chevron" size={18} variant="light" className="portal-icon" /></b>
       </a>
     </section>
-  </div>
+  </div>;
 }

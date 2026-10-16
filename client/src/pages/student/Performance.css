@@ -286,6 +286,97 @@
 }
 
 
+/* FIX S-4: Override admin .perf-card white styling for student dark theme */
+.student-performance-page .perf-card {
+  background: rgba(10,18,40,0.82) !important;
+  border: 1px solid rgba(250,154,2,0.25) !important;
+  color: #e8e8e8 !important;
+}
+.student-performance-page .perf-card .panel-head h3 {
+  color: #f0f0f0 !important;
+}
+.student-performance-page .perf-card .panel-head small {
+  color: #94a3b8 !important;
+}
+.student-performance-page .perf-card .panel-head strong {
+  color: #FA9A02 !important;
+}
+.student-performance-page .perf-card .perf-score-block,
+.student-performance-page .perf-card .perf-counts,
+.student-performance-page .perf-card .perf-line,
+.student-performance-page .perf-card .perf-table-wrap {
+  color: #e8e8e8 !important;
+}
+.student-performance-page .perf-card .perf-chip {
+  background: rgba(255,255,255,0.06) !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  color: #e8e8e8 !important;
+}
+.student-performance-page .perf-card .perf-chip b {
+  color: #FA9A02 !important;
+}
+.student-performance-page .perf-card .perf-state {
+  background: rgba(255,255,255,0.06) !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  color: #e8e8e8 !important;
+}
+.student-performance-page .perf-card .perf-state.approved {
+  background: rgba(34,197,94,0.15) !important;
+  color: #4ade80 !important;
+}
+.student-performance-page .perf-card .perf-state.submitted {
+  background: rgba(250,154,2,0.15) !important;
+  color: #FA9A02 !important;
+}
+.student-performance-page .perf-card .perf-table th {
+  color: #94a3b8 !important;
+  border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+}
+.student-performance-page .perf-card .perf-table td {
+  color: #e8e8e8 !important;
+  border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+}
+.student-performance-page .perf-card .perf-table td strong {
+  color: #f0f0f0 !important;
+}
+.student-performance-page .perf-card .perf-table td small {
+  color: #94a3b8 !important;
+}
+.student-performance-page .perf-card .muted {
+  color: #94a3b8 !important;
+}
+.student-performance-page .perf-card .perf-score-cell {
+  color: #FA9A02 !important;
+}
+.student-performance-page .perf-card .perf-empty {
+  color: #94a3b8 !important;
+}
+.student-performance-page .perf-card .admin-progress {
+  background: rgba(255,255,255,0.08) !important;
+}
+.student-performance-page .perf-card .perf-expand {
+  border: 1px solid rgba(255,255,255,0.15) !important;
+  background: rgba(255,255,255,0.06) !important;
+  color: #e8e8e8 !important;
+}
+.student-performance-page .perf-card .perf-expand:hover {
+  background: rgba(250,154,2,0.15) !important;
+  border-color: rgba(250,154,2,0.4) !important;
+}
+.student-performance-page .perf-card .perf-score-basis {
+  color: #94a3b8 !important;
+}
+.student-performance-page .perf-card .perf-eval-score {
+  color: #e8e8e8 !important;
+}
+.student-performance-page .perf-card .perf-eval-score small {
+  color: #94a3b8 !important;
+}
+.student-performance-page .perf-card .perf-eval-score strong {
+  color: #FA9A02 !important;
+}
+
+
 /* MOBILE */
 
 @media (max-width: 800px) {

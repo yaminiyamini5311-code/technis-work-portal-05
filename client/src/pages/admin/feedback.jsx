@@ -6,7 +6,11 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 function fmtDate(value) {
   if (!value) return "—";
-  try { return new Date(value).toLocaleString(); } catch { return String(value); }
+  try { return new Date(value).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }); } catch { return String(value); }
+}
+
+function pluralise(n, word) {
+  return n === 1 ? `${n} ${word}` : `${n} ${word}s`;
 }
 
 export default function Feedback() {
@@ -14,15 +18,14 @@ export default function Feedback() {
   const [studentTasks, setStudentTasks] = useState([]);
   const [entries, setEntries] = useState([]);
   const [form, setForm] = useState({ user_id: "", task_id: "", score: "", feedback: "", strengths: "", improvements: "" });
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [serverError, setServerError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
   const [search, setSearch] = useState("");
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
-  // Headers are built INSIDE each callback (like AdminDashboard.load) so the
-  // token is read fresh on every request while the callbacks keep a stable
-  // identity — otherwise useEffect would re-run on every render.
   const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 
   const loadEntries = useCallback(async () => {
@@ -60,9 +63,9 @@ export default function Feedback() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadEntries(); }, [loadEntries]);
 
-  // Tasks are ALWAYS derived from the selected student's own assignments
-  // (task_assignments), so feedback can never be filed against a task the
-  // student was not assigned.
+  // FIX C-7: Tasks are ALWAYS derived from the selected student's own assignments
+  // (task_assignments via assignee_ids), so feedback can never be filed against
+  // a task the student was not assigned.
   const assignedTasks = useMemo(() => {
     if (!form.user_id) return [];
     const wanted = String(form.user_id);
@@ -74,7 +77,7 @@ export default function Feedback() {
   }, [form.user_id, studentTasks]);
 
   // Group: student -> task -> entries. Legacy records without a stored
-  // task_id are kept under a clearly-labelled "Unassigned task" group.
+  // task_id are kept under a clearly-labelled "General feedback" group.
   const grouped = useMemo(() => {
     const q = search.trim().toLowerCase();
     const byStudent = new Map();
@@ -86,12 +89,12 @@ export default function Feedback() {
       const sKey = e.student_id;
       if (!byStudent.has(sKey)) byStudent.set(sKey, { student: e, tasks: new Map() });
       const student = byStudent.get(sKey);
-      const tKey = e.task_id || "__unassigned__";
+      const tKey = e.task_id || "__general__";
       if (!student.tasks.has(tKey)) {
         student.tasks.set(tKey, {
           task_id: e.task_id,
           task_code: e.task_code,
-          task_title: e.task_title || (e.task_id ? "Removed task" : "Unassigned task"),
+          task_title: e.task_title || (e.task_id ? "Removed task" : "General feedback"),
           task_day: e.task_day,
           task_missing: e.task_missing,
           entries: [],
@@ -102,12 +105,36 @@ export default function Feedback() {
     return [...byStudent.values()].sort((a, b) => String(a.student.student_name || "").localeCompare(String(b.student.student_name || "")));
   }, [entries, search]);
 
+  // FIX C-12: client-side validation
+  const validate = () => {
+    const errs = {};
+    if (!form.user_id) errs.user_id = "Please select a student";
+    if (!form.feedback.trim()) errs.feedback = "Feedback text is required";
+    if (form.score !== "") {
+      const n = Number(form.score);
+      if (!Number.isFinite(n) || n < 0 || n > 100) errs.score = "Score must be between 0 and 100";
+    }
+    return errs;
+  };
+
+  const updateField = (key, value) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    setFieldErrors((e) => ({ ...e, [key]: "" }));
+    setServerError("");
+    setSuccessMsg("");
+  };
+
   const submit = async (ev) => {
     ev.preventDefault();
     if (loading) return;
-    if (!form.user_id) return setMessage("Select a student");
-    if (!form.feedback.trim()) return setMessage("Feedback text is required");
-    setMessage("");
+    const errs = validate();
+    if (Object.keys(errs).length) {
+      setFieldErrors(errs);
+      setServerError("");
+      return;
+    }
+    setServerError("");
+    setSuccessMsg("");
     setLoading(true);
     try {
       const r = await fetch(`${API_URL}/api/admin/feedback`, {
@@ -123,13 +150,16 @@ export default function Feedback() {
         })
       });
       const d = await r.json().catch(() => ({}));
-      setMessage(r.ok ? "Feedback saved." : d.message || "Unable to save feedback");
-      if (r.ok) {
-        setForm({ user_id: "", task_id: "", score: "", feedback: "", strengths: "", improvements: "" });
-        await loadEntries();
+      if (!r.ok) {
+        setServerError(d.message || "Unable to save feedback");
+        return;
       }
+      setSuccessMsg("Feedback saved.");
+      setForm({ user_id: "", task_id: "", score: "", feedback: "", strengths: "", improvements: "" });
+      setFieldErrors({});
+      await loadEntries();
     } catch (err) {
-      setMessage("An error occurred while saving feedback");
+      setServerError("An error occurred while saving feedback");
     } finally {
       setLoading(false);
     }
@@ -143,24 +173,37 @@ export default function Feedback() {
         <p>Give task-specific feedback to a student. Each entry is stored against that student and that task.</p>
       </div>
 
-      {message && (
-        <div className={message.startsWith("Feedback") ? "success-msg" : "error-msg"}>{message}</div>
-      )}
+      {serverError && <div className="error-msg" role="alert">{serverError}</div>}
+      {successMsg && <div className="success-msg" role="status">{successMsg}</div>}
 
-      <form className="panel form-grid-admin" onSubmit={submit} autoComplete="off">
+      <form className="panel form-grid-admin" onSubmit={submit} noValidate>
         <div className="field">
           <label htmlFor="feedback-student" className="field-label">Student <span className="req">*</span></label>
-          <select id="feedback-student" name="feedback-student" value={form.user_id} required autoComplete="off"
-            onChange={(e) => setForm({ ...form, user_id: e.target.value, task_id: "", score: "" })}>
+          <select
+            id="feedback-student"
+            name="feedback-student"
+            value={form.user_id}
+            required
+            autoComplete="off"
+            aria-invalid={!!fieldErrors.user_id}
+            onChange={(e) => updateField("user_id", e.target.value)}
+          >
             <option value="">Select student</option>
             {students.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
+          {fieldErrors.user_id && <small className="field-error" role="alert">{fieldErrors.user_id}</small>}
         </div>
 
         <div className="field">
           <label htmlFor="feedback-task" className="field-label">Task (optional)</label>
-          <select id="feedback-task" name="feedback-task" value={form.task_id} disabled={!form.user_id} autoComplete="off"
-            onChange={(e) => setForm({ ...form, task_id: e.target.value })}>
+          <select
+            id="feedback-task"
+            name="feedback-task"
+            value={form.task_id}
+            disabled={!form.user_id}
+            autoComplete="off"
+            onChange={(e) => updateField("task_id", e.target.value)}
+          >
             <option value="">General feedback (not task-specific)</option>
             {assignedTasks.map((t) => (
               <option key={t.id} value={t.id}>
@@ -177,29 +220,64 @@ export default function Feedback() {
 
         <div className="field">
           <label htmlFor="feedback-score" className="field-label">Score (0–100, optional)</label>
-          <input id="feedback-score" name="feedback-score" type="number" min="0" max="100" placeholder="Score (optional)"
-            value={form.score} onChange={(e) => setForm({ ...form, score: e.target.value })} autoComplete="off" />
+          <input
+            id="feedback-score"
+            name="feedback-score"
+            type="number"
+            min="0"
+            max="100"
+            placeholder="Score (optional)"
+            value={form.score}
+            onChange={(e) => updateField("score", e.target.value)}
+            autoComplete="off"
+            aria-invalid={!!fieldErrors.score}
+          />
+          {fieldErrors.score && <small className="field-error" role="alert">{fieldErrors.score}</small>}
         </div>
 
         <div className="field">
           <label htmlFor="feedback-strengths" className="field-label">Strengths</label>
-          <input id="feedback-strengths" name="feedback-strengths" placeholder="Strengths (comma separated)"
-            value={form.strengths} onChange={(e) => setForm({ ...form, strengths: e.target.value })} autoComplete="off" />
+          <input
+            id="feedback-strengths"
+            name="feedback-strengths"
+            placeholder="Strengths (comma separated)"
+            value={form.strengths}
+            onChange={(e) => updateField("strengths", e.target.value)}
+            autoComplete="off"
+          />
         </div>
 
         <div className="field">
           <label htmlFor="feedback-improvements" className="field-label">Improvement areas</label>
-          <input id="feedback-improvements" name="feedback-improvements" placeholder="Improvement areas (comma separated)"
-            value={form.improvements} onChange={(e) => setForm({ ...form, improvements: e.target.value })} autoComplete="off" />
+          <input
+            id="feedback-improvements"
+            name="feedback-improvements"
+            placeholder="Improvement areas (comma separated)"
+            value={form.improvements}
+            onChange={(e) => updateField("improvements", e.target.value)}
+            autoComplete="off"
+          />
         </div>
 
-        <div className="field">
+        <div className="field field-full">
           <label htmlFor="feedback-text" className="field-label">Feedback <span className="req">*</span></label>
-          <textarea id="feedback-text" name="feedback-text" placeholder="Feedback" required
-            value={form.feedback} onChange={(e) => setForm({ ...form, feedback: e.target.value })} autoComplete="off" />
+          <textarea
+            id="feedback-text"
+            name="feedback-text"
+            placeholder="Feedback"
+            required
+            rows={3}
+            value={form.feedback}
+            onChange={(e) => updateField("feedback", e.target.value)}
+            autoComplete="off"
+            aria-invalid={!!fieldErrors.feedback}
+          />
+          {fieldErrors.feedback && <small className="field-error" role="alert">{fieldErrors.feedback}</small>}
         </div>
 
-        <button className="gold-btn" type="submit" disabled={loading}>{loading ? "Saving…" : "Save Feedback"}</button>
+        <div className="field field-full">
+          <button className="gold-btn" type="submit" disabled={loading}>{loading ? "Saving…" : "Save Feedback"}</button>
+        </div>
       </form>
 
       <div className="fb-toolbar">
@@ -217,55 +295,60 @@ export default function Feedback() {
         <div className="empty-state">
           {entries.length === 0
             ? "No feedback has been recorded yet."
-            : `No feedback matches “${search}”.`}
+            : `No feedback matches "${search}".`}
         </div>
       ) : (
         <div className="fb-students">
-          {grouped.map((g) => (
-            <section className="panel fb-student perf-card" key={g.student.student_id}>
-              <header className="fb-student-head">
-                <div>
-                  <h3>{g.student.student_name || "Unknown student"}</h3>
-                  <small>
-                    ID: {g.student.student_code}
-                    {g.student.student_email ? ` · ${g.student.student_email}` : ""}
-                  </small>
-                </div>
-                <span className="fb-count" title="Feedback entries for this student">
-                  {[...g.tasks.values()].reduce((n, t) => n + t.entries.length, 0)} entries
-                </span>
-              </header>
+          {grouped.map((g) => {
+            const entryCount = [...g.tasks.values()].reduce((n, t) => n + t.entries.length, 0);
+            return (
+              <section className="panel fb-student perf-card" key={g.student.student_id}>
+                <header className="fb-student-head">
+                  <div>
+                    <h3>{g.student.student_name || "Unknown student"}</h3>
+                    <small>
+                      ID: {g.student.student_code}
+                      {g.student.student_email ? ` · ${g.student.student_email}` : ""}
+                    </small>
+                  </div>
+                  {/* FIX C-9: proper pluralisation */}
+                  <span className="fb-count" title="Feedback entries for this student">
+                    {pluralise(entryCount, "entry")}
+                  </span>
+                </header>
 
-              {[...g.tasks.values()]
-                .sort((a, b) => (a.task_day ?? 999) - (b.task_day ?? 999))
-                .map((t) => (
-                  <article className="fb-task" key={t.task_id || "__unassigned__"}>
-                    <h4>
-                      {t.task_day != null ? `Day ${String(t.task_day).padStart(2, "0")} · ` : ""}
-                      {t.task_title}
-                      {t.task_code ? <small> · {t.task_code}</small> : null}
-                      {t.task_missing ? <span className="fb-warn">task record missing</span> : null}
-                    </h4>
-                    {t.entries.length === 0 ? (
-                      <p className="fb-empty">No feedback for this task yet.</p>
-                    ) : t.entries.map((e) => (
-                      <div className="fb-entry" key={e.id}>
-                        <p>{e.feedback}</p>
-                        <div className="fb-meta">
-                          <span>{e.reviewer_name ? `By ${e.reviewer_name}` : "Reviewer unknown"}</span>
-                          <span>{fmtDate(e.created_at)}</span>
-                          {e.updated_at && e.updated_at !== e.created_at && <span>Updated {fmtDate(e.updated_at)}</span>}
-                          {e.score != null && <span className="fb-score">Score {e.score}</span>}
-                          <span className="fb-status">{e.status}</span>
+                {[...g.tasks.values()]
+                  .sort((a, b) => (a.task_day ?? 999) - (b.task_day ?? 999))
+                  .map((t) => (
+                    <article className="fb-task" key={t.task_id || "__general__"}>
+                      <h4>
+                        {t.task_day != null ? `Day ${String(t.task_day).padStart(2, "0")} · ` : ""}
+                        {t.task_title}
+                        {t.task_code ? <small> · {t.task_code}</small> : null}
+                        {t.task_missing ? <span className="fb-warn">task record missing</span> : null}
+                      </h4>
+                      {t.entries.length === 0 ? (
+                        <p className="fb-empty">No feedback for this task yet.</p>
+                      ) : t.entries.map((e) => (
+                        <div className="fb-entry" key={e.id}>
+                          <p>{e.feedback}</p>
+                          <div className="fb-meta">
+                            {/* FIX C-11: show reviewer name or "—" */}
+                            <span>{e.reviewer_name ? `By ${e.reviewer_name}` : "—"}</span>
+                            <span>{fmtDate(e.created_at)}</span>
+                            {e.updated_at && e.updated_at !== e.created_at && <span>Updated {fmtDate(e.updated_at)}</span>}
+                            {e.score != null && <span className="fb-score">Score {e.score}</span>}
+                            <span className="fb-status">{e.status}</span>
+                          </div>
+                          {e.strengths && <div className="fb-line"><b>Strengths:</b> {e.strengths}</div>}
+                          {e.improvements && <div className="fb-line"><b>Improvements:</b> {e.improvements}</div>}
                         </div>
-                        {e.strengths && <div className="fb-line"><b>Strengths:</b> {e.strengths}</div>}
-                        {e.improvements && <div className="fb-line"><b>Improvements:</b> {e.improvements}</div>}
-                      </div>
-                    ))}
-                  </article>
-                ))}
-            </section>
-          ))}
+                      ))}
+                    </article>
+                  ))}
+              </section>
+            );
+          })}
         </div>
       )}
     </div>
