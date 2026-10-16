@@ -78,26 +78,50 @@ export default function StudentDetailsPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [errorStatus, setErrorStatus] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewFile, setPreviewFile] = useState(null);
   const [previewError, setPreviewError] = useState("");
 
   useEffect(() => {
+    // Validate id before making any API call
+    if (!id || id === "null" || id === "undefined") {
+      setError("Invalid student identifier. Please go back and try again.");
+      setErrorStatus(400);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       try {
         setLoading(true);
         setError("");
+        setErrorStatus(null);
         const res = await fetch(`${API_URL}/api/admin/students/${id}/details`, { headers: auth() });
         const json = await res.json();
         if (!cancelled && res.ok) {
           setData(json);
           setError("");
+          setErrorStatus(null);
         } else if (!cancelled) {
-          setError(json.message || "Unable to load student details");
+          // Distinguish error types
+          if (res.status === 400) {
+            setError("Invalid student identifier.");
+          } else if (res.status === 401 || res.status === 403) {
+            setError("You don't have permission to view this student.");
+          } else if (res.status === 404) {
+            setError("Student not found.");
+          } else {
+            setError(json.message || "Unable to load student details. Please try again.");
+          }
+          setErrorStatus(res.status);
         }
       } catch (e) {
-        if (!cancelled) setError("Unable to load student details. Check your connection.");
+        if (!cancelled) {
+          setError("Unable to load student details. Check your connection.");
+          setErrorStatus(500);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -131,7 +155,12 @@ export default function StudentDetailsPage() {
         <div className="portal-error">
           <h2>Unable to load student details</h2>
           <p>{error}</p>
-          <button onClick={() => navigate("/admin/submissions")} className="back-btn">← Back to Student Submissions</button>
+          <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+            {errorStatus >= 500 && (
+              <button onClick={() => window.location.reload()} className="back-btn">Retry</button>
+            )}
+            <button onClick={() => navigate("/admin/submissions")} className="back-btn">← Back to Student Submissions</button>
+          </div>
         </div>
       </div>
     );

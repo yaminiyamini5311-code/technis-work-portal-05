@@ -68,6 +68,15 @@ function canPreview(mime) {
   );
 }
 
+/**
+ * Return the DB ObjectId for routing/API calls.
+ * The TECHINS display ID (student_id) is for display only and may be null.
+ * The DB ObjectId (student_db_id) is the stable identifier for lookups.
+ */
+function getStudentRouteId(submission) {
+  return submission?.student_db_id || submission?.student_id || null;
+}
+
 function DetailModal({ item, onClose, onReviewed, inline = false }) {
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState("");
@@ -402,7 +411,12 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
   }, [items, searchQuery, filterStatus, filterBatch, sortBy]);
 
   const handleViewDetails = (submission) => {
-    navigate(`/admin/students/${submission.student_id}`);
+    const routeId = getStudentRouteId(submission);
+    if (!routeId) {
+      setError("This submission has no linked student record.");
+      return;
+    }
+    navigate(`/admin/students/${routeId}`);
   };
 
   const handleCloseDetails = () => {
@@ -422,7 +436,14 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
     setError("");
     setMsg("");
     try {
-      const res = await fetch(`${API_URL}/api/admin/students/${deleteTarget.student_id}`, {
+      const routeId = getStudentRouteId(deleteTarget);
+      if (!routeId) {
+        setError("This submission has no linked student record.");
+        setDeleteTarget(null);
+        setDeleting(false);
+        return;
+      }
+      const res = await fetch(`${API_URL}/api/admin/students/${routeId}`, {
         method: "DELETE",
         headers: auth()
       });
@@ -452,7 +473,14 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
     setError("");
     setMsg("");
     try {
-      const res = await fetch(`${API_URL}/api/admin/students/${requirementTarget.student_id}/requirements`, {
+      const routeId = getStudentRouteId(requirementTarget);
+      if (!routeId) {
+        setRequirementError("This submission has no linked student record.");
+        setRequirementTarget(null);
+        setSubmittingRequirement(false);
+        return;
+      }
+      const res = await fetch(`${API_URL}/api/admin/students/${routeId}/requirements`, {
         method: "POST",
         headers: { ...auth(), "Content-Type": "application/json" },
         body: JSON.stringify({ description: requirementDesc })
