@@ -26,6 +26,7 @@ import AuditLogs from "./pages/admin/AuditLogs";
 import AdminProfile from "./pages/admin/Profile";
 import AdminSubmissions from "./pages/admin/Submissions";
 import StudentDetailsPage from "./pages/admin/StudentDetailsPage";
+import TaskReview from "./pages/admin/TaskReview";
 import ManagerSubmissions from "./pages/manager/Submissions";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -121,6 +122,11 @@ export default function App() {
           <Route path="/manager/tasks" element={<AdminTasks />} />
           <Route path="/manager/missions" element={<AdminMissions />} />
           <Route path="/manager/submissions" element={<ManagerSubmissions />} />
+          {/* Dedicated Task Manager review route. It MUST be declared before the
+              catch-all: an unregistered review URL falls through to path="*",
+              which redirects the reviewer to /login — the "Review button takes
+              me to the home page" bug. See pages/admin/TaskReview.jsx. */}
+          <Route path="/manager/tasks/:taskId/review" element={<TaskReview />} />
           <Route path="/manager/daily-activities" element={<DailyActivities />} />
           <Route path="/manager/performance" element={<AdminPerformance />} />
           <Route path="/manager/feedback" element={<Feedback />} />
@@ -138,6 +144,8 @@ export default function App() {
           <Route path="/admin/audit" element={<AuditLogs />} />
           <Route path="/admin/profile" element={<AdminProfile />} />
           <Route path="/admin/students/:id" element={<StudentDetailsPage />} />
+          {/* Dedicated Task Manager review route — see the manager block above. */}
+          <Route path="/admin/tasks/:taskId/review" element={<TaskReview />} />
         </Route>
 
         {/* Redirect old CEO routes to Admin */}
