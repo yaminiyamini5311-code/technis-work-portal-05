@@ -7,11 +7,62 @@ const path = require("path");
 const { sendTaskAssignmentEmail } = require("../utils/email");
 const { writeAudit } = require("../utils/audit_mongo");
 const { ALLOWED_DOMAINS, ALLOWED_PROGRAMS } = require("../config");
+const {
+  TASK_STATUS,
+  STATUS_LABELS,
+  normalizeStatus,
+  normalizeSubmissionStatus,
+  resubmissionWindowHours,
+} = require("../config/taskStatus");
+const {
+  buildTaskStudentState,
+  expireStaleRevisionWindows,
+  legacyDomainFor,
+  loadTaskAssignees,
+  resolveDomain,
+  resolveProgram,
+  resubmissionEligibility,
+  validateRevisionFeedback,
+  toId: sidToId,
+} = require("../utils/submissionStatus");
+const { notifyOnce, notifyAdmins, revisionMessage } = require("../utils/notifications");
+const { formatISTDeadlineLabel } = require("../utils/time");
 const { createCeoNotification, createUserNotification } = require("../utils/ceoNotification");
 const { normalizeRegistrationStatus } = require("../utils/userAccount");
 const { uploadFile, downloadFile, migrateFileToGridFS } = require("../utils/fileStorage");
 
 const router = express.Router();
+
+/** Roles allowed to review submissions, request revisions, approve and remind. */
+const REVIEW_ROLES = ["admin", "ceo", "manager"];
+const isReviewerRole = (role) => REVIEW_ROLES.includes(String(role || "").toLowerCase());
+
+/**
+ * Fields a student may NEVER set through any request body.
+ * The client's form values are stripped before they reach the database so a
+ * crafted request cannot approve itself, invent feedback or move a deadline.
+ */
+const STUDENT_FORBIDDEN_FIELDS = [
+  "status", "workflow_status", "assignment_status",
+  "review_comments", "feedback", "reviewed_by", "reviewer_id", "reviewed_at",
+  "revision_deadline", "revision_requested_at", "revision_cycle",
+  "resubmission_deadline", "score", "earned_score", "max_marks",
+];
+
+/** Remove the above keys from any student-supplied payload. */
+function stripStudentControlledFields(body) {
+  const clean = { ...(body || {}) };
+  for (const key of STUDENT_FORBIDDEN_FIELDS) delete clean[key];
+  return clean;
+}
+
+/** Consistent envelope so every client can rely on the same three fields. */
+function ok(res, data, extra = {}) {
+  return res.json({ success: true, data, error: null, ...extra });
+}
+function fail(res, status, code, message, extra = {}) {
+  return res.status(status).json({ success: false, data: null, error: { code, message }, message, ...extra });
+}
 // Per-file limit is 4 MB: Vercel serverless rejects request bodies above
 // ~4.5 MB at the platform level (opaque 413 before the app sees it), so a
 // higher app-level limit could never actually be used in production.
@@ -78,20 +129,59 @@ async function notify(db, userId, type, title, message, taskId = null) {
   });
 }
 
-async function transition(db, task, toStatus, actorId, comment = null) {
-  const from = task.workflow_status || "Assigned";
-  if (from === toStatus) return;
+/**
+ * Task-level mirror of the per-student state.
+ *
+ * It used to be a single value flipped by `transition()` the moment ANY student
+ * submitted, which is why a task with 38 assignees showed one "Submitted" chip
+ * for everybody. It is now derived: "Submitted" while nobody has handed work
+ * in is impossible, and the real per-student picture lives in status_counts.
+ * Every existing consumer of tasks.status / tasks.workflow_status keeps
+ * working because the legacy values are still written.
+ */
+async function syncTaskWorkflowFromStudents(db, task) {
+  const { counts } = await buildTaskStudentState(db, task);
   const now = new Date().toISOString();
+  let next = "Assigned";
+  if (counts.approved === counts.assigned && counts.assigned > 0) next = "Approved";
+  else if (counts.submitted + counts.revision_required + counts.resubmission_expired > 0) next = counts.approved > 0 ? "Under Review" : "Submitted";
+  else if (counts.in_progress > 0) next = "In Progress";
+  if (task.workflow_status === next) return;
   await db.collection("tasks").updateOne(
     { _id: toId(String(task._id)) },
-    { $set: { workflow_status: toStatus, status: legacyStatus(toStatus), completed_at: toStatus === "Approved" ? now : null, updated_at: now } }
+    { $set: { workflow_status: next, status: legacyStatus(next), updated_at: now } }
   );
-  await db.collection("task_status_history").insertOne({
-    task_id: String(task._id), from_status: from, to_status: toStatus, changed_by: String(actorId), comment, created_at: now
-  });
-  await writeAudit(db, { actorId, action: "task_status_changed", entityType: "task", entityId: String(task._id), previousValue: { status: from }, newValue: { status: toStatus }, metadata: { comment } });
+  task.workflow_status = next;
+  task.status = legacyStatus(next);
 }
 
+function transition(db, task, toStatus, actorId, comment = null) {
+  const from = task.workflow_status || "Assigned";
+  if (from === toStatus) return Promise.resolve();
+  const now = new Date().toISOString();
+  return db.collection("tasks").updateOne(
+    { _id: toId(String(task._id)) },
+    { $set: { workflow_status: toStatus, status: legacyStatus(toStatus), completed_at: toStatus === "Approved" ? now : null, updated_at: now } }
+  ).then(() => db.collection("task_status_history").insertOne({
+    task_id: String(task._id), from_status: from, to_status: toStatus, changed_by: String(actorId), comment, created_at: now
+  })).then(() => writeAudit(db, { actorId, action: "task_status_changed", entityType: "task", entityId: String(task._id), previousValue: { status: from }, newValue: { status: toStatus }, metadata: { comment } })).catch((e) => {
+    console.error("transition():", e.message);
+  });
+}
+
+/**
+ * Row shape for the Live Tasks table.
+ *
+ * Fixes the three counting/mapping defects at the source:
+ *  - assignee_count is the union of the assignment snapshot and the live batch
+ *    membership, so tasks of the same batch stop reporting different numbers.
+ *  - submission_count counts DISTINCT students, not versions.
+ *  - domain/program are resolved from real data: the legacy `program` pseudo
+ *    domain maps to the owning domain and the program comes from the task or
+ *    its assignees, instead of always rendering "—" .
+ *  - status_counts is the per-student aggregate, so the Workflow column can
+ *    show Submitted / Pending / In Progress / Revision / Approved together.
+ */
 async function buildTaskResponse(db, tasks) {
   return Promise.all(tasks.map(async t => {
     const assigned = t.assigned_to
@@ -99,30 +189,41 @@ async function buildTaskResponse(db, tasks) {
       : null;
     const creator = await db.collection("users").findOne({ _id: toId(t.assigned_by) }, { projection: { name: 1 } });
     const fileCount = await db.collection("task_files").countDocuments({ task_id: String(t._id) });
-    const subCount = await db.collection("submissions").countDocuments({ task_id: String(t._id) });
     const lastSub = await db.collection("submissions").find({ task_id: String(t._id) }, { projection: { version: 1 } }).sort({ version: -1 }).limit(1).toArray();
-    // Per-student assignment summary for this task
-    const assignments = await db.collection("task_assignments")
-      .find({ task_id: String(t._id) }, { projection: { student_id: 1, status: 1, progress: 1 } })
-      .toArray();
-    const assigneeIds = [...new Set(assignments.map(a => a.student_id))];
+
+    const assignees = await loadTaskAssignees(db, t);
+    const assigneeIds = assignees.map(a => a.student_id);
+
     let batchName = null;
     if (t.batch_id) {
       const batch = await db.collection("batches").findOne({ _id: toId(t.batch_id) }, { projection: { name: 1 } });
       batchName = batch?.name || null;
     }
+
+    const studentDocs = assignees.map(a => a.student).filter(Boolean);
+    const program = await resolveProgram(db, t, studentDocs.length ? studentDocs : assigned ? [assigned] : []);
+    const { domain, legacy_domain, effective_domain } = resolveDomain(t);
+
+    const { counts } = await buildTaskStudentState(db, t);
+
     return {
       ...t,
       id: String(t._id),
-      student_name: assigned?.name,
+      student_name: t.target_type === "batch" ? batchName : (assigned?.name || null),
       student_email: assigned?.email,
       assigned_by_name: creator?.name,
       file_count: fileCount,
-      submission_count: subCount,
+      // DISTINCT students who handed work in — not the number of versions.
+      submission_count: counts.submitters,
       latest_version: lastSub[0]?.version || null,
       assignee_count: assigneeIds.length,
       assignee_ids: assigneeIds,
       batch_name: batchName,
+      program,
+      domain,
+      legacy_domain,
+      effective_domain,
+      status_counts: counts,
     };
   }));
 }
@@ -440,15 +541,23 @@ router.get("/submissions/export", authenticateToken, authorizeRoles("admin", "ma
   }
 });
 
-/* ─── DOWNLOAD SUBMISSION FILE ──────────────────────────────────────────
- * Streams file from MongoDB GridFS or migrates from legacy filesystem.
- * Supports both new GridFS files and old filesystem files for backward compatibility.
+/* ─── DOWNLOAD / PREVIEW SUBMISSION FILE ─────────────────────────────────
+ * Streams file from Google Drive, MongoDB GridFS or the legacy filesystem.
  *
- * Authorization: reviewers (admin/manager/ceo) may download any submission
- * file; a student may download files belonging to THEIR OWN submissions
- * (submission history access). The owning student is matched by id — never
- * by a client-supplied field — and pending/rejected students are already
- * blocked by requireApprovedStudent on this router.
+ * One authenticated route serves both needs; nothing is exposed publicly:
+ *   .../download                 → Content-Disposition: attachment
+ *   .../download?disposition=inline
+ *   .../download?disposition=inline&download=0
+ *                                  → Content-Disposition: inline (preview)
+ * The client fetches the bytes with the Authorization header and renders them
+ * from a blob URL, so no raw storage path is ever exposed.
+ *
+ * Authorization: reviewers (admin/manager/ceo) may read any submission file; a
+ * student may read files belonging ONLY to their OWN submissions. Ownership is
+ * matched from the stored submission row — never from a client-supplied field
+ * — so student A can never reach student B's file even by guessing a fileId
+ * (IDOR). Pending/rejected students are already blocked by
+ * requireApprovedStudent on this router.
  */
 router.get("/files/:fileId/download", authenticateToken, async (req, res) => {
   try {
@@ -459,21 +568,39 @@ router.get("/files/:fileId/download", authenticateToken, async (req, res) => {
     const sub = await db.collection("submissions").findOne({ _id: toId(file.submission_id) });
     if (!sub) return res.status(404).json({ success: false, message: "Submission not found" });
 
-    const isReviewer = ["admin", "manager", "ceo"].includes(req.user.role);
-    const isOwner = req.user.role === "student" && String(sub.student_id) === String(req.user.id);
+    const isReviewer = isReviewerRole(req.user.role);
+    const isOwner = String(sub.student_id) === String(req.user.id);
     if (!isReviewer && !isOwner) {
       return res.status(403).json({ success: false, message: "You do not have permission to access this file" });
     }
+
+    // `inline` only whitelists types a browser can safely render. Everything
+    // else stays an attachment, so an uploaded .docx/.zip is never rendered
+    // in the app's origin (defence in depth against stored XSS via SVG/HTML).
+    const wantsInline = String(req.query.disposition || "") === "inline";
+    const mime = file.mime_type || "application/octet-stream";
+    const INLINE_SAFE = /^image\/(png|jpeg|gif|webp)$/.test(mime)
+      || mime === "application/pdf"
+      || /^text\/plain$/.test(mime);
+    const disposition = (wantsInline && INLINE_SAFE) ? "inline" : "attachment";
+    const filename = (file.original_name || "submission-file").replace(/[\r\n"\\]/g, "_");
+    const safeHeaders = (contentType) => {
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", `${disposition}; filename="${encodeURIComponent(filename)}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+      res.setHeader("Cache-Control", "private, no-store");
+      if (file.size) res.setHeader("Content-Length", file.size);
+    };
     
     // Google Drive storage (preferred when available)
     if (file.drive_file_id) {
       try {
         const { downloadFromDrive } = require("../utils/driveStorage");
         const { stream, meta } = await downloadFromDrive(file.drive_file_id);
-        res.setHeader("Content-Type", file.mime_type || meta.mimeType || "application/octet-stream");
-        res.setHeader("Content-Disposition", 'attachment; filename="' + encodeURIComponent(file.original_name || "submission-file") + '"');
+        safeHeaders(file.mime_type || meta.mimeType || "application/octet-stream");
         stream.pipe(res);
-        await writeAudit(db, { actorId: req.user.id, action: "submission_file_downloaded", entityType: "submission_file", entityId: String(file._id), newValue: { submission_id: String(sub._id), storage_type: "drive" } });
+        await writeAudit(db, { actorId: req.user.id, action: "submission_file_downloaded", entityType: "submission_file", entityId: String(file._id), newValue: { submission_id: String(sub._id), storage_type: "drive", disposition } });
         return;
       } catch (driveError) {
         console.error("[Download] Drive error:", driveError.message);
@@ -485,10 +612,7 @@ router.get("/files/:fileId/download", authenticateToken, async (req, res) => {
     if (file.gridfs_id) {
       try {
         const { stream, file: gridfsFile } = await downloadFile(db, file.gridfs_id);
-        
-        res.setHeader("Content-Type", file.mime_type || "application/octet-stream");
-        res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(file.original_name || "submission-file")}"`);
-        
+        safeHeaders(file.mime_type || "application/octet-stream");
         stream.pipe(res);
         
         await writeAudit(db, { 
@@ -496,7 +620,7 @@ router.get("/files/:fileId/download", authenticateToken, async (req, res) => {
           action: "submission_file_downloaded", 
           entityType: "submission_file", 
           entityId: String(file._id), 
-          newValue: { submission_id: String(sub._id), storage_type: "gridfs" } 
+          newValue: { submission_id: String(sub._id), storage_type: "gridfs", disposition } 
         });
         
         return;
@@ -531,10 +655,11 @@ router.get("/files/:fileId/download", authenticateToken, async (req, res) => {
           action: "submission_file_downloaded", 
           entityType: "submission_file", 
           entityId: String(file._id), 
-          newValue: { submission_id: String(sub._id), storage_type: "filesystem" } 
+          newValue: { submission_id: String(sub._id), storage_type: "filesystem", disposition } 
         });
         
-        return res.download(file.storage_path, file.original_name || "submission-file");
+        safeHeaders(file.mime_type || "application/octet-stream");
+        return fs.createReadStream(file.storage_path).pipe(res);
       }
     }
     
@@ -554,6 +679,9 @@ router.get("/files/:fileId/download", authenticateToken, async (req, res) => {
 router.get("/", authenticateToken, async (req, res) => {
   try {
     const db = req.db;
+    // Close any revision window that has passed before the counts are built,
+    // so the Live Tasks table never shows a stale "Revision Required".
+    if (isReviewerRole(req.user.role)) await runExpirySweep(db);
     let tasks;
     if (["student", "member"].includes(req.user.role)) {
       // Students must have approved registration
@@ -779,12 +907,18 @@ router.post("/", authenticateToken, authorizeRoles("admin", "ceo", "manager"), a
     const taskCode = await nextTaskCode(db);
     const now = new Date().toISOString();
 
+    // Program is stored on the task so the Program column shows a real value
+    // instead of "—". An explicit program wins; otherwise it is derived from
+    // the students this task is being assigned to.
+    const derivedProgram = await resolveProgram(db, { program }, targetStudents);
+    const storedProgram = program || derivedProgram || null;
+
     // One shared Task document. Per-student state lives in task_assignments.
     const result = await db.collection("tasks").insertOne({
       task_code: taskCode,
       title,
       category: String(b.category || "").trim() || null,
-      program: program || null,
+      program: storedProgram,
       group: group || null,
       department: null,
       domain,
@@ -916,6 +1050,13 @@ router.put("/:id", authenticateToken, authorizeRoles("admin", "ceo", "manager"),
       }
       update.domain = domain;
     }
+    if ("program" in b) {
+      const value = String(b.program || "").trim();
+      if (value && !ALLOWED_PROGRAMS.includes(value.toLowerCase())) {
+        return res.status(400).json({ success: false, message: "Invalid program. Choose from: " + ALLOWED_PROGRAMS.join(", ") });
+      }
+      update.program = value || null;
+    }
     if ("day_number" in b) {
       const raw = b.day_number;
       if (raw === undefined || raw === null || raw === "") {
@@ -1009,6 +1150,737 @@ router.put("/:id", authenticateToken, authorizeRoles("admin", "ceo", "manager"),
     res.status(500).json({ success: false, message: "Unable to update task" });
   }
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TASK MANAGER — review interface backend
+   ═══════════════════════════════════════════════════════════════════════════
+   One aggregation (utils/submissionStatus.buildTaskStudentState) feeds the
+   header, the four tabs and every count, so the numbers can never disagree
+   between the tab badges, the tables and the Live Tasks table.
+
+   All routes here are reviewer-only (admin / ceo / manager) and additionally
+   scoped: a manager may only work on tasks they created, exactly like the
+   legacy POST /review route already did.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Cooldown between two reminders for the same student + task. */
+function reminderCooldownMs() {
+  const raw = Number(process.env.REMINDER_COOLDOWN_HOURS);
+  const hours = Number.isFinite(raw) && raw > 0 ? raw : 12;
+  return hours * 3600 * 1000;
+}
+
+/**
+ * Load the task for a reviewer request, enforcing:
+ *  - a valid ObjectId (400, not a confusing 404)
+ *  - existence (404)
+ *  - manager ownership (403)
+ * Returns { task } or null after having already written the response.
+ */
+async function loadReviewTask(req, res) {
+  let taskId;
+  try {
+    taskId = new ObjectId(String(req.params.id || "").trim());
+  } catch {
+    fail(res, 400, "INVALID_TASK_ID", "This review link is not valid. Open the task from the task list and try again.");
+    return null;
+  }
+  const task = await req.db.collection("tasks").findOne({ _id: taskId });
+  if (!task) {
+    fail(res, 404, "TASK_NOT_FOUND", "This task no longer exists. It may have been removed.");
+    return null;
+  }
+  if (req.user.role === "manager" && String(task.assigned_by) !== String(req.user.id)) {
+    fail(res, 403, "FORBIDDEN", "You can only review tasks that were assigned by you.");
+    return null;
+  }
+  return task;
+}
+
+/** Submission files with an authenticated preview/download path. */
+async function filesForSubmission(db, submissionId) {
+  const files = await db.collection("submission_files")
+    .find({ submission_id: String(submissionId) })
+    .sort({ created_at: 1 })
+    .toArray();
+  return files.map(f => ({
+    id: String(f._id),
+    name: f.original_name,
+    size: f.size ?? null,
+    mime: f.mime_type || "application/octet-stream",
+    created_at: f.created_at || null,
+    // Never a raw Drive/GridFS path: always an authenticated endpoint.
+    download_url: `/api/tasks/files/${String(f._id)}/download`,
+    preview_url: `/api/tasks/files/${String(f._id)}/download?disposition=inline`,
+  }));
+}
+
+/** Every version a student has submitted for a task, newest first. */
+async function versionsForStudent(db, taskId, studentId) {
+  const rows = await db.collection("submissions")
+    .find({ task_id: String(taskId), student_id: String(studentId) })
+    .sort({ version: -1 })
+    .toArray();
+  const reviewerIds = rows.map(r => r.reviewer_id).filter(Boolean);
+  const reviewers = reviewerIds.length
+    ? await db.collection("users").find({ _id: { $in: reviewerIds.map(toId) } }, { projection: { name: 1 } }).toArray()
+    : [];
+  const nameById = new Map(reviewers.map(r => [String(r._id), r.name]));
+  return Promise.all(rows.map(async (s) => ({
+    id: String(s._id),
+    submission_id: String(s._id),
+    submission_code: s.submission_code || null,
+    version: s.version || 1,
+    status: normalizeSubmissionStatus(s.status),
+    status_label: s.status || STATUS_LABELS[normalizeSubmissionStatus(s.status)],
+    submitted_at: s.submitted_at || null,
+    comment: s.comment || null,
+    reviewed_at: s.reviewed_at || null,
+    review_comments: s.review_comments || null,
+    reviewer_id: s.reviewer_id || null,
+    reviewer_name: s.reviewer_id ? (nameById.get(String(s.reviewer_id)) || null) : null,
+    score: s.score ?? null,
+    max_marks: s.max_marks ?? null,
+    window_expired_at: s.window_expired_at || null,
+    files: await filesForSubmission(db, s._id),
+  })));
+}
+
+/** Normalize ?page / ?limit / ?search for the tabbed lists. */
+function readListQuery(req) {
+  const page = Math.max(Number.parseInt(req.query.page, 10) || 1, 1);
+  const limitRaw = Number.parseInt(req.query.limit, 10) || 25;
+  const limit = Math.min(Math.max(limitRaw, 1), 200);
+  const search = String(req.query.search || "").trim().toLowerCase();
+  return { page, limit, search };
+}
+
+function filterAndPage(rows, { search, page, limit }) {
+  let filtered = rows;
+  if (search) {
+    filtered = rows.filter(r => [r.student_name, r.student_email, r.student_code, r.batch_name]
+      .filter(Boolean)
+      .some(v => String(v).toLowerCase().includes(search)));
+  }
+  const total = filtered.length;
+  const start = (page - 1) * limit;
+  return {
+    total,
+    page,
+    limit,
+    pages: Math.max(1, Math.ceil(total / limit)),
+    rows: filtered.slice(start, start + limit),
+  };
+}
+
+/**
+ * GET /api/tasks/:id/review
+ * The single aggregation endpoint: header, Task Details payload and every
+ * status count the four tab badges need. One request, no client-side maths,
+ * so the tabs and the Live Tasks table always agree.
+ */
+router.get("/:id/review", authenticateToken, authorizeRoles("admin", "ceo", "manager"), async (req, res) => {
+  try {
+    const db = req.db;
+    const task = await loadReviewTask(req, res);
+    if (!task) return;
+
+    // Lazy expiry first, so a window that closed while nobody was looking is
+    // already reflected in the numbers this request returns.
+    await runExpirySweep(db);
+
+    const { counts, rows, assigneeCount } = await buildTaskStudentState(db, task);
+    const assignees = await loadTaskAssignees(db, task);
+    const { domain, legacy_domain, effective_domain } = resolveDomain(task);
+    const program = await resolveProgram(db, task, assignees.map(a => a.student).filter(Boolean));
+
+    const creator = task.assigned_by
+      ? await db.collection("users").findOne({ _id: toId(task.assigned_by) }, { projection: { name: 1, email: 1 } })
+      : null;
+
+    const details = {
+      id: String(task._id),
+      task_code: task.task_code || null,
+      title: task.title || "",
+      description: task.description || "",
+      domain: effective_domain,
+      stored_domain: domain,
+      legacy_domain,
+      program,
+      target_type: task.target_type || "student",
+      batch_id: task.batch_id || null,
+      batch_name: task.target_type === "batch"
+        ? ((await db.collection("batches").findOne({ _id: toId(task.batch_id) }, { projection: { name: 1 } }))?.name || null)
+        : (rows[0]?.batch_name || null),
+      assigned_students: task.target_type === "batch"
+        ? assignees.map(a => ({ id: a.student_id, name: a.student_name, code: a.student_code }))
+        : rows.map(r => ({ id: r.student_id, name: r.student_name, code: r.student_code })),
+      total_assignees: assigneeCount,
+      priority: task.priority || "medium",
+      task_type: task.task_type || null,
+      start_date: task.start_date || null,
+      start_time: task.start_time || null,
+      start_at: task.start_at || null,
+      due_date: task.due_date || null,
+      due_time: task.due_time || null,
+      due_at: task.due_at || null,
+      how_to_do: task.how_to_do || null,
+      expected_output: task.expected_output || "",
+      submission_requirements: task.submission_requirements || "",
+      day_number: task.day_number ?? null,
+      workflow_status: task.workflow_status || null,
+      assigned_by_name: creator?.name || null,
+      assigned_by_email: creator?.email || null,
+      created_at: task.created_at || null,
+      updated_at: task.updated_at || null,
+    };
+
+    ok(res, {
+      task: details,
+      counts,
+      status_labels: STATUS_LABELS,
+      status_enum: TASK_STATUS,
+      resubmission_window_hours: resubmissionWindowHours(),
+      generated_at: new Date().toISOString(),
+    });
+  } catch (e) {
+    console.error("GET TASK REVIEW:", e);
+    fail(res, 500, "REVIEW_LOAD_FAILED", "Unable to load the review data. Please retry.");
+  }
+});
+
+/** Shared implementation for the three tabbed lists. */
+async function reviewListHandler(req, res, bucket) {
+  const db = req.db;
+  const task = await loadReviewTask(req, res);
+  if (!task) return;
+  await runExpirySweep(db);
+
+  const { rows } = await buildTaskStudentState(db, task);
+  const scoped = rows.filter(r => r.status === bucket);
+  const page = filterAndPage(scoped, readListQuery(req));
+
+  const withFiles = await Promise.all(page.rows.map(async r => ({
+    ...r,
+    status_label: STATUS_LABELS[r.status],
+    // The task deadline travels with every row so the Pending / In Progress
+    // tables can render a per-student "time remaining" without a second call.
+    task_due_at: task.due_at || null,
+    task_due_date: task.due_date || null,
+    task_title: task.title || "",
+    files: r.submission_id ? await filesForSubmission(db, r.submission_id) : [],
+  })));
+
+  ok(res, {
+    task: { id: String(task._id), task_code: task.task_code || null, title: task.title || "", due_at: task.due_at || null },
+    status: bucket,
+    total: page.total,
+    page: page.page,
+    limit: page.limit,
+    pages: page.pages,
+    students: withFiles,
+  });
+}
+
+/** GET /api/tasks/:id/review/submitted — students who handed work in. */
+router.get("/:id/review/submitted", authenticateToken, authorizeRoles("admin", "ceo", "manager"), (req, res) =>
+  reviewListHandler(req, res, "submitted").catch((e) => {
+    console.error("REVIEW SUBMITTED:", e);
+    fail(res, 500, "REVIEW_LIST_FAILED", "Unable to load submitted students. Please retry.");
+  }));
+
+/** GET /api/tasks/:id/review/pending — assigned, nothing started. */
+router.get("/:id/review/pending", authenticateToken, authorizeRoles("admin", "ceo", "manager"), (req, res) =>
+  reviewListHandler(req, res, "pending").catch((e) => {
+    console.error("REVIEW PENDING:", e);
+    fail(res, 500, "REVIEW_LIST_FAILED", "Unable to load pending students. Please retry.");
+  }));
+
+/** GET /api/tasks/:id/review/in-progress — explicitly started, not submitted. */
+router.get("/:id/review/in-progress", authenticateToken, authorizeRoles("admin", "ceo", "manager"), (req, res) =>
+  reviewListHandler(req, res, "in_progress").catch((e) => {
+    console.error("REVIEW IN PROGRESS:", e);
+    fail(res, 500, "REVIEW_LIST_FAILED", "Unable to load in-progress students. Please retry.");
+  }));
+
+/**
+ * GET /api/tasks/:id/review/assignments/:studentId
+ * Everything about ONE student's work on this task: profile, every version
+ * with its files and timestamps, the open revision cycle and all past review
+ * feedback. Scoped by taskId AND studentId so the View Submission button can
+ * never open a different student's record.
+ */
+router.get("/:id/review/assignments/:studentId", authenticateToken, authorizeRoles("admin", "ceo", "manager"), async (req, res) => {
+  try {
+    const db = req.db;
+    const task = await loadReviewTask(req, res);
+    if (!task) return;
+    await runExpirySweep(db);
+
+    const studentId = String(req.params.studentId || "").trim();
+    if (!studentId || studentId === "null" || studentId === "undefined") {
+      return fail(res, 400, "INVALID_STUDENT_ID", "No student was specified for this submission.");
+    }
+
+    const { rows } = await buildTaskStudentState(db, task);
+    const row = rows.find(r => String(r.student_id) === studentId);
+    if (!row) {
+      return fail(res, 404, "ASSIGNMENT_NOT_FOUND", "This student is not assigned to this task.");
+    }
+
+    const assignment = await db.collection("task_assignments")
+      .findOne({ task_id: String(task._id), student_id: studentId });
+    const versions = await versionsForStudent(db, task._id, studentId);
+    const { effective_domain, legacy_domain } = resolveDomain(task);
+
+    ok(res, {
+      task: {
+        id: String(task._id),
+        task_code: task.task_code || null,
+        title: task.title || "",
+        description: task.description || "",
+        domain: effective_domain,
+        legacy_domain,
+        due_at: task.due_at || null,
+        due_date: task.due_date || null,
+      },
+      student: {
+        student_id: studentId,
+        student_db_id: studentId,
+        student_name: row.student_name,
+        student_email: row.student_email,
+        student_code: row.student_code,
+        student_department: row.student_department,
+        student_program: row.student_program,
+        batch_name: row.batch_name,
+      },
+      assignment: {
+        id: assignment ? String(assignment._id) : null,
+        status: row.status,
+        status_label: STATUS_LABELS[row.status],
+        overdue: row.overdue,
+        assigned_at: row.assigned_at,
+        submission_version: row.submission_version,
+        submission_comment: row.submission_comment,
+        submitted_at: row.submitted_at,
+        revision_cycle: row.revision_cycle,
+        revision_requested_at: row.revision_requested_at,
+        revision_deadline: row.revision_deadline,
+        revision_status: assignment?.revision_status || null,
+        revision_history: Array.isArray(assignment?.revision_history) ? assignment.revision_history : [],
+        resubmission_available: row.resubmission_available,
+        resubmission_expires_in_ms: row.resubmission_expires_in_ms,
+      },
+      versions,
+      latest: versions[0] || null,
+    });
+  } catch (e) {
+    console.error("GET REVIEW ASSIGNMENT:", e);
+    fail(res, 500, "REVIEW_DETAIL_FAILED", "Unable to load this submission. Please retry.");
+  }
+});
+
+/**
+ * POST /api/tasks/:id/review/approve
+ * Body: { studentId } or { submissionId }
+ *
+ * Affects ONLY that student's submission — never the whole task — and rejects
+ * a duplicate approval with 409 instead of silently re-notifying.
+ */
+router.post("/:id/review/approve", authenticateToken, authorizeRoles("admin", "ceo", "manager"), async (req, res) => {
+  try {
+    const db = req.db;
+    const task = await loadReviewTask(req, res);
+    if (!task) return;
+    await runExpirySweep(db);
+
+    const { studentId, submissionId } = await resolveReviewTarget(db, task, req.body || {}, res);
+    if (!studentId) return;
+
+    const latest = await db.collection("submissions")
+      .find({ task_id: String(task._id), student_id: studentId })
+      .sort({ version: -1 })
+      .limit(1)
+      .toArray();
+    const submission = submissionId ? latest.find(s => String(s._id) === String(submissionId)) : latest[0];
+    if (!submission) {
+      return fail(res, 404, "SUBMISSION_NOT_FOUND", "This student has not submitted anything to review.");
+    }
+
+    const current = normalizeSubmissionStatus(submission.status);
+    if (current === "approved") {
+      return fail(res, 409, "ALREADY_APPROVED", "This submission has already been approved.");
+    }
+    // Only a handed-in version may be approved. A pending student, an
+    // in-progress student or an expired revision window are all illegal
+    // transitions and must not be silently accepted.
+    if (current !== "submitted") {
+      return fail(res, 409, "ILLEGAL_TRANSITION",
+        `This submission is "${submission.status}" and cannot be approved. Only a submitted version can be approved.`);
+    }
+
+    const now = new Date().toISOString();
+    const feedback = String((req.body && req.body.feedback) || "").trim() || "Approved";
+
+    await db.collection("submissions").updateOne(
+      { _id: submission._id },
+      { $set: {
+        status: "Approved",
+        reviewer_id: req.user.id,
+        reviewed_at: now,
+        review_comments: feedback,
+        approved_at: now,
+        approved_by: req.user.id,
+      } }
+    );
+
+    const { updateAssignment, ensureAssignment } = require("../models/TaskAssignment");
+    await ensureAssignment(db, String(task._id), studentId);
+    await updateAssignment(db, String(task._id), studentId, {
+      status: "approved",
+      progress: 100,
+      revision_status: "closed",
+    });
+
+    await syncTaskWorkflowFromStudents(db, task);
+    await writeAudit(db, {
+      actorId: req.user.id,
+      action: "submission_approved",
+      entityType: "submission",
+      entityId: String(submission._id),
+      previousValue: { status: submission.status },
+      newValue: { status: "Approved", review_comments: feedback },
+      metadata: { task_id: String(task._id), student_id: studentId },
+    });
+
+    await notifyOnce(db, {
+      userId: studentId,
+      type: "task_approved",
+      title: "Submission approved",
+      message: `Your submission for ${task.title} has been approved.${feedback && feedback !== "Approved" ? ` Reviewer note: ${feedback}` : ""}`,
+      taskId: String(task._id),
+      submissionId: String(submission._id),
+      recipientRole: "student",
+    });
+
+    const { counts } = await buildTaskStudentState(db, task);
+    ok(res, {
+      status: "approved",
+      task_id: String(task._id),
+      student_id: studentId,
+      submission_id: String(submission._id),
+      submission_code: submission.submission_code || null,
+      reviewed_at: now,
+      reviewed_by: req.user.id,
+      feedback,
+      counts,
+      message: "Submission approved",
+    });
+  } catch (e) {
+    console.error("APPROVE SUBMISSION:", e);
+    fail(res, 500, "APPROVE_FAILED", "Unable to approve this submission. Please retry.");
+  }
+});
+
+/**
+ * POST /api/tasks/:id/review/request-revision
+ * Body: { studentId | submissionId, feedback }
+ *
+ * Feedback is mandatory (min 10 chars, validated here — the client mirrors it).
+ * Opens a NEW revision cycle with a fresh 24-hour window measured from the
+ * SERVER clock. The original submission and all its history are preserved.
+ */
+router.post("/:id/review/request-revision", authenticateToken, authorizeRoles("admin", "ceo", "manager"), async (req, res) => {
+  try {
+    const db = req.db;
+    const task = await loadReviewTask(req, res);
+    if (!task) return;
+    await runExpirySweep(db);
+
+    const validation = validateRevisionFeedback(req.body?.feedback);
+    if (!validation.ok) {
+      return fail(res, 400, validation.code, validation.message);
+    }
+    const feedback = validation.value;
+
+    const { studentId, submissionId } = await resolveReviewTarget(db, task, req.body || {}, res);
+    if (!studentId) return;
+
+    const existing = await db.collection("submissions")
+      .find({ task_id: String(task._id), student_id: studentId })
+      .sort({ version: -1 })
+      .toArray();
+    const submission = submissionId ? existing.find(s => String(s._id) === String(submissionId)) : existing[0];
+    if (!submission) {
+      return fail(res, 404, "SUBMISSION_NOT_FOUND", "This student has not submitted anything to revise.");
+    }
+    const current = normalizeSubmissionStatus(submission.status);
+    if (current === "approved") {
+      return fail(res, 409, "ILLEGAL_TRANSITION", "An approved submission cannot be sent back for revision.");
+    }
+
+    // ── New cycle: 24h from the SERVER clock, never from the client. ──────
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const windowHours = resubmissionWindowHours();
+    const deadline = new Date(now.getTime() + windowHours * 3600 * 1000).toISOString();
+
+    const { getAssignment, ensureAssignment, updateAssignment } = require("../models/TaskAssignment");
+    const { assignment: prior } = await ensureAssignment(db, String(task._id), studentId);
+    const cycle = Number(prior?.revision_cycle || 0) + 1;
+
+    // A cycle that already EXPIRED may be reopened: the student gets a brand new
+    // 24-hour window measured from now. An expired window is never extended in
+    // place. A cycle that is still open, on the other hand, must be resolved
+    // (resubmitted or expired) before another revision can be requested.
+    const priorCycleOpen = prior?.revision_status === "open";
+    if (current === "revision_required" && priorCycleOpen) {
+      return fail(res, 409, "REVISION_ALREADY_OPEN", "A revision is already open for this submission.");
+    }
+
+    await updateAssignment(db, String(task._id), studentId, {
+      status: "revision_required",
+      revision_cycle: cycle,
+      revision_requested_at: nowIso,
+      revision_deadline: deadline,
+      revision_status: "open",
+      revision_history: [
+        ...(Array.isArray(prior?.revision_history) ? prior.revision_history : []),
+        {
+          cycle,
+          requestedBy: String(req.user.id),
+          requestedAt: nowIso,
+          feedback,
+          deadline,
+          window_hours: windowHours,
+          status: "open",
+        },
+      ],
+    });
+
+    await db.collection("submissions").updateOne(
+      { _id: submission._id },
+      { $set: {
+        status: "Revision Required",
+        reviewer_id: req.user.id,
+        reviewed_at: nowIso,
+        review_comments: feedback,
+        revision_cycle: cycle,
+      } }
+    );
+
+    await syncTaskWorkflowFromStudents(db, task);
+    await writeAudit(db, {
+      actorId: req.user.id,
+      action: "revision_requested",
+      entityType: "submission",
+      entityId: String(submission._id),
+      previousValue: { status: submission.status },
+      newValue: { status: "Revision Required", review_comments: feedback, cycle },
+      metadata: { task_id: String(task._id), student_id: studentId, deadline },
+    });
+
+    const deadlineLabel = formatISTDeadlineLabel(deadline);
+    await notifyOnce(db, {
+      userId: studentId,
+      type: "revision_required",
+      title: "Revision required",
+      message: revisionMessage({ taskTitle: task.title, feedback, deadlineLabel }),
+      taskId: String(task._id),
+      submissionId: String(submission._id),
+      cycle,
+      revisionRequestedAt: nowIso,
+      revisionDeadline: deadline,
+      recipientRole: "student",
+      actionUrl: "/student/tasks",
+    });
+
+    const { counts } = await buildTaskStudentState(db, task);
+    ok(res, {
+      status: "revision_required",
+      task_id: String(task._id),
+      student_id: studentId,
+      submission_id: String(submission._id),
+      revision_cycle: cycle,
+      revision_requested_at: nowIso,
+      resubmission_deadline: deadline,
+      resubmission_deadline_label: deadlineLabel,
+      window_hours: windowHours,
+      counts,
+      message: "Revision requested",
+    });
+  } catch (e) {
+    console.error("REQUEST REVISION:", e);
+    fail(res, 500, "REVISION_FAILED", "Unable to request a revision. Please retry.");
+  }
+});
+
+/**
+ * POST /api/tasks/:id/review/remind
+ * Body: { studentIds: ["...", ...] } (one id = single reminder)
+ *
+ * Creates an in-app notification per student. Duplicates are prevented twice:
+ * the client disables the button while the request is in flight, and the server
+ * enforces a per-student-per-task cooldown so a reload, a second tab or a
+ * double click cannot spam anyone.
+ */
+router.post("/:id/review/remind", authenticateToken, authorizeRoles("admin", "ceo", "manager"), async (req, res) => {
+  try {
+    const db = req.db;
+    const task = await loadReviewTask(req, res);
+    if (!task) return;
+
+    const raw = Array.isArray(req.body?.studentIds)
+      ? req.body.studentIds
+      : (req.body?.studentId ? [req.body.studentId] : []);
+    const studentIds = raw.map(s => String(s).trim()).filter(s => s && s !== "null" && s !== "undefined");
+    if (!studentIds.length) {
+      return fail(res, 400, "NO_STUDENTS", "Select at least one student to remind.");
+    }
+
+    const { rows } = await buildTaskStudentState(db, task);
+    const known = new Set(rows.map(r => String(r.student_id)));
+    const targets = [...new Set(studentIds)].filter(id => known.has(id));
+    const unknown = [...new Set(studentIds)].filter(id => !known.has(id));
+    if (!targets.length) {
+      return fail(res, 404, "ASSIGNMENT_NOT_FOUND", "None of the selected students are assigned to this task.");
+    }
+
+    const cooldownMs = reminderCooldownMs();
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const dueLabel = task.due_at ? formatISTDeadlineLabel(task.due_at) : null;
+
+    const sent = [];
+    const skipped = [];
+    for (const studentId of targets) {
+      const assignment = await db.collection("task_assignments").findOne({ task_id: String(task._id), student_id: studentId });
+      const last = assignment?.reminder_sent_at ? new Date(assignment.reminder_sent_at) : null;
+      if (last && !Number.isNaN(last.getTime()) && now.getTime() - last.getTime() < cooldownMs) {
+        const retryInMs = cooldownMs - (now.getTime() - last.getTime());
+        skipped.push({ student_id: studentId, retry_in_ms: retryInMs });
+        continue;
+      }
+      const row = rows.find(r => String(r.student_id) === studentId);
+      const message = `Reminder: "${task.title}" is still ${STATUS_LABELS[row.status].toLowerCase()}.${dueLabel ? ` Please complete it by ${dueLabel}.` : " Please complete it as soon as possible."}`;
+      // The dedupe key includes the cooldown slot, so repeated clicks inside one
+      // slot can never duplicate, while a legitimate reminder after the cooldown
+      // still gets through.
+      const slot = Math.floor(now.getTime() / cooldownMs);
+      const result = await notifyOnce(db, {
+        userId: studentId,
+        studentId,
+        type: "task_reminder",
+        title: "Task reminder",
+        message,
+        taskId: String(task._id),
+        cycle: `r${slot}`,
+        recipientRole: "student",
+      });
+      await db.collection("task_assignments").updateOne(
+        { task_id: String(task._id), student_id: studentId },
+        { $set: { reminder_sent_at: nowIso, reminder_sent_by: String(req.user.id) } },
+        { upsert: true }
+      );
+      if (result.created) sent.push({ student_id: studentId });
+      else skipped.push({ student_id: studentId, duplicate: true });
+    }
+
+    await writeAudit(db, {
+      actorId: req.user.id,
+      action: "task_reminder_sent",
+      entityType: "task",
+      entityId: String(task._id),
+      newValue: { sent: sent.length, skipped: skipped.length },
+      metadata: { unknown },
+    });
+
+    ok(res, {
+      task_id: String(task._id),
+      sent,
+      skipped,
+      unknown,
+      cooldown_ms: cooldownMs,
+      message: sent.length
+        ? `Reminder sent to ${sent.length} student${sent.length === 1 ? "" : "s"}.`
+        : "No new reminder was sent: every selected student is still inside the reminder cooldown.",
+    });
+  } catch (e) {
+    console.error("SEND REMINDER:", e);
+    fail(res, 500, "REMINDER_FAILED", "Unable to send the reminder. Please retry.");
+  }
+});
+
+/**
+ * Resolve which student's submission a reviewer action targets.
+ * Accepts studentId (preferred) or submissionId, and ALWAYS verifies the
+ * submission really belongs to (task, student) — a mismatched pair is a 404,
+ * never a cross-student write.
+ */
+async function resolveReviewTarget(db, task, body, res) {
+  const submissionId = body.submissionId ? String(body.submissionId).trim() : null;
+  let studentId = body.studentId ? String(body.studentId).trim() : null;
+  const clean = (v) => v && v !== "null" && v !== "undefined" ? v : null;
+
+  if (!studentId && submissionId) {
+    const sub = await db.collection("submissions").findOne({ _id: toId(submissionId) });
+    if (!sub || String(sub.task_id) !== String(task._id)) {
+      fail(res, 404, "SUBMISSION_NOT_FOUND", "That submission does not belong to this task.");
+      return {};
+    }
+    studentId = String(sub.student_id);
+  }
+  studentId = clean(studentId);
+  if (!studentId) {
+    fail(res, 400, "NO_TARGET", "No student was specified for this action.");
+    return {};
+  }
+  if (submissionId) {
+    const sub = await db.collection("submissions").findOne({ _id: toId(submissionId) });
+    if (!sub || String(sub.task_id) !== String(task._id) || String(sub.student_id) !== studentId) {
+      fail(res, 404, "SUBMISSION_NOT_FOUND", "That submission does not belong to this task and student.");
+      return {};
+    }
+  }
+  return { studentId, submissionId };
+}
+
+/**
+ * Close revision windows that have passed and tell the student once.
+ * Used both lazily (before every Task Manager read) and by the cron endpoint.
+ */
+async function runExpirySweep(db) {
+  try {
+    return await expireStaleRevisionWindows(db, {
+      notify: async ({ task, assignment, deadline, now }) => {
+        await notifyOnce(db, {
+          userId: String(assignment.student_id),
+          type: "resubmission_expired",
+          title: "Resubmission window expired",
+          message: `The 24-hour resubmission window for "${task.title}" has expired. Ask your administrator to request a new revision if you can still fix it.`,
+          taskId: String(task._id),
+          cycle: assignment.revision_cycle,
+          revisionDeadline: deadline,
+          revisionRequestedAt: assignment.revision_requested_at || null,
+          recipientRole: "student",
+        });
+        await notifyAdmins(db, {
+          type: "resubmission_expired_admin",
+          title: "Resubmission window expired",
+          message: `The resubmission window for "${task.title}" expired at ${formatISTDeadlineLabel(deadline)}.`,
+          taskId: String(task._id),
+          studentId: String(assignment.student_id),
+          cycle: assignment.revision_cycle,
+          revisionDeadline: deadline,
+        });
+        void now;
+      },
+    });
+  } catch (e) {
+    console.error("Revision expiry sweep failed:", e.message);
+    return [];
+  }
+}
 
 /* ─── GET TASK BY ID ────────────────────────────────────────────────────── */
 router.get("/:id", authenticateToken, async (req, res) => {
@@ -1139,168 +2011,435 @@ router.patch("/:id/status", authenticateToken, async (req, res) => {
   } catch (e) { console.error("Update status:", e); res.status(500).json({ success: false, message: "Unable to update status" }); }
 });
 
-/* ─── SUBMIT TASK ───────────────────────────────────────────────────────── */
+/* ─── SUBMISSION STORAGE (shared by submit + resubmit) ────────────────────
+ * Writes ONE version of a submission for (task, student) and mirrors it onto
+ * that student's assignment. Both entry points funnel through here so a
+ * resubmission is stored exactly like a first submission — only the gate that
+ * decides whether a new version is allowed differs.
+ *
+ * Throws { status, code, message } on failure so the caller can answer with the
+ * right HTTP status; nothing partial is ever left behind (DB rows and Drive
+ * files are rolled back together).
+ */
+async function storeSubmissionVersion(db, task, studentId, { files, comment, version, actorId, revisionCycle = null }) {
+  const { ensureTaskFolder, validateUpload, uploadToDrive, deleteFromDrive } = require("../utils/driveStorage");
+  const crypto = require("crypto");
+
+  const submissionCode = await nextSubmissionCode(db);
+  const submittedAt = new Date().toISOString();
+
+  const subResult = await db.collection("submissions").insertOne({
+    submission_code: submissionCode,
+    task_id: String(task._id),
+    student_id: String(studentId),
+    version,
+    comment: comment || null,
+    status: "Submitted",
+    submitted_at: submittedAt,
+    revision_cycle: revisionCycle,
+    reviewer_id: null,
+    reviewed_at: null,
+    review_comments: null,
+    created_at: submittedAt
+  });
+  const sid = String(subResult.insertedId);
+
+  let parentFolderId = null;
+  // Drive is only contacted when files are actually attached: comment-only
+  // submissions must keep working even if Drive is temporarily unavailable.
+  if ((files || []).length) {
+    try {
+      const folder = await ensureTaskFolder(
+        db,
+        studentId,
+        String(task._id),
+        task.task_code || String(task._id),
+        task.title || "Untitled Task"
+      );
+      parentFolderId = folder.id;
+    } catch (folderErr) {
+      console.error("[Submit] Drive folder error:", folderErr.message);
+      try { await db.collection("submissions").deleteOne({ _id: subResult.insertedId }); } catch { /* noop */ }
+      const err = new Error("Unable to prepare Drive folder: " + folderErr.message);
+      err.status = 502; err.code = "DRIVE_FOLDER_FAILED";
+      throw err;
+    }
+  }
+
+  const uploadedFiles = [];
+  let uploadError = null;
+  for (const file of (files || [])) {
+    const v = validateUpload(file, Number(process.env.GOOGLE_DRIVE_UPLOAD_MAX_BYTES || 5 * 1024 * 1024));
+    if (!v.ok) { uploadError = v.errors.join("; "); break; }
+    let driveFile = null;
+    try {
+      const ext = (file.originalname.match(/\.[^.]+$/) || [""])[0].toLowerCase();
+      const datePart = submittedAt.slice(0, 10);
+      const taskPart = "TASK_" + String(task.task_code || task._id).replace(/[^a-zA-Z0-9]/g, "_");
+      const overrideName = taskPart + "_SUBMISSION_" + datePart + "_v" + version + ext;
+      driveFile = await uploadToDrive(file.buffer, file.originalname, file.mimetype, parentFolderId, overrideName);
+    } catch (upErr) {
+      console.error("[Submit] Drive upload error:", upErr.message);
+      uploadError = "Drive upload failed: " + upErr.message;
+      break;
+    }
+
+    let saved = false;
+    let lastErr = null;
+    for (let i = 0; i < 3; i++) {
+      try {
+        const ins = await db.collection("submission_files").insertOne({
+          submission_id: sid,
+          original_name: file.originalname,
+          mime_type: file.mimetype,
+          size: file.size,
+          drive_file_id: driveFile.id,
+          drive_folder_id: parentFolderId,
+          drive_web_view_link: driveFile.webViewLink || null,
+          drive_web_content_link: driveFile.webContentLink || null,
+          storage_type: "drive",
+          idempotency_key: crypto.randomUUID(),
+          created_at: submittedAt,
+        });
+        saved = true;
+        uploadedFiles.push({ driveFile: driveFile, fileId: ins.insertedId, saved: true });
+        break;
+      } catch (dbErr) {
+        lastErr = dbErr;
+        await new Promise((r) => setTimeout(r, Math.pow(2, i) * 300));
+      }
+    }
+    if (!saved) {
+      uploadedFiles.push({ driveFile: driveFile, fileId: null, saved: false, error: (lastErr && lastErr.message) || "DB insert failed" });
+      uploadError = "Database save failed for " + file.originalname + ": " + ((lastErr && lastErr.message) || "unknown");
+      break;
+    }
+  }
+
+  if (uploadError) {
+    // Roll back: never leave a partial submission. Remove DB rows and Drive files.
+    try { await db.collection("submission_files").deleteMany({ submission_id: sid }); } catch (e) { console.error("[Submit] rollback files error:", e.message); }
+    try { await db.collection("submissions").deleteOne({ _id: subResult.insertedId }); } catch (e) { console.error("[Submit] rollback submission error:", e.message); }
+    for (const uf of uploadedFiles) {
+      if (uf.driveFile && uf.driveFile.id) {
+        try { await deleteFromDrive(uf.driveFile.id); } catch (e) { console.error("[Submit] rollback drive delete failed:", e.message); }
+      }
+    }
+    for (const uf of uploadedFiles) {
+      if (uf.driveFile && uf.driveFile.id) {
+        try {
+          await db.collection("drive_orphans").insertOne({
+            drive_file_id: uf.driveFile.id, drive_folder_id: parentFolderId, submission_id: sid,
+            task_id: String(task._id), student_id: String(studentId), original_name: uf.driveFile.name || "unknown",
+            created_at: new Date().toISOString(), error: uploadError, rolled_back: true,
+          });
+        } catch (e) { console.error("[Submit] orphan record failed:", e.message); }
+      }
+    }
+    const err = new Error(uploadError);
+    err.status = 502; err.code = "UPLOAD_FAILED";
+    throw err;
+  }
+
+  const { updateAssignment } = require("../models/TaskAssignment");
+  await updateAssignment(db, String(task._id), studentId, {
+    status: "submitted",
+    submission_version: version,
+    submission_comment: comment || null,
+    submitted_at: submittedAt,
+    ...(revisionCycle ? { revision_status: "resubmitted" } : {}),
+  });
+  await writeAudit(db, {
+    actorId,
+    action: revisionCycle ? "submission_resubmitted" : "submission_uploaded",
+    entityType: "submission",
+    entityId: sid,
+    newValue: { submission_code: submissionCode, task_id: String(task._id), version, submitted_at: submittedAt, revision_cycle: revisionCycle },
+  });
+
+  return { submissionId: sid, submissionCode, version, submittedAt, parentFolderId };
+}
+
+/** Load a task a student is allowed to act on, or write the error response. */
+async function loadStudentTask(db, req, res) {
+  let taskId;
+  try {
+    taskId = new ObjectId(String(req.params.id || "").trim());
+  } catch {
+    fail(res, 400, "INVALID_TASK_ID", "This task link is not valid.");
+    return null;
+  }
+  const task = await db.collection("tasks").findOne({ _id: taskId });
+  if (!task) {
+    fail(res, 404, "TASK_NOT_FOUND", "This task no longer exists.");
+    return null;
+  }
+  const { getAssignment } = require("../models/TaskAssignment");
+  const assignment = await getAssignment(db, String(task._id), req.user.id);
+  const legacyOwner = String(task.assigned_to) === String(req.user.id);
+  if (!assignment && !legacyOwner) {
+    // IDOR guard: a student can only ever act on a task assigned to them.
+    fail(res, 403, "FORBIDDEN", "This task is not assigned to you.");
+    return null;
+  }
+  return { task, assignment };
+}
+
+/* ─── SUBMIT TASK (first version only) ─────────────────────────────────────
+ * A student may create exactly ONE first submission through this route.
+ * Any later version must go through POST /:id/resubmit, which enforces the
+ * 24-hour revision window on the SERVER clock. Previously both went through
+ * this one route with no window check at all, which is how a version could be
+ * pushed after the deadline.
+ *
+ * Every status / feedback / deadline field a client might send is stripped
+ * before it reaches the database.
+ */
 router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), upload.array("files", 5), async (req, res) => {
   try {
     const db = req.db;
-    const task = await db.collection("tasks").findOne({ _id: toId(req.params.id) });
-    if (!task) return res.status(404).json({ success: false, message: "Task not found" });
+    const loaded = await loadStudentTask(db, req, res);
+    if (!loaded) return;
+    const { task, assignment } = loaded;
+    if (["Approved", "Cancelled", "Archived"].includes(task.workflow_status)) {
+      return fail(res, 409, "TASK_CLOSED", "This task cannot accept a submission.");
+    }
 
-    // Students may only submit tasks they have an assignment for
-    const { getAssignment, updateAssignment } = require("../models/TaskAssignment");
-    const assignment = await getAssignment(db, String(task._id), req.user.id);
-    const legacyOwner = task.assigned_to === req.user.id;
-    if (!assignment && !legacyOwner) return res.status(403).json({ success: false, message: "Access denied" });
-    if (["Approved", "Cancelled", "Archived"].includes(task.workflow_status)) return res.status(409).json({ success: false, message: "This task cannot accept a submission" });
+    const existing = await db.collection("submissions")
+      .countDocuments({ task_id: String(task._id), student_id: req.user.id });
+    if (existing > 0) {
+      return fail(res, 409, "ALREADY_SUBMITTED",
+        "You have already submitted this task. Use the resubmission option if a revision was requested.");
+    }
 
     // Enforce configured start/end date-time window server-side.
     const now = new Date();
     const startAt = taskStartAt(task);
     const endAt = taskEndAt(task);
     if (startAt && now < new Date(startAt)) {
-      return res.status(409).json({ success: false, message: `Task has not started yet. Starts on ${new Date(startAt).toLocaleString()}` });
+      return fail(res, 409, "NOT_STARTED", `Task has not started yet. Starts on ${new Date(startAt).toLocaleString()}`);
     }
     if (endAt && now > new Date(endAt)) {
-      return res.status(409).json({ success: false, message: "The task deadline has passed." });
+      return fail(res, 409, "DEADLINE_PASSED", "The task deadline has passed.");
     }
 
     // Reject empty submissions: at least one file or a comment is required
     // (mirrors the student UI validation so API clients get the same rule).
-    const commentText = String(req.body?.comment || "").trim();
+    const body = stripStudentControlledFields(req.body);
+    const commentText = String(body.comment || "").trim();
     if (!(req.files || []).length && !commentText) {
-      return res.status(400).json({ success: false, message: "Add at least one file or a submission comment before submitting." });
+      return fail(res, 400, "EMPTY_SUBMISSION", "Add at least one file or a submission comment before submitting.");
     }
 
-    const priorSubCount = await db.collection("submissions").countDocuments({ task_id: String(task._id), student_id: req.user.id });
-    const version = priorSubCount + 1;
-    const submissionCode = await nextSubmissionCode(db);
-    const submittedAt = new Date().toISOString();
+    const stored = await storeSubmissionVersion(db, task, req.user.id, {
+      files: req.files || [],
+      comment: commentText,
+      version: 1,
+      actorId: req.user.id,
+    });
 
-    const subResult = await db.collection("submissions").insertOne({
-      submission_code: submissionCode,
+    await transition(db, task, "Submitted", req.user.id, "Submission received");
+    await syncTaskWorkflowFromStudents(db, task);
+    await notifyAdmins(db, {
+      type: "submission_received",
+      title: "Submission received",
+      message: `${stored.submissionCode} was submitted for ${task.title}.`,
+      taskId: String(task._id),
+      submissionId: stored.submissionId,
+      studentId: req.user.id,
+    });
+    void assignment;
+
+    res.status(201).json({
+      success: true,
+      data: { ...stored, status: "submitted", message: "Submission stored successfully" },
+      error: null,
+      // Legacy flat keys kept so existing callers keep working.
+      message: "Submission stored successfully",
+      submissionId: stored.submissionId,
+      submissionCode: stored.submissionCode,
+      version: stored.version,
+      submittedAt: stored.submittedAt,
+    });
+  } catch (e) {
+    console.error("Submission error:", e);
+    fail(res, e.status || 500, e.code || "SUBMIT_FAILED", e.message || "Unable to store submission");
+  }
+});
+
+/* ─── RESUBMISSION ELIGIBILITY (student) ───────────────────────────────────
+ * The backend is the source of truth for the 24-hour window: the button state
+ * in the portal is only a rendering of what this endpoint returns. Refreshing,
+ * switching device or changing the client clock cannot change the answer,
+ * because the deadline was written from the server clock at revision time and
+ * is compared against the server clock here.
+ */
+router.get("/:id/resubmission-eligibility", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), async (req, res) => {
+  try {
+    const db = req.db;
+    const loaded = await loadStudentTask(db, req, res);
+    if (!loaded) return;
+    const { task, assignment } = loaded;
+
+    await runExpirySweep(db);
+    const assignmentNow = assignment
+      ? await db.collection("task_assignments").findOne({ _id: assignment._id })
+      : null;
+    const latestRows = await db.collection("submissions")
+      .find({ task_id: String(task._id), student_id: req.user.id })
+      .sort({ version: -1 })
+      .limit(1)
+      .toArray();
+    const latest = latestRows[0] || null;
+
+    const { resolveStatus } = require("../utils/submissionStatus");
+    const now = new Date();
+    const resolved = resolveStatus(assignmentNow, latest, now);
+    const eligibility = resubmissionEligibility(
+      { status: resolved, revision_deadline: assignmentNow?.revision_deadline || null, revision_status: assignmentNow?.revision_status || null },
+      now
+    );
+
+    ok(res, {
       task_id: String(task._id),
-      student_id: req.user.id,
+      task_code: task.task_code || null,
+      task_title: task.title || "",
+      status: resolved,
+      status_label: STATUS_LABELS[resolved],
+      revision_cycle: assignmentNow?.revision_cycle || 0,
+      revision_requested_at: assignmentNow?.revision_requested_at || null,
+      revision_deadline: assignmentNow?.revision_deadline || null,
+      revision_deadline_label: assignmentNow?.revision_deadline ? formatISTDeadlineLabel(assignmentNow.revision_deadline) : null,
+      last_review_feedback: latest?.review_comments || null,
+      latest_submission: latest ? {
+        id: String(latest._id),
+        version: latest.version,
+        submitted_at: latest.submitted_at,
+      } : null,
+      resubmission_available: eligibility.allowed,
+      resubmission_blocked_reason: eligibility.reason,
+      resubmission_expires_in_ms: eligibility.expires_in_ms,
+      window_hours: resubmissionWindowHours(),
+      server_time: now.toISOString(),
+    });
+  } catch (e) {
+    console.error("RESUBMISSION ELIGIBILITY:", e);
+    fail(res, 500, "ELIGIBILITY_FAILED", "Unable to check the resubmission window. Please retry.");
+  }
+});
+
+/* ─── RESUBMIT (student, new version) ──────────────────────────────────────
+ * Only allowed while THIS student's revision cycle is open and the server
+ * clock is inside the deadline. Every older version is kept, so the admin can
+ * always see what changed between v1, v2, v3...
+ */
+router.post("/:id/resubmit", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), upload.array("files", 5), async (req, res) => {
+  try {
+    const db = req.db;
+    const loaded = await loadStudentTask(db, req, res);
+    if (!loaded) return;
+    const { task, assignment } = loaded;
+
+    await runExpirySweep(db);
+    const assignmentNow = await db.collection("task_assignments").findOne({ _id: assignment._id });
+    const priorCount = await db.collection("submissions")
+      .countDocuments({ task_id: String(task._id), student_id: req.user.id });
+    if (priorCount === 0) {
+      return fail(res, 409, "NO_PRIOR_SUBMISSION", "You have not submitted this task yet, so there is nothing to resubmit.");
+    }
+
+    const latestRows = await db.collection("submissions")
+      .find({ task_id: String(task._id), student_id: req.user.id })
+      .sort({ version: -1 })
+      .limit(1)
+      .toArray();
+    const latest = latestRows[0];
+
+    // ── The gate. Server clock only. ──────────────────────────────────────
+    const cycle = Number(assignmentNow?.revision_cycle || 0);
+    const cycleStatus = assignmentNow?.revision_status || null;
+    // Distinguish "the window closed" from "there was never a revision", so the
+    // student always gets the accurate reason and the UI can show the right
+    // message. A window that expired is never reopened implicitly.
+    if (cycleStatus === "expired" || normalizeSubmissionStatus(latest?.status) === "resubmission_expired") {
+      return fail(res, 409, "RESUBMISSION_EXPIRED", "The 24-hour resubmission window has expired.");
+    }
+    const openCycle = cycleStatus === "open" && cycle > 0;
+    if (!openCycle) {
+      return fail(res, 409, "NO_OPEN_REVISION",
+        "No revision was requested for this submission.");
+    }
+    const now = new Date();
+    const deadline = assignmentNow?.revision_deadline ? new Date(assignmentNow.revision_deadline) : null;
+    if (!deadline || Number.isNaN(deadline.getTime())) {
+      return fail(res, 409, "RESUBMISSION_EXPIRED", "The 24-hour resubmission window has expired.");
+    }
+    if (now.getTime() > deadline.getTime()) {
+      // Persist the expiry before answering, so the state is correct even if
+      // the student immediately hits refresh.
+      await db.collection("task_assignments").updateOne(
+        { _id: assignmentNow._id },
+        { $set: { status: "resubmission_expired", revision_status: "expired", updated_at: now.toISOString() } }
+      );
+      await db.collection("submissions").updateMany(
+        { task_id: String(task._id), student_id: req.user.id, status: "Revision Required" },
+        { $set: { status: "Revision Required", window_expired_at: now.toISOString() } }
+      );
+      return fail(res, 409, "RESUBMISSION_EXPIRED", "The 24-hour resubmission window has expired.");
+    }
+
+    const body = stripStudentControlledFields(req.body);
+    const commentText = String(body.comment || "").trim();
+    if (!(req.files || []).length && !commentText) {
+      return fail(res, 400, "EMPTY_SUBMISSION", "Attach the corrected file or describe what you changed before resubmitting.");
+    }
+
+    const version = priorCount + 1;
+    const stored = await storeSubmissionVersion(db, task, req.user.id, {
+      files: req.files || [],
+      comment: commentText,
       version,
-      comment: String(req.body?.comment || "").trim() || null,
-      status: "Submitted",
-      submitted_at: submittedAt,
-      reviewer_id: null,
-      reviewed_at: null,
-      review_comments: null,
-      created_at: submittedAt
+      actorId: req.user.id,
+      revisionCycle: cycle,
     });
-    const sid = String(subResult.insertedId);
 
-    const { ensureStudentFolder, ensureTaskFolder, validateUpload, uploadToDrive, deleteFromDrive } = require("../utils/driveStorage");
-    const crypto = require("crypto");
-    // Fetch student info for folder naming
-    const student = await db.collection("users").findOne({ _id: toId(req.user.id) }, { projection: { name: 1, student_id: 1 } });
-    let parentFolderId = null;
-    // Drive is only contacted when files are actually attached: comment-only
-    // submissions must keep working even if Drive is temporarily unavailable.
-    if ((req.files || []).length) {
-      try {
-        const folder = await ensureTaskFolder(
-          db,
-          req.user.id,
-          String(task._id),
-          task.task_code || String(task._id),
-          task.title || "Untitled Task"
-        );
-        parentFolderId = folder.id;
-      } catch (folderErr) {
-        console.error("[Submit] Drive folder error:", folderErr.message);
-        return res.status(502).json({ success: false, message: "Unable to prepare Drive folder: " + folderErr.message });
-      }
-    }
+    // Close the open entry in revisionHistory — history is append-only.
+    const history = Array.isArray(assignmentNow.revision_history) ? assignmentNow.revision_history.slice() : [];
+    const idx = history.findIndex(h => h && h.cycle === cycle && h.status === "open");
+    if (idx >= 0) history[idx] = { ...history[idx], status: "resubmitted", resubmitted_at: stored.submittedAt };
+    await db.collection("task_assignments").updateOne(
+      { _id: assignmentNow._id },
+      { $set: { revision_history: history } }
+    );
 
-    const uploadedFiles = [];
-    let uploadError = null;
-    for (const file of (req.files || [])) {
-      const v = validateUpload(file, Number(process.env.GOOGLE_DRIVE_UPLOAD_MAX_BYTES || 5 * 1024 * 1024));
-      if (!v.ok) { uploadError = v.errors.join("; "); break; }
-      let driveFile = null;
-      try {
-        const ext = (file.originalname.match(/\.[^.]+$/) || [""])[0].toLowerCase();
-        const datePart = (submittedAt || new Date().toISOString()).slice(0, 10);
-        const taskPart = "TASK_" + String(task.task_code || task.id || task._id).replace(/[^a-zA-Z0-9]/g, "_");
-        const overrideName = taskPart + "_SUBMISSION_" + datePart + "_v" + version + ext;
-        driveFile = await uploadToDrive(file.buffer, file.originalname, file.mimetype, parentFolderId, overrideName);
-      } catch (upErr) {
-        console.error("[Submit] Drive upload error:", upErr.message);
-        uploadError = "Drive upload failed: " + upErr.message;
-        break;
-      }
-
-      let saved = false;
-      let lastErr = null;
-      for (let i = 0; i < 3; i++) {
-        try {
-          const ins = await db.collection("submission_files").insertOne({
-            submission_id: sid,
-            original_name: file.originalname,
-            mime_type: file.mimetype,
-            size: file.size,
-            drive_file_id: driveFile.id,
-            drive_folder_id: parentFolderId,
-            drive_web_view_link: driveFile.webViewLink || null,
-            drive_web_content_link: driveFile.webContentLink || null,
-            storage_type: "drive",
-            idempotency_key: crypto.randomUUID(),
-            created_at: submittedAt,
-          });
-          saved = true;
-          uploadedFiles.push({ driveFile: driveFile, fileId: ins.insertedId, saved: true });
-          break;
-        } catch (dbErr) {
-          lastErr = dbErr;
-          await new Promise((r) => setTimeout(r, Math.pow(2, i) * 300));
-        }
-      }
-      if (!saved) {
-        uploadedFiles.push({ driveFile: driveFile, fileId: null, saved: false, error: (lastErr && lastErr.message) || "DB insert failed" });
-        uploadError = "Database save failed for " + file.originalname + ": " + ((lastErr && lastErr.message) || "unknown");
-        break;
-      }
-    }
-
-    if (uploadError) {
-      // Roll back: never leave a partial submission. Remove DB rows and Drive files.
-      try { await db.collection("submission_files").deleteMany({ submission_id: sid }); } catch (e) { console.error("[Submit] rollback files error:", e.message); }
-      try { await db.collection("submissions").deleteOne({ _id: subResult.insertedId }); } catch (e) { console.error("[Submit] rollback submission error:", e.message); }
-      for (const uf of uploadedFiles) {
-        if (uf.driveFile && uf.driveFile.id) {
-          try { await deleteFromDrive(uf.driveFile.id); } catch (e) { console.error("[Submit] rollback drive delete failed:", e.message); }
-        }
-      }
-      // Record orphans for reconcile (best effort)
-      for (const uf of uploadedFiles) {
-        if (uf.driveFile && uf.driveFile.id) {
-          try {
-            await db.collection("drive_orphans").insertOne({
-              drive_file_id: uf.driveFile.id, drive_folder_id: parentFolderId, submission_id: sid,
-              task_id: String(task._id), student_id: req.user.id, original_name: uf.driveFile.name || "unknown",
-              created_at: new Date().toISOString(), error: uploadError, rolled_back: true,
-            });
-          } catch (e) { console.error("[Submit] orphan record failed:", e.message); }
-        }
-      }
-      return res.status(502).json({ success: false, message: uploadError });
-    }
-
-    await transition(db, task, version > 1 ? "Resubmitted" : "Submitted", req.user.id, "Submission received");
-    // Record the submission snapshot on the student's own assignment
-    await updateAssignment(db, String(task._id), req.user.id, {
-      status: "submitted",
-      submission_version: version,
-      submission_comment: String(req.body?.comment || "").trim() || null,
-      submitted_at: submittedAt,
+    await transition(db, task, "Resubmitted", req.user.id, "Resubmission received");
+    await syncTaskWorkflowFromStudents(db, task);
+    await notifyAdmins(db, {
+      type: "resubmission_received",
+      title: "Corrected resubmission received",
+      message: `${stored.submissionCode} (v${version}) was resubmitted for ${task.title} after revision cycle ${cycle}.`,
+      taskId: String(task._id),
+      submissionId: stored.submissionId,
+      studentId: req.user.id,
+      cycle,
+      revisionDeadline: assignmentNow.revision_deadline,
+      revisionRequestedAt: assignmentNow.revision_requested_at || null,
     });
-    await notify(db, task.assigned_by, "submission_received", "Submission received", `${submissionCode} was submitted for ${task.title}.`, String(task._id));
-    await writeAudit(db, { actorId: req.user.id, action: "submission_uploaded", entityType: "submission", entityId: sid, newValue: { submission_code: submissionCode, task_id: String(task._id), version, submitted_at: submittedAt } });
 
-    res.status(201).json({ success: true, message: "Submission stored successfully", submissionId: sid, submissionCode, version, submittedAt });
-  } catch (e) { console.error("Submission error:", e); res.status(500).json({ success: false, message: "Unable to store submission" }); }
+    res.status(201).json({
+      success: true,
+      data: { ...stored, status: "submitted", revision_cycle: cycle, message: "Resubmission stored successfully" },
+      error: null,
+      message: "Resubmission stored successfully",
+      submissionId: stored.submissionId,
+      submissionCode: stored.submissionCode,
+      version: stored.version,
+      submittedAt: stored.submittedAt,
+    });
+  } catch (e) {
+    console.error("Resubmission error:", e);
+    fail(res, e.status || 500, e.code || "RESUBMIT_FAILED", e.message || "Unable to store the resubmission");
+  }
 });
 
 /* ─── REVIEW SUBMISSION ─────────────────────────────────────────────────── */
@@ -1317,8 +2456,20 @@ router.post("/review", authenticateToken, authorizeRoles("admin", "ceo", "manage
     if (effectiveRole === "manager" && task.assigned_by !== req.user.id) return res.status(403).json({ success: false, message: "You can only review tasks assigned by you" });
 
     const decision = String(req.body?.decision || "").toLowerCase();
+    if (!["approve", "revision"].includes(decision)) {
+      return res.status(400).json({ success: false, error: { code: "BAD_DECISION", message: "Decision must be approve or revision" }, message: "Decision must be approve or revision" });
+    }
+
     const comment = String(req.body?.comment || "").trim();
-    if (!["approve", "revision"].includes(decision) || !comment) return res.status(400).json({ success: false, message: "Decision and review comment are required" });
+    if (decision === "revision") {
+      // Mandatory feedback, minimum length — the same rule the Task Manager
+      // dialog enforces, so the legacy caller cannot create a revision with
+      // no usable feedback either.
+      const validation = validateRevisionFeedback(comment);
+      if (!validation.ok) {
+        return res.status(400).json({ success: false, error: { code: validation.code, message: validation.message }, message: validation.message });
+      }
+    }
 
     // OPTIONAL scoring. The schema has no mandatory score/max_marks pair, so
     // scoring stays opt-in: when both are supplied they are validated and
@@ -1347,14 +2498,12 @@ router.post("/review", authenticateToken, authorizeRoles("admin", "ceo", "manage
       }
     }
 
-    const next = decision === "approve" ? "Approved" : "Revision Required";
     const now = new Date().toISOString();
-
     const submissionUpdate = {
-      status: next,
+      status: decision === "approve" ? "Approved" : "Revision Required",
       reviewer_id: req.user.id,
       reviewed_at: now,
-      review_comments: comment,
+      review_comments: comment || null,
     };
     if (scoreValue !== null) {
       submissionUpdate.score = scoreValue;
@@ -1363,18 +2512,92 @@ router.post("/review", authenticateToken, authorizeRoles("admin", "ceo", "manage
       submissionUpdate.scored_at = now;
       submissionUpdate.scored_by = req.user.id;
     }
-    await db.collection("submissions").updateOne({ _id: sub._id }, { $set: submissionUpdate });
-    await transition(db, task, next, req.user.id, comment);
-    // Mirror the decision onto the submitting student's assignment
-    const { updateAssignment } = require("../models/TaskAssignment");
-    await updateAssignment(db, String(task._id), sub.student_id, {
-      status: decision === "approve" ? "approved" : "revision_required",
-      progress: decision === "approve" ? 100 : undefined,
-    });
-    await notify(db, sub.student_id, decision === "approve" ? "task_approved" : "revision_required", decision === "approve" ? "Task approved" : "Revision required", `${task.title}: ${comment}`, sub.task_id);
-    await writeAudit(db, { actorId: req.user.id, action: decision === "approve" ? "submission_approved" : "revision_requested", entityType: "submission", entityId: String(sub._id), previousValue: { status: sub.status }, newValue: { status: next, review_comments: comment } });
 
-    res.json({ success: true, message: decision === "approve" ? "Submission approved" : "Revision requested", status: next, score: scoreValue, max_marks: maxMarksValue });
+    // A revision opens a NEW cycle with a fresh 24h window from the server
+    // clock; an approval closes the loop for that student only.
+    let cycle = null;
+    let deadline = null;
+    if (decision === "revision") {
+      const { getAssignment, ensureAssignment, updateAssignment } = require("../models/TaskAssignment");
+      const { assignment: prior } = await ensureAssignment(db, String(task._id), String(sub.student_id));
+      cycle = Number(prior?.revision_cycle || 0) + 1;
+      deadline = new Date(Date.now() + resubmissionWindowHours() * 3600 * 1000).toISOString();
+      submissionUpdate.revision_cycle = cycle;
+      await updateAssignment(db, String(task._id), String(sub.student_id), {
+        status: "revision_required",
+        revision_cycle: cycle,
+        revision_requested_at: now,
+        revision_deadline: deadline,
+        revision_status: "open",
+        revision_history: [
+          ...(Array.isArray(prior?.revision_history) ? prior.revision_history : []),
+          {
+            cycle,
+            requestedBy: String(req.user.id),
+            requestedAt: now,
+            feedback: comment,
+            deadline,
+            window_hours: resubmissionWindowHours(),
+            status: "open",
+          },
+        ],
+      });
+    } else {
+      const { ensureAssignment, updateAssignment } = require("../models/TaskAssignment");
+      await ensureAssignment(db, String(task._id), String(sub.student_id));
+      await updateAssignment(db, String(task._id), String(sub.student_id), {
+        status: "approved",
+        progress: 100,
+        revision_status: "closed",
+      });
+    }
+
+    await db.collection("submissions").updateOne({ _id: sub._id }, { $set: submissionUpdate });
+    await transition(db, task, submissionUpdate.status, req.user.id, comment || null);
+    await syncTaskWorkflowFromStudents(db, task);
+
+    if (decision === "approve") {
+      await notifyOnce(db, {
+        userId: String(sub.student_id),
+        type: "task_approved",
+        title: "Submission approved",
+        message: `Your submission for ${task.title} has been approved.${comment ? ` Reviewer note: ${comment}` : ""}`,
+        taskId: String(task._id),
+        submissionId: String(sub._id),
+        recipientRole: "student",
+      });
+    } else {
+      const deadlineLabel = formatISTDeadlineLabel(deadline);
+      await notifyOnce(db, {
+        userId: String(sub.student_id),
+        type: "revision_required",
+        title: "Revision required",
+        message: revisionMessage({ taskTitle: task.title, feedback: comment, deadlineLabel }),
+        taskId: String(task._id),
+        submissionId: String(sub._id),
+        cycle,
+        revisionRequestedAt: now,
+        revisionDeadline: deadline,
+        recipientRole: "student",
+      });
+    }
+    await writeAudit(db, { actorId: req.user.id, action: decision === "approve" ? "submission_approved" : "revision_requested", entityType: "submission", entityId: String(sub._id), previousValue: { status: sub.status }, newValue: { status: submissionUpdate.status, review_comments: comment, cycle } });
+
+    res.json({
+      success: true,
+      data: {
+        status: submissionUpdate.status,
+        score: scoreValue,
+        max_marks: maxMarksValue,
+        revision_cycle: cycle,
+        resubmission_deadline: deadline,
+      },
+      error: null,
+      message: decision === "approve" ? "Submission approved" : "Revision requested",
+      status: submissionUpdate.status,
+      score: scoreValue,
+      max_marks: maxMarksValue,
+    });
   } catch (e) { console.error("Review error:", e); res.status(500).json({ success: false, message: "Unable to review submission" }); }
 });
 
@@ -1442,7 +2665,7 @@ router.get("/:id/my-submission-status", authenticateToken, checkStudentRegistrat
     const submission = await db.collection("submissions")
       .findOne(
         { task_id: String(taskId), student_id: req.user.id },
-        { projection: { _id: 1, status: 1, version: 1, submitted_at: 1, comment: 1 } }
+        { projection: { _id: 1, status: 1, version: 1, submitted_at: 1, comment: 1, review_comments: 1 } }
       );
     
     // Get the student's assignment record for this task
@@ -1452,41 +2675,69 @@ router.get("/:id/my-submission-status", authenticateToken, checkStudentRegistrat
     // Get the task to check if it's assigned to this student via legacy assigned_to
     const task = await db.collection("tasks").findOne(
       { _id: toId(taskId) },
-      { projection: { assigned_to: 1, workflow_status: 1 } }
+      { projection: { assigned_to: 1, workflow_status: 1, title: 1, task_code: 1, due_at: 1 } }
     );
     
     const legacyOwner = task?.assigned_to === req.user.id;
     
     // Student must have either an assignment or be the legacy owner
     if (!assignment && !legacyOwner) {
-      return res.status(403).json({ success: false, message: "Access denied" });
+      return fail(res, 403, "FORBIDDEN", "This task is not assigned to you.");
     }
-    
-    // Determine the workflow status for THIS student (per-student only).
-    let studentWorkflowStatus = null;
-    if (submission) {
-      // Student has submitted - use THEIR submission status.
-      studentWorkflowStatus = submission.status;
-    } else if (assignment) {
-      switch (assignment.status) {
-        case "approved": studentWorkflowStatus = "Approved"; break;
-        case "revision_required": studentWorkflowStatus = "Revision Required"; break;
-        case "submitted": studentWorkflowStatus = "Submitted"; break;
-        case "in_progress": studentWorkflowStatus = "In Progress"; break;
-        case "assigned":
-        default: studentWorkflowStatus = "Assigned"; break;
-      }
-    }
+
+    // Expire any window that has closed, so a student who refreshes sees the
+    // real state instead of a stale "Resubmit" button.
+    await runExpirySweep(db);
+    const assignmentNow = assignment ? await db.collection("task_assignments").findOne({ _id: assignment._id }) : null;
+
+    // One canonical status per student, from the same resolver the admin Task
+    // Manager uses — the two portals can never disagree about a student.
+    const now = new Date();
+    const { resolveStatus } = require("../utils/submissionStatus");
+    const resolved = resolveStatus(assignmentNow, submission, now);
+    const eligibility = resubmissionEligibility(
+      { status: resolved, revision_deadline: assignmentNow?.revision_deadline || null, revision_status: assignmentNow?.revision_status || null },
+      now
+    );
+
+    let studentWorkflowStatus = STATUS_LABELS[resolved];
     // Respect a cancelled/archived task for everyone.
     if (task?.workflow_status === "Cancelled" || task?.workflow_status === "Archived") {
       studentWorkflowStatus = task.workflow_status;
     }
-    
-    res.json({
-      success: true,
+
+    ok(res, {
+      task_id: String(taskId),
+      task_title: task?.title || "",
+      task_code: task?.task_code || null,
+      due_at: task?.due_at || null,
+      has_submission: !!submission,
+      // `workflow_status` keeps its historical label so the existing student UI
+      // keeps working; `status` is the canonical enum value.
+      workflow_status: studentWorkflowStatus,
+      status: resolved,
+      status_label: STATUS_LABELS[resolved],
+      assignment_status: assignmentNow ? normalizeStatus(assignmentNow.status) : null,
+      revision_cycle: assignmentNow?.revision_cycle || 0,
+      revision_requested_at: assignmentNow?.revision_requested_at || null,
+      revision_deadline: assignmentNow?.revision_deadline || null,
+      revision_deadline_label: assignmentNow?.revision_deadline ? formatISTDeadlineLabel(assignmentNow.revision_deadline) : null,
+      review_feedback: submission?.review_comments || null,
+      resubmission_available: eligibility.allowed && !["Cancelled", "Archived"].includes(studentWorkflowStatus),
+      resubmission_blocked_reason: eligibility.reason,
+      resubmission_expires_in_ms: eligibility.expires_in_ms,
+      latest_submission: submission ? {
+        id: String(submission._id),
+        version: submission.version,
+        submitted_at: submission.submitted_at,
+        status: submission.status,
+        comment: submission.comment
+      } : null
+    }, {
+      // Legacy flat keys
       has_submission: !!submission,
       workflow_status: studentWorkflowStatus,
-      assignment_status: assignment?.status || null,
+      assignment_status: assignmentNow ? normalizeStatus(assignmentNow.status) : null,
       latest_submission: submission ? {
         id: String(submission._id),
         version: submission.version,
@@ -1497,25 +2748,83 @@ router.get("/:id/my-submission-status", authenticateToken, checkStudentRegistrat
     });
   } catch (e) {
     console.error("GET MY SUBMISSION STATUS:", e);
-    res.status(500).json({ success: false, message: "Unable to check submission status" });
+    fail(res, 500, "STATUS_FAILED", "Unable to check submission status");
   }
 });
 
-/* ─── GET TASK SUBMISSIONS ──────────────────────────────────────────────── */
+/* ─── GET TASK SUBMISSIONS ─────────────────────────────────────────────────
+ * Every version submitted for this task, newest first, each row carrying the
+ * student it belongs to.
+ *
+ * The old shape had no student identity on the row at all, which is why the
+ * review modal could only ever show "one student": the client had no way to
+ * tell the rows apart. Student name / code / department / program / batch and
+ * the canonical review status are resolved here, per version.
+ *
+ * Access: reviewers see everything; a student sees only their OWN versions.
+ */
 router.get("/:id/submissions", authenticateToken, async (req, res) => {
   try {
     const db = req.db;
     const task = await db.collection("tasks").findOne({ _id: toId(req.params.id) });
     if (!task) return res.status(404).json({ success: false, message: "Task not found" });
-    if (!["admin", "manager", "ceo"].includes(req.user.role) && task.assigned_to !== req.user.id) {
-      return res.status(403).json({ success: false, message: "Access denied" });
+
+    const isReviewer = isReviewerRole(req.user.role);
+    if (!isReviewer) {
+      const { getAssignment } = require("../models/TaskAssignment");
+      const own = await getAssignment(db, String(task._id), req.user.id);
+      const legacyOwner = String(task.assigned_to) === String(req.user.id);
+      if (!own && !legacyOwner) {
+        return fail(res, 403, "FORBIDDEN", "You do not have permission to view these submissions.");
+      }
     }
 
-    const submissions = await db.collection("submissions").find({ task_id: String(task._id) }).sort({ version: -1 }).toArray();
+    const filter = { task_id: String(task._id) };
+    if (!isReviewer) filter.student_id = req.user.id;
+
+    const submissions = await db.collection("submissions").find(filter).sort({ submitted_at: -1 }).toArray();
+    const studentIds = [...new Set(submissions.map(s => String(s.student_id)))];
+    const [students, reviewers, assignments] = await Promise.all([
+      studentIds.length
+        ? db.collection("users").find({ _id: { $in: studentIds.map(toId) } }, { projection: { name: 1, email: 1, student_id: 1, learner_id: 1, department: 1, program: 1, batch_id: 1 } }).toArray()
+        : [],
+      db.collection("users").find({ _id: { $in: submissions.map(s => toId(s.reviewer_id)).filter(Boolean) } }, { projection: { name: 1 } }).toArray(),
+      db.collection("task_assignments").find({ task_id: String(task._id), student_id: { $in: studentIds } }).toArray(),
+    ]);
+    const studentById = new Map(students.map(s => [String(s._id), s]));
+    const reviewerById = new Map(reviewers.map(s => [String(s._id), s.name]));
+    const assignmentByStudent = new Map(assignments.map(a => [String(a.student_id), a]));
+
+    const batchIds = [...new Set(students.map(s => s.batch_id).filter(Boolean))];
+    const batches = batchIds.length
+      ? await db.collection("batches").find({ _id: { $in: batchIds.map(toId) } }, { projection: { name: 1 } }).toArray()
+      : [];
+    const batchNameById = new Map(batches.map(b => [String(b._id), b.name]));
+
     const rows = await Promise.all(submissions.map(async s => {
-      const u = s.reviewer_id ? await db.collection("users").findOne({ _id: toId(s.reviewer_id) }, { projection: { name: 1 } }) : null;
-      const files = await db.collection("submission_files").find({ submission_id: String(s._id) }, { projection: { original_name: 1, size: 1, mime_type: 1 } }).toArray();
-      return { ...s, id: String(s._id), reviewer_name: u?.name, file_count: files.length, files: files.map(f => ({ id: String(f._id), name: f.original_name, size: f.size, mime: f.mime_type, download_url: `/api/tasks/files/${String(f._id)}/download` })) };
+      const student = studentById.get(String(s.student_id));
+      const assignment = assignmentByStudent.get(String(s.student_id));
+      const files = await filesForSubmission(db, s._id);
+      return {
+        ...s,
+        id: String(s._id),
+        student_id: String(s.student_id),
+        student_db_id: String(s.student_id),
+        student_name: student?.name || null,
+        student_code: student?.student_id || student?.learner_id || null,
+        student_email: student?.email || null,
+        student_department: student?.department || null,
+        student_program: student?.program || null,
+        batch_name: student?.batch_id ? (batchNameById.get(String(student.batch_id)) || null) : null,
+        reviewer_name: s.reviewer_id ? (reviewerById.get(String(s.reviewer_id)) || null) : null,
+        // Canonical review status for this student-task, plus the raw label.
+        review_status: normalizeSubmissionStatus(s.status),
+        review_status_label: STATUS_LABELS[normalizeSubmissionStatus(s.status)],
+        revision_cycle: assignment?.revision_cycle || s.revision_cycle || null,
+        revision_deadline: assignment?.revision_deadline || null,
+        file_count: files.length,
+        files,
+      };
     }));
     res.json({ success: true, submissions: rows });
   } catch (e) { res.status(500).json({ success: false, message: "Unable to fetch submissions" }); }
