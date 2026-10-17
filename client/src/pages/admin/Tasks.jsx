@@ -1,44 +1,63 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useExclusiveSelect } from "../../hooks/useExclusiveSelect";
+import useModalBehavior from "../../components/useModalBehavior";
 import "../../styles/admin.css";
-import { formatISTDateShort } from "../../utils/dateHelper";
+import { formatISTDateShort, formatISTDateTime } from "../../utils/dateHelper";
+import {
+  STATUS_LABEL,
+  apiFetch,
+  downloadFile,
+  remainingTime,
+  statusClass,
+  taskTitle,
+  titleCase,
+  unwrap,
+} from "../../utils/api";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 
 /* Fetch-with-auth download: a plain anchor cannot send the Authorization
-   header, so files are fetched as blobs and saved via object URL. */
+   header, so files are fetched as blobs and saved via object URL.
+   Downloads now happen inside the Task Manager review viewer; this wrapper
+   stays for any other caller on this page. */
 async function downloadSubmissionFile(file, onError) {
   try {
-    const res = await fetch(`${API_URL}${file.download_url}`, { headers: auth() });
-    if (!res.ok) {
-      let msg = "Unable to download file";
-      try { msg = (await res.json()).message || msg; } catch {}
-      onError(msg);
-      return;
-    }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = file.name || "submission-file";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-  } catch {
-    onError("Unable to download file. Check your connection.");
+    await downloadFile(file);
+  } catch (e) {
+    onError(e.message || "Unable to download file");
   }
 }
 
 // REMOVED: PROGRAMS array now loaded from batches collection (same source as signup dropdown)
 
+/**
+ * Real domains only.
+ *
+ * "Program" used to be listed here as if it were a domain, so every task
+ * created through that dropdown stored domain:"program" and the Live Tasks
+ * table rendered a "Program" badge in the DOMAIN column while the PROGRAM
+ * column showed "—". Program is a separate field and is derived from the
+ * assignees; see the Program column below.
+ */
 const DOMAINS = [
   { value: "edutins", label: "EduTins" },
   { value: "resins", label: "ResIns" },
   { value: "innovins", label: "InnoVins" },
   { value: "systins", label: "SysTins" },
-  { value: "program", label: "Program" }
+];
+
+/* Status chips rendered in the Workflow column. These are the per-student
+   counts returned by the backend aggregation — one row per task used to show a
+   single task-wide status, which was wrong as soon as one of 38 students acted. */
+const WORKFLOW_CHIPS = [
+  { key: "submitted", label: "Submitted", className: "st st-submitted" },
+  { key: "pending", label: "Pending", className: "st st-pending" },
+  { key: "in_progress", label: "In Progress", className: "st st-in-progress" },
+  { key: "revision_required", label: "Revision", className: "st st-revision" },
+  { key: "resubmission_expired", label: "Expired", className: "st st-expired" },
+  { key: "approved", label: "Approved", className: "st st-approved" },
 ];
 
 /* Blank form for CREATE mode. Editing reuses the same fields, so this object
@@ -78,9 +97,6 @@ export default function Tasks() {
   const [form, setForm] = useState(EMPTY_FORM);
 
   const { student, setStudent, reset, isStudentDisabled } = useExclusiveSelect();
-  const [selected, setSelected] = useState(null);
-  const [submissions, setSubmissions] = useState([]);
-  const [review, setReview] = useState({ decision: "revision", comment: "" });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -91,6 +107,11 @@ export default function Tasks() {
   // `deleting` keeps the confirm button disabled while the request is in flight.
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const closeDeleteRef = useModalBehavior(Boolean(confirmDelete), () => setConfirmDelete(null));
+
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const workspace = pathname.startsWith("/manager") ? "manager" : "admin";
 
   const load = async () => {
     try {
@@ -116,6 +137,15 @@ export default function Tasks() {
   };
 
   useEffect(() => { load(); }, []);
+
+  /* Domain filter.
+     `effective_domain` is what the Domain column shows and what the filter
+     matches on, so the legacy "program" pseudo-domain does not silently hide
+     every row the moment it is removed from the dropdown. */
+  const filteredTasks = useMemo(
+    () => tasks.filter(t => !domainFilter || (t.effective_domain || t.domain) === domainFilter),
+    [tasks, domainFilter]
+  );
 
   const create = async (event) => {
     event.preventDefault();
@@ -251,13 +281,34 @@ export default function Tasks() {
     }
   };
 
-  const openReview = async (task) => {
-    setSelected(task); 
-    setSubmissions([]); 
-    setReview({ decision: "revision", comment: "" });
-    const res = await fetch(`${API_URL}/api/tasks/${task.id}/submissions`, { headers: auth() });
-    const data = await res.json();
-    setSubmissions(data.submissions || []);
+  /**
+   * Open the Task Manager for one task.
+   *
+   * This is a NAVIGATION to a registered route (`/${workspace}/tasks/:id/review`),
+   * not an in-page modal:
+   *  - the old modal opened directly over the Assign Task form, so the review
+   *    UI and the create/edit form were on screen at the same time with no
+   *    scroll lock, focus trap or Escape handling;
+   *  - it fetched `submissions[0]` — the highest version of the whole task —
+   *    so it showed one arbitrary student even when 20 had submitted;
+   *  - it never checked `res.ok`, so an API failure rendered an empty modal
+   *    indistinguishable from "no submissions";
+   *  - there was no route to navigate to, and any unregistered review URL
+   *    fell through to the catch-all that redirects to /login — the reported
+   *    "Review takes me to the home page" behaviour.
+   *
+   * Guarded here so an invalid id produces a visible, actionable message
+   * instead of a bad URL.
+   */
+  const openReview = (task) => {
+    setMessage("");
+    setError("");
+    const id = task && task.id ? String(task.id) : "";
+    if (!id || id === "null" || id === "undefined") {
+      setError("This task has no valid identifier, so its review page cannot be opened. Refresh the list and try again.");
+      return;
+    }
+    navigate(`/${workspace}/tasks/${id}/review`);
   };
 
   // Opens the confirmation popup. Nothing is deleted until confirmDeleteTask runs.
@@ -305,38 +356,9 @@ export default function Tasks() {
     }
   };
 
-  const submitReview = async (decision = review.decision) => {
-    const latest = submissions[0];
-    if (!latest) return setError("No submission is available for review.");
-    
-    // Auto-set comment for approval/revision to avoid requiring manual entry
-    // and update the review state so the textarea reflects the auto-generated value
-    let comment = review.comment;
-    if (decision === "approve") {
-      comment = "Approved";
-    } else if (decision === "revision") {
-      comment = "Revision requested";
-    }
-    if (!review.comment.trim() && decision !== "approve" && decision !== "revision") {
-      return setError("Review comments are required.");
-    }
-    // Update review state so textarea shows the auto-generated comment
-    if ((decision === "approve" || decision === "revision") && comment !== review.comment) {
-      setReview({ ...review, comment });
-    }
-    const res = await fetch(`${API_URL}/api/tasks/review`, { 
-      method: "POST", 
-      headers: { ...auth(), "Content-Type": "application/json" }, 
-      body: JSON.stringify({ submission_id: latest.id, decision, comment }) 
-    });
-    const data = await res.json();
-    
-    if (!res.ok) return setError(data.message || "Unable to review submission");
-    
-    setMessage(data.message); 
-    setSelected(null); 
-    load();
-  };
+  // Review decisions live on the dedicated review route now
+  // (pages/admin/TaskReview.jsx), where the target student, the version and the
+  // feedback are all explicit. Nothing to do here.
 
   return (
     <div className="admin-simple page-enter">
@@ -590,11 +612,16 @@ export default function Tasks() {
             </tr>
           </thead>
           <tbody>
-            {tasks.filter(t => !domainFilter || t.domain === domainFilter).map(t => (
+            {filteredTasks.map(t => {
+              const counts = t.status_counts || {};
+              const deadline = remainingTime(t.due_at || t.due_date);
+              return (
               <tr key={t.id}>
                 <td>
                   <strong>{t.task_code || `T-${t.id}`}</strong>
-                  <small>{t.title}</small>
+                  {/* white-space keeps the stored title verbatim, so a "|"
+                      separator stays a pipe instead of reading like an "I". */}
+                  <small style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{taskTitle(t.title)}</small>
                 </td>
                 <td>
                   <span className="domain-chip" style={{
@@ -606,7 +633,12 @@ export default function Tasks() {
                     fontWeight: '700',
                     textTransform: 'capitalize'
                   }}>
-                    {t.domain ? DOMAINS.find(d => d.value === t.domain)?.label || t.domain : '—'}
+                    {/* effective_domain maps the legacy "program" pseudo-domain
+                        to the real owning domain (EduTins) instead of printing
+                        "Program" here on every row. */}
+                    {t.effective_domain
+                      ? (DOMAINS.find(d => d.value === t.effective_domain)?.label || titleCase(t.effective_domain))
+                      : '—'}
                   </span>
                 </td>
                 <td>
@@ -619,16 +651,39 @@ export default function Tasks() {
                     t.student_name
                   )}
                 </td>
-                <td>{t.program ? t.program.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '—'}</td>
+                {/* Real program: the task's own value, or the one shared by
+                    its assignees. Previously this read tasks.program only,
+                    which is null for every batch task, so it always showed "—". */}
+                <td>{t.program ? titleCase(t.program) : '—'}</td>
+                {/* Per-student aggregate. A task with 38 assignees cannot be
+                    described by one status, so the backend returns the counts
+                    and each non-zero bucket is shown as its own chip. */}
                 <td>
-                  <span className={`pill ${t.status}`}>
-                    {t.workflow_status || t.status}
-                  </span>
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                    {WORKFLOW_CHIPS.map((chip) => {
+                      const value = counts[chip.key] || 0;
+                      if (!value) return null;
+                      return <span key={chip.key} className={chip.className}>{value} {chip.label}</span>;
+                    })}
+                    {(!counts.assigned) && <span className="st st-pending">No assignees</span>}
+                  </div>
                 </td>
                 <td>{t.priority}</td>
                 <td>{t.start_date ? `${t.start_date}${t.start_time ? ` ${t.start_time}` : ""}` : "—"}</td>
-                <td>{t.due_date ? formatISTDateShort(t.due_date) : "—"}</td>
-                <td>{t.submission_count || 0}</td>
+                <td>
+                  {t.due_date ? formatISTDateShort(t.due_date) : "—"}
+                  {/* "Overdue" is a derived flag, not a stored status. */}
+                  {deadline && deadline.overdue && (
+                    <small style={{ display: 'block', color: '#B42318', fontWeight: 700 }}>{deadline.label}</small>
+                  )}
+                </td>
+                {/* Distinct students who submitted, not versions. */}
+                <td>
+                  <strong>{t.submission_count || 0}</strong>
+                  <small style={{ display: 'block' }}>
+                    of {t.assignee_count || 0} assignee{t.assignee_count === 1 ? "" : "s"}
+                  </small>
+                </td>
                 <td>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <button
@@ -650,21 +705,26 @@ export default function Tasks() {
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
 
-        {!tasks.filter(t => !domainFilter || t.domain === domainFilter).length && <div className="empty-state">No tasks yet.</div>}
+        {!filteredTasks.length && (
+          <div className="empty-state">
+            {domainFilter ? `No tasks in ${DOMAINS.find(d => d.value === domainFilter)?.label || domainFilter}.` : "No tasks yet."}
+          </div>
+        )}
       </div>
 
       {confirmDelete && (
-        <div className="review-modal">
-          <div className="panel" role="dialog" aria-modal="true" aria-labelledby="confirm-delete-title">
+        <div className="review-modal" ref={closeDeleteRef} onPointerDown={(e) => { if (e.target === e.currentTarget) setConfirmDelete(null); }}>
+          <div className="panel" role="alertdialog" aria-modal="true" aria-labelledby="confirm-delete-title">
             <div className="panel-head">
               <div>
                 <span className="section-kicker">REMOVE TASK</span>
                 <h3 id="confirm-delete-title">
-                  {confirmDelete.task_code || "Task"} · {confirmDelete.title}
+                  {confirmDelete.task_code || "Task"} · {taskTitle(confirmDelete.title)}
                 </h3>
                 <p>
                   {confirmDelete.target_type === "batch"
@@ -692,67 +752,6 @@ export default function Tasks() {
                 {deleting ? "Removing…" : "Yes, remove task"}
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {selected && (
-        <div className="review-modal">
-          <div className="panel">
-            <div className="panel-head">
-              <div>
-                <span className="section-kicker">SUBMISSION REVIEW</span>
-                <h3>{selected.task_code || "Task"} · {selected.title}</h3>
-                <p>{selected.student_name}</p>
-              </div>
-              <button onClick={() => setSelected(null)}>Close</button>
-            </div>
-
-            {submissions.length ? (
-              <>
-                <div className="submission-manager">
-                  <div>
-                    <strong>Version {submissions[0].version}</strong>
-                    <small>
-                      {submissions[0].submission_code} · {new Date(submissions[0].submitted_at).toLocaleString()}
-                    </small>
-                    <p>{submissions[0].comment || "No submission comment."}</p>
-                    {(submissions[0].files || []).length ? (
-                      <div className="quick-actions">
-                        {submissions[0].files.map(f => (
-                          <button key={f.id} onClick={() => downloadSubmissionFile(f, setError)}>
-                            {f.name}{f.size ? ` (${f.size < 1024 ? `${f.size} B` : `${(f.size / 1024).toFixed(1)} KB`})` : ""}
-                          </button>
-                        ))}
-                      </div>
-                    ) : <small>No files attached to this version.</small>}
-                  </div>
-                  <span className="pill completed">{submissions[0].status}</span>
-                </div>
-
-                <div className="field" style={{ marginTop: '20px' }}>
-                  <label className="field-label" htmlFor="review-comment">
-                    Review comments <span className="req">*</span>
-                  </label>
-                  <textarea
-                    id="review-comment"
-                    name="review-comment"
-                    value={review.comment}
-                    onChange={e => setReview({ ...review, comment: e.target.value })}
-                    placeholder="Review comments / revision reason"
-                    required
-                    style={{ minHeight: '120px', padding: '12px 14px', fontSize: '14px', fontWeight: '600' }}
-                  />
-                </div>
-
-                <div className="quick-actions">
-                  <button onClick={() => submitReview("revision")}>Request Revision</button>
-                  <button className="gold-btn" onClick={() => submitReview("approve")}>Approve</button>
-                </div>
-              </>
-            ) : (
-              <div className="empty-state">No submission versions are available for this task.</div>
-            )}
           </div>
         </div>
       )}
