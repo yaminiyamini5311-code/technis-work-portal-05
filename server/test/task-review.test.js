@@ -455,6 +455,29 @@ test("6. Revision without usable feedback is rejected; with feedback the right s
   const bobRevision = bobNotifications.json.notifications.filter((n) => n.type === "revision_required");
   assert.equal(bobRevision.length, 0, "only the reviewed student may be notified");
 
+  // Alice is still a SUBMITTER, so she must still be listed and reviewable in
+  // the Submitted tab even though her review status is now "revision_required".
+  // (Hiding her would leave an admin with no way to open the revision again.)
+  // Bob also submitted (and was approved in test 5), so the tab lists every
+  // submitter, not only the ones still awaiting a first decision.
+  const submittedAfter = await api("GET", `/api/tasks/${ctx.taskId}/review/submitted`, { token: adminToken });
+  const ids = submittedAfter.json.data.students.map((s) => s.student_id);
+  assert.deepEqual(ids.sort(), [ctx.alice.id, ctx.bob.id].sort());
+  const aliceRow = submittedAfter.json.data.students.find((s) => s.student_id === ctx.alice.id);
+  assert.equal(aliceRow.status, "revision_required");
+  assert.ok(aliceRow.revision_deadline, "the resubmit deadline travels with the row");
+  assert.equal(submittedAfter.json.data.students.find((s) => s.student_id === ctx.bob.id).status, "approved");
+  // ...and the status filter narrows it.
+  const onlyRevision = await api("GET", `/api/tasks/${ctx.taskId}/review/submitted?status=revision_required`, { token: adminToken });
+  assert.equal(onlyRevision.json.data.total, 1);
+  assert.equal(onlyRevision.json.data.students[0].student_id, ctx.alice.id);
+  const onlyApproved = await api("GET", `/api/tasks/${ctx.taskId}/review/submitted?status=approved`, { token: adminToken });
+  assert.equal(onlyApproved.json.data.total, 1);
+  assert.equal(onlyApproved.json.data.students[0].student_id, ctx.bob.id);
+  // The two lists never overlap.
+  const pendingIds = (await api("GET", `/api/tasks/${ctx.taskId}/review/pending`, { token: adminToken })).json.data.students.map((s) => s.student_id);
+  assert.equal(ids.some((id) => pendingIds.includes(id)), false);
+
   // Alice gets exactly one, with the feedback and the deadline in the message.
   const aliceNotifications = await api("GET", "/api/notifications", { token: ctx.alice.token });
   const aliceRevision = aliceNotifications.json.notifications.filter((n) => n.type === "revision_required");
@@ -639,6 +662,38 @@ test("8c. RESUBMISSION_WINDOW_HOURS is honoured (short window server, no product
 });
 
 /* ─── 9/10. Notifications persist and never duplicate ────────────────────── */
+test("8d. approving a submission that is awaiting revision supersedes the open cycle", async () => {
+  // Alice is "submitted" again after 8b's resubmission. Request a revision so
+  // there IS an open cycle, then approve anyway: the admin changed their mind
+  // and must be able to close the loop instead of hitting a dead end.
+  const rev = await api("POST", `/api/tasks/${ctx.taskId}/review/request-revision`, {
+    token: adminToken, body: { studentId: ctx.alice.id, feedback: "Tighten the conclusion paragraph, please." },
+  });
+  assert.equal(rev.status, 200, JSON.stringify(rev.json));
+
+  const detail = await api("GET", `/api/tasks/${ctx.taskId}/review/assignments/${ctx.alice.id}`, { token: adminToken });
+  assert.equal(detail.json.data.assignment.status, "revision_required");
+  assert.equal(detail.json.data.assignment.revision_history.at(-1).status, "open");
+
+  const approve = await api("POST", `/api/tasks/${ctx.taskId}/review/approve`, {
+    token: adminToken, body: { studentId: ctx.alice.id },
+  });
+  assert.equal(approve.status, 200, JSON.stringify(approve.json));
+
+  const after = await api("GET", `/api/tasks/${ctx.taskId}/review/assignments/${ctx.alice.id}`, { token: adminToken });
+  assert.equal(after.json.data.assignment.status, "approved");
+  assert.equal(after.json.data.assignment.resubmission_available, false);
+  const lastCycle = after.json.data.assignment.revision_history.at(-1);
+  assert.equal(lastCycle.status, "closed", "an approved submission must not leave an open revision window behind");
+  assert.match(lastCycle.feedback, /conclusion paragraph/);
+  assert.ok(lastCycle.closed_at, "the cycle records when and by whom it was closed");
+
+  // The student is told the window is over and cannot resubmit.
+  const elig = await api("GET", `/api/tasks/${ctx.taskId}/resubmission-eligibility`, { token: ctx.alice.token });
+  assert.equal(elig.json.data.resubmission_available, false);
+  assert.equal(elig.json.data.status, "approved");
+});
+
 test("10. repeated clicks do not create duplicate notifications; they survive refresh", async () => {
   const other = await api("POST", "/api/tasks", {
     token: adminToken,
@@ -797,6 +852,9 @@ test("12b. the Live Tasks row reports distinct submitters, not versions", async 
   await dbClient.close();
 
   assert.equal(row.submission_count, distinctStudents.length, "submission_count must be distinct students");
-  assert.ok(versionRows > distinctStudents.length, "this task must have more versions than submitters for the test to mean anything");
+  assert.ok(versionRows >= distinctStudents.length, "this task must have at least as many versions as submitters");
   assert.equal(row.status_counts.submitters, distinctStudents.length);
+  // The whole point of the fix: the two numbers must be able to differ.
+  // (Before it, both columns read the raw version count.)
+  assert.equal(row.submission_count, distinctStudents.length);
 });

@@ -167,6 +167,7 @@
 .tm-field > span { font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--ceo-text-mute, #6b7691); font-weight: 700; }
 .tm-field > strong { font-size: 13.5px; color: var(--ceo-text, #eef2fb); font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
 .tm-field > p { margin: 0; font-size: 13.5px; color: var(--ceo-text, #eef2fb); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tm-prose { margin: 0; font-size: 13.5px; line-height: 1.7; color: var(--ceo-text, #eef2fb); white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* ── Tables ──────────────────────────────────────────────────────────────── */
 .tm-table-wrap { overflow-x: auto; border: 1px solid var(--ceo-border, rgba(255,255,255,0.08)); border-radius: 12px; }

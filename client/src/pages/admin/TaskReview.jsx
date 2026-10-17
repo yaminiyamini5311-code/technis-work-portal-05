@@ -41,11 +41,14 @@ const TABS = [
   { key: "in-progress", label: "In Progress", endpoint: "in-progress", bucket: "in_progress" },
 ];
 
-/** tab -> which counts[]. it reads. Approved / Revision / Expired are shown
- *  as their own chips in the header and inside the Submitted list, because a
- *  student who has already been reviewed is still someone you may act on. */
+/** tab -> which counts[] its badge reads.
+ *  The Submitted tab lists every student who handed work in (whatever their
+ *  review status), so its badge reads `submitters` — the distinct-submitter
+ *  count — not the `submitted` bucket, which excludes students already sent
+ *  back for revision. Approved / Revision / Expired have their own chips in
+ *  the header and their own filter inside the Submitted tab. */
 const TAB_COUNT_KEY = {
-  submitted: "submitted",
+  submitted: "submitters",
   pending: "pending",
   "in-progress": "in_progress",
 };
@@ -489,7 +492,10 @@ function SubmissionViewer({ taskId, studentId, onClose, onChanged }) {
                         <li key={`${h.cycle}-${i}`}>
                           <strong>Cycle {h.cycle} · {h.status}</strong>
                           <small>
-                            Requested {formatISTDateTime(h.requested_at)} · deadline {formatISTDateTime(h.deadline)}
+                            {/* The stored field is camelCase (requestedAt); the
+                                snake_case alias is accepted so rows written by
+                                any future writer still render. */}
+                            Requested {formatISTDateTime(h.requestedAt || h.requested_at)} · deadline {formatISTDateTime(h.deadline)}
                             {h.resubmitted_at ? ` · resubmitted ${formatISTDateTime(h.resubmitted_at)}` : ""}
                             {h.expired_at ? ` · expired ${formatISTDateTime(h.expired_at)}` : ""}
                           </small>
@@ -513,6 +519,7 @@ function SubmissionViewer({ taskId, studentId, onClose, onChanged }) {
                           className="tm-btn tm-btn-approve"
                           disabled={busy !== null || status === "approved"}
                           onClick={() => setConfirmApprove(true)}
+                          title={status === "approved" ? "This submission is already approved." : "Approve this student's submission"}
                         >
                           {busy === "approve" ? "Approving…" : "Approve"}
                         </button>
@@ -564,7 +571,7 @@ function SubmissionViewer({ taskId, studentId, onClose, onChanged }) {
 }
 
 /* ── Student detail (for Pending / In Progress rows) ─────────────────────── */
-function AssignmentDetail({ taskId, studentId, onClose, onRemind, reminding, onChanged }) {
+function AssignmentDetail({ taskId, studentId, onClose, onRemind, reminding }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -688,6 +695,7 @@ export default function TaskReview() {
   const [pages, setPages] = useState(1);
   const [search, setSearch] = useState("");
   const [batchFilter, setBatchFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [rowsLoading, setRowsLoading] = useState(false);
   const [rowsError, setRowsError] = useState("");
 
@@ -729,6 +737,7 @@ export default function TaskReview() {
     try {
       const params = new URLSearchParams({ page: String(page), limit: "25" });
       if (search.trim()) params.set("search", search.trim());
+      if (statusFilter) params.set("status", statusFilter);
       const data = unwrap(await apiFetch(`/api/tasks/${taskId}/review/${endpoint}?${params}`));
       setRows(data.students || []);
       setTotal(data.total || 0);
@@ -740,9 +749,12 @@ export default function TaskReview() {
     } finally {
       setRowsLoading(false);
     }
-  }, [taskId, endpoint, page, search, invalidId]);
+  }, [taskId, endpoint, page, search, statusFilter, invalidId]);
 
   useEffect(() => { loadRows(); }, [loadRows]);
+
+  // Switching tab resets the filters that only make sense for one of them.
+  useEffect(() => { setStatusFilter(""); setBatchFilter(""); setPage(1); }, [tab]);
 
   /* Display-only countdown for open revision windows: the deadline itself
      comes from the server and is never recomputed here. */
@@ -913,6 +925,20 @@ export default function TaskReview() {
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                 aria-label="Search students"
               />
+              {tab === "submitted" && (
+                <select
+                  className="tm-select"
+                  value={statusFilter}
+                  onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                  aria-label="Filter by review status"
+                >
+                  <option value="">All review statuses</option>
+                  <option value="submitted">Awaiting review</option>
+                  <option value="revision_required">Revision requested</option>
+                  <option value="resubmission_expired">Resubmission expired</option>
+                  <option value="approved">Approved</option>
+                </select>
+              )}
               {batchOptions.length > 1 && (
                 <select
                   className="tm-select"
@@ -948,8 +974,8 @@ export default function TaskReview() {
               <div className="tm-empty">
                 <strong>{total === 0 ? EMPTY_COPY[tab].title : "No student matches this filter"}</strong>
                 <p>{total === 0 ? EMPTY_COPY[tab].body : "Try a different search term or clear the batch filter."}</p>
-                {(search || batchFilter) && (
-                  <button type="button" className="tm-btn" onClick={() => { setSearch(""); setBatchFilter(""); setPage(1); }}>
+                {(search || batchFilter || statusFilter) && (
+                  <button type="button" className="tm-btn" onClick={() => { setSearch(""); setBatchFilter(""); setStatusFilter(""); setPage(1); }}>
                     Clear filters
                   </button>
                 )}
@@ -985,7 +1011,6 @@ export default function TaskReview() {
           studentId={detailFor}
           reminding={reminding}
           onRemind={(id) => remind(id).catch(() => {})}
-          onChanged={refreshAll}
           onClose={() => setDetailFor(null)}
         />
       )}
@@ -1042,22 +1067,22 @@ function TaskDetails({ task, review, loading }) {
 
       <div className="tm-section">
         <h4>Description</h4>
-        <p className="tm-field"><span> </span>{task.description || "No description was provided."}</p>
+        <p className="tm-prose">{task.description || "No description was provided."}</p>
       </div>
 
       <div className="tm-section">
         <h4>How to Do</h4>
-        <p className="tm-field"><span> </span>{task.how_to_do || "No instructions were provided."}</p>
+        <p className="tm-prose">{task.how_to_do || "No instructions were provided."}</p>
       </div>
 
       <div className="tm-section">
         <h4>Expected Output</h4>
-        <p className="tm-field"><span> </span>{task.expected_output || "No expected output was provided."}</p>
+        <p className="tm-prose">{task.expected_output || "No expected output was provided."}</p>
       </div>
 
       <div className="tm-section">
         <h4>Submission Requirements</h4>
-        <p className="tm-field"><span> </span>{task.submission_requirements || "No submission requirements were provided."}</p>
+        <p className="tm-prose">{task.submission_requirements || "No submission requirements were provided."}</p>
       </div>
 
       <div className="tm-section">

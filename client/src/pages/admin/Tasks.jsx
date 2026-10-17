@@ -1,34 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useExclusiveSelect } from "../../hooks/useExclusiveSelect";
 import useModalBehavior from "../../components/useModalBehavior";
 import "../../styles/admin.css";
-import { formatISTDateShort, formatISTDateTime } from "../../utils/dateHelper";
-import {
-  STATUS_LABEL,
-  apiFetch,
-  downloadFile,
-  remainingTime,
-  statusClass,
-  taskTitle,
-  titleCase,
-  unwrap,
-} from "../../utils/api";
+import { formatISTDateShort } from "../../utils/dateHelper";
+import { remainingTime, taskTitle, titleCase } from "../../utils/api";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
-
-/* Fetch-with-auth download: a plain anchor cannot send the Authorization
-   header, so files are fetched as blobs and saved via object URL.
-   Downloads now happen inside the Task Manager review viewer; this wrapper
-   stays for any other caller on this page. */
-async function downloadSubmissionFile(file, onError) {
-  try {
-    await downloadFile(file);
-  } catch (e) {
-    onError(e.message || "Unable to download file");
-  }
-}
 
 // REMOVED: PROGRAMS array now loaded from batches collection (same source as signup dropdown)
 

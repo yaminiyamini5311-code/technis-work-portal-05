@@ -3,7 +3,7 @@ import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
 import { useScrollReveal } from "../../components/useScrollReveal";
 import { formatISTDateTime, formatISTDate } from "../../utils/dateHelper";
-import { downloadFile, remainingTime } from "../../utils/api";
+import { remainingTime } from "../../utils/api";
 import "./MyTasks.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -103,23 +103,27 @@ export default function MyTasks() {
               `${API_URL}/api/tasks/${task.id}/my-submission-status`,
               { headers: auth() }
             );
+            // The endpoint returns { success, data, error } plus a flat mirror
+            // of the same fields. Prefer `data`, fall back to the flat keys so
+            // the portal keeps working against either shape.
+            const status = subData?.data || subData || {};
             return {
               ...task,
-              has_submission: subData.has_submission || false,
-              student_workflow_status: subData.workflow_status || null,
-              latest_submission: subData.latest_submission || null,
+              has_submission: status.has_submission || false,
+              student_workflow_status: status.workflow_status || null,
+              latest_submission: status.latest_submission || null,
               // Canonical per-student status + the revision window. The
               // backend is the source of truth for every one of these; the
               // portal only renders them.
-              student_status: subData.status || null,
-              revision_cycle: subData.revision_cycle ?? 0,
-              revision_requested_at: subData.revision_requested_at || null,
-              revision_deadline: subData.revision_deadline || null,
-              revision_deadline_label: subData.revision_deadline_label || null,
-              review_feedback: subData.review_feedback || null,
-              resubmission_available: subData.resubmission_available === true,
-              resubmission_blocked_reason: subData.resubmission_blocked_reason || null,
-              resubmission_expires_in_ms: subData.resubmission_expires_in_ms ?? 0,
+              student_status: status.status || null,
+              revision_cycle: status.revision_cycle ?? 0,
+              revision_requested_at: status.revision_requested_at || null,
+              revision_deadline: status.revision_deadline || null,
+              revision_deadline_label: status.revision_deadline_label || null,
+              review_feedback: status.review_feedback || null,
+              resubmission_available: status.resubmission_available === true,
+              resubmission_blocked_reason: status.resubmission_blocked_reason || null,
+              resubmission_expires_in_ms: status.resubmission_expires_in_ms ?? 0,
             };
           } catch (err) {
             // If endpoint fails, fall back to task data
@@ -271,7 +275,7 @@ export default function MyTasks() {
    * `resubmission_available`, which the backend computed on its own clock.
    */
   const countdown = (task) => {
-    const remaining = remainingTime(task.revision_deadline);
+    const remaining = remainingTime(task.revision_deadline, now);
     if (!remaining) return "";
     return remaining.overdue ? remaining.label : `· ${remaining.label}`;
   };
@@ -436,13 +440,13 @@ export default function MyTasks() {
                     ))}
                   </div>
                 )}
-                /* ── Revision Required section ────────────────────────────────────────────
+                {/* ── Revision Required section ───────────────────────────────────────
                  * Feedback is shown prominently, the deadline is the exact one
                  * stored by the server, and the countdown is display-only.
                  * Resubmit is enabled only while the server says the window is
                  * open; after that the card says the window expired and the
                  * student has to ask for a new revision.
-                 */
+                 */}
                 {(needsRevision || windowExpired) && (
                   <div className={`feedback-box revision-box ${windowExpired ? "revision-box-expired" : ""}`}>
                     <div className="revision-box-head">
