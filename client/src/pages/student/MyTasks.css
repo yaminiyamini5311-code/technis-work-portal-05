@@ -902,3 +902,101 @@
     font-size: 15px;
     font-weight: 700;
 }
+
+/* ── Revision Required ───────────────────────────────────────────────────
+   Prominent, self-contained block: what the admin asked for, the exact
+   deadline the server stored, and a display-only countdown. The expired
+   variant is deliberately calmer and greyer — the student can no longer act
+   on it and has to ask for a new revision.
+   ──────────────────────────────────────────────────────────────────────── */
+.revision-box {
+  background: rgba(250, 154, 2, 0.12);
+  border-left-color: #FFA51A;
+}
+
+.revision-box-expired {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  border-left-color: rgba(255, 255, 255, 0.3);
+}
+
+.revision-box-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.revision-box-head strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #FFA51A;
+}
+
+.revision-box-expired .revision-box-head strong {
+  color: var(--text-secondary, #C7D2E8);
+}
+
+.revision-cycle {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--text-muted, #A9B6D0);
+}
+
+.revision-feedback {
+  margin: 0 0 12px;
+  padding: 11px 13px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-primary, #F5F8FF);
+  font-size: 13.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.revision-deadline {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-muted, #A9B6D0);
+}
+
+.revision-deadline strong {
+  display: inline;
+  color: var(--text-primary, #F5F8FF);
+  font-variant-numeric: tabular-nums;
+}
+
+.revision-countdown {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(250, 154, 2, 0.16);
+  border: 1px solid rgba(250, 154, 2, 0.34);
+  color: #FFD79A;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.revision-note {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-muted, #A9B6D0);
+}
+
+.revision-upload {
+  border-color: rgba(250, 154, 2, 0.35);
+}

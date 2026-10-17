@@ -8,10 +8,18 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 export function getNotificationTarget(notification, role) {
   if (!notification) return null;
 
-  const { type, related_task_id } = notification;
+  const { type, related_task_id, task_id, action_url, deep_link } = notification;
 
   // Treat CEO as admin for routing
   const effectiveRole = role === "ceo" ? "admin" : role;
+  const isReviewer = role === "admin" || role === "ceo" || role === "manager";
+  const base = role === "ceo" ? "admin" : role;
+  // The backend stores the deep link it computed for this notification.
+  // Honouring it means a click lands on the exact view that needs attention
+  // (e.g. the Task Manager for one task) instead of a generic list.
+  if (deep_link || action_url) return deep_link || action_url;
+
+  const taskId = task_id || related_task_id;
 
   // Registration pending notifications - navigate to pending registrations panel
   if (type === "registration_pending") {
@@ -20,26 +28,18 @@ export function getNotificationTarget(notification, role) {
     }
   }
 
-  // Task-related notifications - navigate to tasks list (task detail not implemented)
-  if (type === "task_assigned" || type === "task_updated" || type === "task_due" || type === "task_started" || type === "task_approved") {
-    if (related_task_id) {
-      if (role === "student") {
-        return `/student/tasks`;
-      } else if (role === "admin" || role === "manager" || role === "ceo") {
-        return `/${effectiveRole}/tasks`;
-      }
+  // Workflow notifications about one task land the reviewer directly in that
+  // task's Task Manager, where the four tabs and the counts live.
+  if (isReviewer && taskId) {
+    if (["revision_required", "submission_received", "resubmission_received", "resubmission_expired_admin"].includes(type)) {
+      return `/${base}/tasks/${taskId}/review`;
     }
+    return `/${base}/tasks`;
   }
 
-  // Review-related notifications - navigate to tasks list
-  if (type === "review_required" || type === "review_approved" || type === "review_rejected" || type === "revision_required" || type === "submission_received") {
-    if (related_task_id) {
-      if (role === "student") {
-        return `/student/tasks`;
-      } else if (role === "admin" || role === "manager") {
-        return `/${effectiveRole}/tasks`;
-      }
-    }
+  // Task-related notifications for students - navigate to their task list.
+  if (role === "student" && taskId) {
+    return "/student/tasks";
   }
 
   // Feedback notifications
@@ -48,6 +48,8 @@ export function getNotificationTarget(notification, role) {
     if (role === "admin" || role === "ceo") return "/admin/feedback";
     if (role === "manager") return "/manager/feedback";
   }
+
+  void effectiveRole;
 
   // Default: navigate to portal's feedback page (notifications page equivalent)
   if (role === "student") return "/student/feedback";
@@ -119,12 +121,17 @@ export default function NotificationBell() {
   }, [open]);
 
   const markAndNavigate = async (item) => {
-    // Mark as read
+    // Mark as read. Ownership is enforced server-side, so a notification that
+    // belongs to someone else simply answers 404 and is ignored here.
     if (!item.read_at) {
-      await fetch(`${API_URL}/api/notifications/${item.id}/read`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
+      try {
+        await fetch(`${API_URL}/api/notifications/${item.id}/read`, {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        });
+      } catch {
+        // A failed read receipt must not block navigation.
+      }
     }
 
     // Navigate to target
