@@ -1349,16 +1349,35 @@ router.get("/:id/review", authenticateToken, authorizeRoles("admin", "ceo", "man
   }
 });
 
-/** Shared implementation for the three tabbed lists. */
-async function reviewListHandler(req, res, bucket) {
+/**
+ * Shared implementation for the three tabbed lists.
+ *
+ * `mode`:
+ *   "submitted"    every student who handed work in, whatever their review
+ *                  status is. A student whose submission is "Revision
+ *                  Required" or "Resubmission Expired" is still someone the
+ *                  reviewer has to be able to open, so the tab lists every
+ *                  submitter and shows their review status as a chip. This is
+ *                  also what fixes the old modal, which could only ever show
+ *                  the single highest-version row of the whole task.
+ *   "pending"      assigned, no submission, work not started.
+ *   "in_progress"  explicitly started, nothing submitted yet.
+ *
+ * `?status=` narrows any of them to one canonical status.
+ */
+async function reviewListHandler(req, res, mode) {
   const db = req.db;
   const task = await loadReviewTask(req, res);
   if (!task) return;
   await runExpirySweep(db);
 
   const { rows } = await buildTaskStudentState(db, task);
-  const scoped = rows.filter(r => r.status === bucket);
-  const page = filterAndPage(scoped, readListQuery(req));
+  const scoped = mode === "submitted"
+    ? rows.filter(r => Boolean(r.submission_id))
+    : rows.filter(r => r.status === mode);
+  const statusFilter = String(req.query.status || "").trim();
+  const filtered = statusFilter ? scoped.filter(r => r.status === statusFilter) : scoped;
+  const page = filterAndPage(filtered, readListQuery(req));
 
   const withFiles = await Promise.all(page.rows.map(async r => ({
     ...r,
@@ -1373,7 +1392,8 @@ async function reviewListHandler(req, res, bucket) {
 
   ok(res, {
     task: { id: String(task._id), task_code: task.task_code || null, title: task.title || "", due_at: task.due_at || null },
-    status: bucket,
+    mode,
+    status: statusFilter || null,
     total: page.total,
     page: page.page,
     limit: page.limit,
@@ -1382,7 +1402,7 @@ async function reviewListHandler(req, res, bucket) {
   });
 }
 
-/** GET /api/tasks/:id/review/submitted — students who handed work in. */
+/** GET /api/tasks/:id/review/submitted — every student who handed work in. */
 router.get("/:id/review/submitted", authenticateToken, authorizeRoles("admin", "ceo", "manager"), (req, res) =>
   reviewListHandler(req, res, "submitted").catch((e) => {
     console.error("REVIEW SUBMITTED:", e);
@@ -1511,10 +1531,11 @@ router.post("/:id/review/approve", authenticateToken, authorizeRoles("admin", "c
     if (current === "approved") {
       return fail(res, 409, "ALREADY_APPROVED", "This submission has already been approved.");
     }
-    // Only a handed-in version may be approved. A pending student, an
-    // in-progress student or an expired revision window are all illegal
-    // transitions and must not be silently accepted.
-    if (current !== "submitted") {
+    // A submitted version may be approved, and so may one that is currently
+    // "Revision Required": an admin who decides the work is good enough after
+    // all must be able to close the loop instead of hitting a dead end. A
+    // student with nothing submitted has nothing to approve at all.
+    if (current !== "submitted" && current !== "revision_required") {
       return fail(res, 409, "ILLEGAL_TRANSITION",
         `This submission is "${submission.status}" and cannot be approved. Only a submitted version can be approved.`);
     }
@@ -1534,12 +1555,25 @@ router.post("/:id/review/approve", authenticateToken, authorizeRoles("admin", "c
       } }
     );
 
-    const { updateAssignment, ensureAssignment } = require("../models/TaskAssignment");
+    const { updateAssignment, ensureAssignment, getAssignment } = require("../models/TaskAssignment");
     await ensureAssignment(db, String(task._id), studentId);
+    // Approving supersedes an open revision cycle: the student no longer has
+    // anything to resubmit. The cycle itself stays in revisionHistory, marked
+    // "closed" so the timeline never shows a window that is still open.
+    const currentAssignment = await getAssignment(db, String(task._id), studentId);
+    let revisionHistory = Array.isArray(currentAssignment?.revision_history) ? currentAssignment.revision_history : null;
+    if (revisionHistory) {
+      const idx = revisionHistory.findIndex((h) => h && h.status === "open");
+      if (idx >= 0) {
+        revisionHistory = revisionHistory.slice();
+        revisionHistory[idx] = { ...revisionHistory[idx], status: "closed", closed_at: now, closed_by: String(req.user.id) };
+      }
+    }
     await updateAssignment(db, String(task._id), studentId, {
       status: "approved",
       progress: 100,
       revision_status: "closed",
+      ...(revisionHistory ? { revision_history: revisionHistory } : {}),
     });
 
     await syncTaskWorkflowFromStudents(db, task);
@@ -2734,10 +2768,24 @@ router.get("/:id/my-submission-status", authenticateToken, checkStudentRegistrat
         comment: submission.comment
       } : null
     }, {
-      // Legacy flat keys
+      // Legacy flat keys.
+      //
+      // These used to be the ONLY response shape, so they are kept as a
+      // complete mirror of `data`: a caller reading the flat `status` must
+      // get the same canonical value a caller reading `data.status` gets.
       has_submission: !!submission,
       workflow_status: studentWorkflowStatus,
+      status: resolved,
+      status_label: STATUS_LABELS[resolved],
       assignment_status: assignmentNow ? normalizeStatus(assignmentNow.status) : null,
+      revision_cycle: assignmentNow?.revision_cycle || 0,
+      revision_requested_at: assignmentNow?.revision_requested_at || null,
+      revision_deadline: assignmentNow?.revision_deadline || null,
+      revision_deadline_label: assignmentNow?.revision_deadline ? formatISTDeadlineLabel(assignmentNow.revision_deadline) : null,
+      review_feedback: submission?.review_comments || null,
+      resubmission_available: eligibility.allowed && !["Cancelled", "Archived"].includes(studentWorkflowStatus),
+      resubmission_blocked_reason: eligibility.reason,
+      resubmission_expires_in_ms: eligibility.expires_in_ms,
       latest_submission: submission ? {
         id: String(submission._id),
         version: submission.version,

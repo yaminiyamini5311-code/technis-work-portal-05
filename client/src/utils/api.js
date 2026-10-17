@@ -26,9 +26,17 @@ export function authHeaders(extra = {}) {
  */
 export async function apiFetch(path, { method = "GET", body, form, signal } = {}) {
   const headers = authHeaders();
-  let payload = body;
-  if (form) payload = form;
-  else if (body !== undefined) headers["Content-Type"] = "application/json";
+  let payload;
+  if (form) {
+    // FormData: let fetch set the multipart boundary itself.
+    payload = form;
+  } else if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
+    // Must be serialised: passing a plain object as the fetch body makes the
+    // browser stringify it with String(), which produces the literal text
+    // "[object Object]" and a 500 from body-parser on the server.
+    payload = JSON.stringify(body);
+  }
 
   let res;
   try {
@@ -153,6 +161,7 @@ export function taskTitle(value) {
   // Normalize only the characters that survive a round trip identically and
   // strip control characters (which would break layout). Case, punctuation and
   // separators are preserved verbatim.
+  // eslint-disable-next-line no-control-regex -- stripping C0 controls is the point
   return String(value)
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
     .replace(/\r\n/g, "\n");
