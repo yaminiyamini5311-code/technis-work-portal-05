@@ -856,6 +856,160 @@ router.post("/", authenticateToken, authorizeRoles("admin", "ceo", "manager"), a
   } catch (e) { console.error("Create task error:", e); res.status(500).json({ success: false, message: "Unable to create task" }); }
 });
 
+/* ─── EDIT TASK ──────────────────────────────────────────────────────────────
+ * Updates the content of ONE existing task in place (used by the Edit button
+ * on the Tasks page). It is a partial update: only the keys present in the
+ * body are written, so a form that always submits every field behaves like a
+ * full save while a partial API caller cannot wipe a field by omitting it.
+ *
+ * Only the fields the task form owns are writable:
+ *   title, description, how_to_do, expected_output, submission_requirements,
+ *   priority, domain, day_number, start_date, start_time, due_date, due_time
+ * Assignment (target_type / batch_id / assigned_to / student_ids), task_code,
+ * workflow status, submissions, files and history are deliberately NOT
+ * editable here: reassigning students is a separate operation and every other
+ * record that points at this task must keep working after an edit.
+ *
+ * start_at / due_at are recomputed from the merged values so the server-side
+ * submission window always follows the dates shown in the UI, and the
+ * deadline can be extended but never moved before the start date.
+ *
+ * Authorized exactly like task creation and deletion (admin / ceo / manager).
+ */
+router.put("/:id", authenticateToken, authorizeRoles("admin", "ceo", "manager"), async (req, res) => {
+  try {
+    const db = req.db;
+    let taskId;
+    try {
+      taskId = new ObjectId(String(req.params.id || "").trim());
+    } catch {
+      return res.status(400).json({ success: false, message: "Invalid task id" });
+    }
+
+    const task = await db.collection("tasks").findOne({ _id: taskId });
+    if (!task) return res.status(404).json({ success: false, message: "Task not found" });
+
+    const taskKey = String(task._id);
+    const b = req.body || {};
+    const update = {};
+
+    if ("title" in b) {
+      const title = String(b.title || "").trim();
+      if (!title) return res.status(400).json({ success: false, message: "Task title is required" });
+      update.title = title;
+    }
+    for (const field of ["description", "expected_output", "submission_requirements"]) {
+      if (field in b) update[field] = String(b[field] || "").trim();
+    }
+    if ("how_to_do" in b) {
+      update.how_to_do = b.how_to_do ? String(b.how_to_do).trim().substring(0, 5000) : null;
+    }
+    if ("priority" in b) {
+      const priority = String(b.priority || "").trim().toLowerCase();
+      if (!priorityValues.has(priority)) return res.status(400).json({ success: false, message: "Invalid priority" });
+      update.priority = priority;
+    }
+    if ("domain" in b) {
+      const domain = String(b.domain || "").trim().toLowerCase();
+      if (!ALLOWED_DOMAINS.includes(domain)) {
+        return res.status(400).json({ success: false, message: "Invalid domain. Choose from: " + ALLOWED_DOMAINS.join(", ") });
+      }
+      update.domain = domain;
+    }
+    if ("day_number" in b) {
+      const raw = b.day_number;
+      if (raw === undefined || raw === null || raw === "") {
+        update.day_number = null;
+      } else {
+        const dayNumber = Number(raw);
+        if (!Number.isInteger(dayNumber) || dayNumber < 1 || dayNumber > 60) {
+          return res.status(400).json({ success: false, message: "Day must be an integer between 1 and 60" });
+        }
+        update.day_number = dayNumber;
+      }
+    }
+
+    // Dates: merge with the stored values first so a partial body still keeps
+    // the task's real window, then validate the window the task will have.
+    const hasDateKey = ["start_date", "start_time", "due_date", "due_time"].some(k => k in b);
+    let startDate = task.start_date || null;
+    let startTime = task.start_time || null;
+    let dueDate = task.due_date || null;
+    let dueTime = task.due_time || null;
+    if (hasDateKey) {
+      if ("start_date" in b) { startDate = b.start_date ? String(b.start_date).trim() : null; update.start_date = startDate; }
+      if ("start_time" in b) { startTime = b.start_time ? String(b.start_time).trim() : null; update.start_time = startTime; }
+      if ("due_date" in b) { dueDate = b.due_date ? String(b.due_date).trim() : null; update.due_date = dueDate; }
+      if ("due_time" in b) { dueTime = b.due_time ? String(b.due_time).trim() : null; update.due_time = dueTime; }
+
+      if (startDate && dueDate) {
+        if (startDate > dueDate) {
+          return res.status(400).json({ success: false, message: "Starting Date cannot be after Ending Date" });
+        }
+        if (startDate === dueDate && startTime && dueTime && startTime > dueTime) {
+          return res.status(400).json({ success: false, message: "Starting time cannot be after ending time" });
+        }
+      }
+      update.start_at = combineTaskDateTime(startDate, startTime, "00:00");
+      update.due_at = combineTaskDateTime(dueDate, dueTime, "23:59");
+    }
+
+    const editableKeys = Object.keys(update);
+    if (editableKeys.length === 0) {
+      return res.status(400).json({ success: false, message: "No editable fields supplied" });
+    }
+
+    update.updated_at = new Date().toISOString();
+    await db.collection("tasks").updateOne({ _id: taskId }, { $set: update });
+
+    const previousValue = {};
+    const newValue = {};
+    for (const key of editableKeys) {
+      previousValue[key] = task[key] ?? null;
+      newValue[key] = update[key];
+    }
+
+    await writeAudit(db, {
+      actorId: req.user.id,
+      action: "task_updated",
+      entityType: "task",
+      entityId: taskKey,
+      previousValue,
+      newValue,
+      metadata: { changed: editableKeys },
+    });
+
+    // Tell the assigned students what moved. Notification failures never fail
+    // the edit itself (same fail-soft approach as the assignment email).
+    try {
+      const assignments = await db.collection("task_assignments")
+        .find({ task_id: taskKey }, { projection: { student_id: 1 } })
+        .toArray();
+      const summary = editableKeys
+        .filter(k => !["start_at", "due_at"].includes(k))
+        .map(k => `${k.replace(/_/g, " ")}: ${update[k] === null || update[k] === "" ? "cleared" : update[k]}`)
+        .join(" · ");
+      const message = `${update.title || task.title} (${task.task_code || taskKey}) was updated by ${req.user.role === "ceo" ? "the CEO" : "an administrator"}. ${summary}`;
+      for (const studentId of new Set(assignments.map(a => String(a.student_id)).filter(Boolean))) {
+        await notify(db, studentId, "task_updated", "Task updated", message.substring(0, 400), taskKey);
+      }
+    } catch (e) {
+      console.error("Task update notification failed:", e.message);
+    }
+
+    res.json({
+      success: true,
+      message: "Task updated successfully",
+      taskId: taskKey,
+      taskCode: task.task_code || null,
+      updated: editableKeys,
+    });
+  } catch (e) {
+    console.error("UPDATE TASK:", e);
+    res.status(500).json({ success: false, message: "Unable to update task" });
+  }
+});
+
 /* ─── GET TASK BY ID ────────────────────────────────────────────────────── */
 router.get("/:id", authenticateToken, async (req, res) => {
   try {

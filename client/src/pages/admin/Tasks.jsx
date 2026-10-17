@@ -40,6 +40,31 @@ const DOMAINS = [
   { value: "program", label: "Program" }
 ];
 
+/* Blank form for CREATE mode. Editing reuses the same fields, so this object
+   is the single definition of "no task selected". */
+const EMPTY_FORM = {
+  title: "",
+  description: "",
+  priority: "medium",
+  start_date: "",
+  start_time: "",
+  due_date: "",
+  due_time: "",
+  day_number: "",
+  domain: "edutins",
+  how_to_do: "",
+  expected_output: "",
+  submission_requirements: ""
+};
+
+/* Fields the backend accepts on an edit (PUT /api/tasks/:id). Assignment is
+   deliberately absent: the Edit action changes a task, it never reassigns it. */
+const EDITABLE_FIELDS = [
+  "title", "description", "priority", "domain", "day_number",
+  "start_date", "start_time", "due_date", "due_time",
+  "how_to_do", "expected_output", "submission_requirements"
+];
+
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
   const [students, setStudents] = useState([]);
@@ -49,20 +74,7 @@ export default function Tasks() {
   const [domainFilter, setDomainFilter] = useState("");
   const [targetType, setTargetType] = useState("student"); // "student" | "batch" | "program"
   const [batchId, setBatchId] = useState("");
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    priority: "medium",
-    start_date: "",
-    start_time: "",
-    due_date: "",
-    due_time: "",
-    day_number: "",
-    domain: "edutins",
-    how_to_do: "",
-    expected_output: "",
-    submission_requirements: ""
-  });
+  const [form, setForm] = useState(EMPTY_FORM);
 
   const { student, setStudent, reset, isStudentDisabled } = useExclusiveSelect();
   const [selected, setSelected] = useState(null);
@@ -71,6 +83,9 @@ export default function Tasks() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Task edit: `editing` holds the task currently loaded into the form above.
+  // When it is null the form behaves exactly as it always has (create mode).
+  const [editing, setEditing] = useState(null);
   // Task removal: `confirmDelete` holds the task awaiting confirmation,
   // `deleting` keeps the confirm button disabled while the request is in flight.
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -144,25 +159,92 @@ export default function Tasks() {
       const parts = [`Task ${data.taskCode} assigned`];
       if (data.assigned_count) parts.push(`to ${data.assigned_count} student${data.assigned_count === 1 ? "" : "s"}`);
       setMessage(parts.join(" ") + ".");
-      setForm({
-        title: "",
-        description: "",
-        priority: "medium",
-        start_date: "",
-        start_time: "",
-        due_date: "",
-        due_time: "",
-        day_number: "",
-        domain: "edutins",
-        how_to_do: "",
-        expected_output: "",
-        submission_requirements: ""
-      });
+      setForm(EMPTY_FORM);
       reset();
       setBatchId("");
       await load();
     } catch (e) {
       setError(e.message || "Unable to create task");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /* Loads a task into the EXISTING form above, pre-filled with its current
+     values, and switches that form into edit mode. Assignment selectors are
+     shown for context only and are disabled while editing: this action edits
+     the task, it never reassigns it. */
+  const openEdit = (task) => {
+    setMessage("");
+    setError("");
+    setConfirmDelete(null);
+    setEditing(task);
+    setTargetType(task.target_type === "batch" ? "batch" : "student");
+    setStudent(task.assigned_to || "");
+    setBatchId(task.batch_id || "");
+    setForm({
+      title: task.title || "",
+      description: task.description || "",
+      priority: task.priority || "medium",
+      start_date: task.start_date || "",
+      start_time: task.start_time || "",
+      due_date: task.due_date || "",
+      due_time: task.due_time || "",
+      day_number: task.day_number ?? "",
+      domain: task.domain || "edutins",
+      how_to_do: task.how_to_do || "",
+      expected_output: task.expected_output || "",
+      submission_requirements: task.submission_requirements || ""
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Leaves edit mode and restores the blank create form. Nothing is saved.
+  const cancelEdit = () => {
+    setEditing(null);
+    setForm(EMPTY_FORM);
+    setTargetType("student");
+    setBatchId("");
+    reset();
+  };
+
+  const saveEdit = async (event) => {
+    event.preventDefault();
+    if (!editing) return;
+    setMessage("");
+    setError("");
+
+    if (!form.title.trim()) return setError("Task title is required");
+    // A deadline may be extended, but never moved before the start date.
+    if (form.start_date && form.due_date) {
+      if (form.start_date > form.due_date) return setError("Starting Date cannot be after Ending Date");
+      if (form.start_date === form.due_date && form.start_time && form.due_time && form.start_time > form.due_time) return setError("Starting time cannot be after ending time");
+    }
+
+    const taskId = editing.id;
+    const taskCode = editing.task_code || editing.title;
+    const payload = {};
+    for (const field of EDITABLE_FIELDS) payload[field] = form[field];
+
+    try {
+      setSubmitting(true);
+      const res = await fetch(`${API_URL}/api/tasks/${taskId}`, {
+        method: "PUT",
+        headers: { ...auth(), "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.success) {
+        setError(data.message || "Unable to update task. Please try again.");
+        return;
+      }
+
+      setMessage(`Task ${taskCode} updated successfully.`);
+      cancelEdit();
+      await load();
+    } catch {
+      setError("Unable to update task. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -251,8 +333,19 @@ export default function Tasks() {
       
       {error && <div className="error-msg">{error}</div>}
       {message && <div className="success-msg">{message}</div>}
-      
-      <form className="panel form-grid-admin" onSubmit={create} autoComplete="off">
+
+      {editing && (
+        <div className="info-msg">
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span>
+              EDITING TASK {editing.task_code || "—"} · {editing.title}
+            </span>
+            <button type="button" onClick={cancelEdit} disabled={submitting}>Cancel edit</button>
+          </div>
+        </div>
+      )}
+
+      <form className="panel form-grid-admin" onSubmit={editing ? saveEdit : create} autoComplete="off">
         <div className="field">
           <label className="field-label" htmlFor="task-title">Task title <span className="req">*</span></label>
           <input
@@ -276,11 +369,16 @@ export default function Tasks() {
             value={targetType}
             onChange={e => setTargetType(e.target.value)}
             required
+            disabled={!!editing}
             autoComplete="off"
+            title={editing ? "Editing does not change who a task is assigned to" : ""}
           >
             <option value="student">Individual Student</option>
             <option value="batch">Entire Batch</option>
           </select>
+          {editing && (
+            <small className="field-hint">Assignment cannot be changed while editing</small>
+          )}
         </div>
 
         <div className="field">
@@ -292,11 +390,11 @@ export default function Tasks() {
             name="task-student"
             value={student}
             onChange={e => setStudent(e.target.value)}
-            disabled={isStudentDisabled || targetType !== "student"}
+            disabled={isStudentDisabled || targetType !== "student" || !!editing}
             autoComplete="off"
-            style={isStudentDisabled || targetType !== "student" ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
-            title={isStudentDisabled ? "Disabled because a program is selected" : targetType !== "student" ? "Select 'Individual Student' above" : ""}
-            aria-disabled={isStudentDisabled || targetType !== "student"}
+            style={isStudentDisabled || targetType !== "student" || !!editing ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+            title={editing ? "Editing does not change who a task is assigned to" : isStudentDisabled ? "Disabled because a program is selected" : targetType !== "student" ? "Select 'Individual Student' above" : ""}
+            aria-disabled={isStudentDisabled || targetType !== "student" || !!editing}
           >
             <option value="">Select student</option>
             {students.map(s => (
@@ -317,11 +415,11 @@ export default function Tasks() {
             name="task-batch"
             value={batchId}
             onChange={e => setBatchId(e.target.value)}
-            disabled={batchesLoading || targetType !== "batch"}
+            disabled={batchesLoading || targetType !== "batch" || !!editing}
             autoComplete="off"
-            style={batchesLoading || targetType !== "batch" ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
-            title={targetType !== "batch" ? "Select 'Entire Batch' above" : ""}
-            aria-disabled={batchesLoading || targetType !== "batch"}
+            style={batchesLoading || targetType !== "batch" || !!editing ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+            title={editing ? "Editing does not change who a task is assigned to" : targetType !== "batch" ? "Select 'Entire Batch' above" : ""}
+            aria-disabled={batchesLoading || targetType !== "batch" || !!editing}
           >
             <option value="">{batchesLoading ? "Loading batches..." : "Select batch"}</option>
             {batches.map(b => (
@@ -434,7 +532,9 @@ export default function Tasks() {
         </div>
 
         <button className="gold-btn" type="submit" disabled={submitting}>
-          {submitting ? "Assigning…" : "Assign Task"}
+          {editing
+            ? (submitting ? "Saving…" : "Save Changes")
+            : (submitting ? "Assigning…" : "Assign Task")}
         </button>
       </form>
 
@@ -516,6 +616,13 @@ export default function Tasks() {
                 <td>{t.submission_count || 0}</td>
                 <td>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => openEdit(t)}
+                      disabled={deleting || submitting}
+                      aria-label={`Edit task ${t.task_code || t.title}`}
+                    >
+                      Edit
+                    </button>
                     <button onClick={() => openReview(t)}>Review</button>
                     <button
                       onClick={() => askDelete(t)}
