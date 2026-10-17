@@ -2,18 +2,19 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import TechinsIcon from "../../components/TechinsIcon";
 import "./StudentDetailsPage.css";
+import { formatISTDateTime, formatISTDate } from "../../utils/dateHelper";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 
 function fmtDate(value) {
   if (!value) return "—";
-  try { return new Date(value).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }); } catch { return String(value); }
+  return formatISTDate(value);
 }
 
 function fmtDateTime(value) {
   if (!value) return "—";
-  try { return new Date(value).toLocaleString("en-US", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }); } catch { return String(value); }
+  return formatISTDateTime(value);
 }
 
 function formatBytes(n) {

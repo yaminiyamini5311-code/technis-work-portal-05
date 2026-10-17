@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, Fragment } from "react";
 import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
 import { useScrollReveal } from "../../components/useScrollReveal";
+import { formatISTDateTime, formatISTDate } from "../../utils/dateHelper";
 import "./MyTasks.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -9,7 +10,7 @@ const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` }
 
 function formatDateTime(value) {
   if (!value) return "—";
-  try { return new Date(value).toLocaleString(); } catch { return String(value); }
+  return formatISTDateTime(value);
 }
 
 function formatBytes(n) {
@@ -304,13 +305,13 @@ export default function MyTasks() {
             const showAwaitingReview = hasStudentSubmission && ["Submitted", "Under Review", "Resubmitted"].includes(studentStatus);
             
             // Check if task is overdue
-            const isOverdue = task.due_date && new Date(task.due_date) < new Date() && workflow !== "Approved";
+            const isOverdue = task.due_date && formatISTDateTime(task.due_date) !== "—" && new Date(task.due_date).toISOString() < new Date().toISOString() && workflow !== "Approved";
             
             // Format dates for display
             const formatDate = (dateStr) => {
               if (!dateStr) return null;
-              const d = new Date(dateStr + 'T00:00:00'); // Avoid timezone shifts
-              return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+              // Use shared IST formatter for consistent timezone
+              return formatISTDate(dateStr);
             };
             
             return (

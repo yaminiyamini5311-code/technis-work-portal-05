@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useExclusiveSelect } from "../../hooks/useExclusiveSelect";
 import "../../styles/admin.css";
+import { formatISTDateShort } from "../../utils/dateHelper";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
@@ -307,12 +308,26 @@ export default function Tasks() {
   const submitReview = async (decision = review.decision) => {
     const latest = submissions[0];
     if (!latest) return setError("No submission is available for review.");
-    if (!review.comment.trim()) return setError("Review comments are required.");
     
+    // Auto-set comment for approval/revision to avoid requiring manual entry
+    // and update the review state so the textarea reflects the auto-generated value
+    let comment = review.comment;
+    if (decision === "approve") {
+      comment = "Approved";
+    } else if (decision === "revision") {
+      comment = "Revision requested";
+    }
+    if (!review.comment.trim() && decision !== "approve" && decision !== "revision") {
+      return setError("Review comments are required.");
+    }
+    // Update review state so textarea shows the auto-generated comment
+    if ((decision === "approve" || decision === "revision") && comment !== review.comment) {
+      setReview({ ...review, comment });
+    }
     const res = await fetch(`${API_URL}/api/tasks/review`, { 
       method: "POST", 
       headers: { ...auth(), "Content-Type": "application/json" }, 
-      body: JSON.stringify({ submission_id: latest.id, decision, comment: review.comment }) 
+      body: JSON.stringify({ submission_id: latest.id, decision, comment }) 
     });
     const data = await res.json();
     
@@ -612,7 +627,7 @@ export default function Tasks() {
                 </td>
                 <td>{t.priority}</td>
                 <td>{t.start_date ? `${t.start_date}${t.start_time ? ` ${t.start_time}` : ""}` : "—"}</td>
-                <td>{t.due_date ? `${t.due_date}${t.due_time ? ` ${t.due_time}` : ""}` : "—"}</td>
+                <td>{t.due_date ? formatISTDateShort(t.due_date) : "—"}</td>
                 <td>{t.submission_count || 0}</td>
                 <td>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
