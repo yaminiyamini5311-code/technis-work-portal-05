@@ -400,7 +400,11 @@ test("full task lifecycle: assign -> submit -> revision -> resubmit -> approve -
   assert.equal(allSubs.status, 200);
   const row = allSubs.json.submissions.find((s) => s.id === sub2.json.submissionId);
   assert.ok(row, "submission missing from reviewer table");
-  assert.equal(row.student_id, studentId);
+  // `student_id` is the TECHINS display code and is null for students who
+  // have none; `student_db_id` is the users._id the student routes use.
+  // Routing must use the latter — routing on the former produced
+  // /admin/students/null (see getStudentRouteId in SubmissionsView).
+  assert.equal(row.student_db_id, studentId);
   assert.equal(row.status, "Approved");
   assert.equal(row.version, 2);
   // The version that carried the file reports it (v2 was comment-only).

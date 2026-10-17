@@ -226,7 +226,12 @@ router.get("/submissions", authenticateToken, authorizeRoles("admin", "manager",
         outcome: task?.outcome || null,
         outcome_submitted_at: task?.outcome_submitted_at || s.submitted_at || null,
         student_id: student?.student_id || null,
-        student_db_id: String(s.student_id),
+        // The users._id (DB ObjectId) is the only identifier the student
+        // routes accept. String(null) yields the literal text "null", which
+        // would travel into /admin/students/null as a truthy id, so a
+        // submission without a student reference must stay null here and is
+        // rejected by the client guard before any request is made.
+        student_db_id: s.student_id ? String(s.student_id) : null,
         student_name: student?.name || null,
         student_email: student?.email || null,
         student_phone: student?.phone || null,

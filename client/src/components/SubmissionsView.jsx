@@ -72,9 +72,18 @@ function canPreview(mime) {
  * Return the DB ObjectId for routing/API calls.
  * The TECHINS display ID (student_id) is for display only and may be null.
  * The DB ObjectId (student_db_id) is the stable identifier for lookups.
+ *
+ * Guards the string forms of "no id" as well: a submission whose student
+ * reference is missing serializes to the literal text "null"/"undefined",
+ * which is truthy and would otherwise be sent on as a real id and produce
+ * /admin/students/null. Returns null in every unusable case so the caller
+ * can show the existing error state instead of calling the API.
  */
 function getStudentRouteId(submission) {
-  return submission?.student_db_id || submission?.student_id || null;
+  const raw = submission?.student_db_id || submission?.student_id || "";
+  const id = String(raw).trim();
+  if (!id || id === "null" || id === "undefined") return null;
+  return id;
 }
 
 function DetailModal({ item, onClose, onReviewed, inline = false }) {
