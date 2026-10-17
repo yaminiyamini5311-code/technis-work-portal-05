@@ -11,5 +11,11 @@
       "src": "/(.*)",
       "dest": "server.js"
     }
+  ],
+  "crons": [
+    {
+      "src": "/api/cron/expire-resubmissions",
+      "schedule": "0 * * * *"
+    }
   ]
 }

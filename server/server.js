@@ -236,6 +236,7 @@ const performanceRoutes  = require("./routes/performanceRoutes");
 const auditRoutes        = require("./routes/auditRoutes");
 const authorizedUsersRoutes = require("./routes/authorizedUsersRoutes");
 const batchRoutes        = require("./routes/batchRoutes");
+const cronRoutes         = require("./routes/cronRoutes");
 
 app.use("/api/auth",         authRoutes);
 app.use("/api/admin",        adminRoutes);
@@ -255,6 +256,10 @@ app.use("/api/performance",  performanceRoutes);
 app.use("/api/audit-logs",   auditRoutes);
 app.use("/api/authorized-users", authorizedUsersRoutes);
 app.use("/api/batches",      batchRoutes);
+// Vercel Cron target. Authenticated with CRON_SECRET (NOT a user JWT) because
+// a cron invocation has no signed-in user; see routes/cronRoutes.js and the
+// "crons" block in server/vercel.json.
+app.use("/api/cron",         cronRoutes);
 
 // ─── 404 ───────────────────────────────────────────────────────────────────
 app.use((req, res) => {
