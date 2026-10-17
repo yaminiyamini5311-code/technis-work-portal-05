@@ -640,8 +640,16 @@ router.delete("/students/:id", authenticateToken, authorizeRoles("admin", "ceo")
 router.get("/students/:id/details", authenticateToken, authorizeRoles("admin", "ceo", "manager"), async (req, res) => {
   try {
     const db = req.db;
-    const userId = toId(req.params.id);
-    if (!userId) return res.status(400).json({ success: false, message: "Invalid student id" });
+    // The route param is the users._id ObjectId (what the submissions list
+    // sends as student_db_id). toId() is lenient and would hand the raw string
+    // back for junk input, turning a bad id into a misleading 404, so the
+    // ObjectId is parsed explicitly here — same rule as DELETE /api/tasks/:id.
+    let userId;
+    try {
+      userId = new ObjectId(String(req.params.id || "").trim());
+    } catch {
+      return res.status(400).json({ success: false, message: "Invalid student id" });
+    }
     const user = await db.collection("users").findOne({ _id: userId }, { projection: { password: 0 } });
     if (!user) return res.status(404).json({ success: false, message: "Student not found" });
 
