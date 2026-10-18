@@ -156,7 +156,11 @@ export function isDeadlinePassedIST(deadlineISO, refDate) {
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 /**
- * "15 Oct 2026, 12:33 PM" in IST.
+ * "18 Oct 2026, 10:00:00 AM" in IST — the ONE date+time format used across the
+ * CEO workspace, the student portal and every dialog. Seconds are included so
+ * two events in the same minute (a task start and its submission) are never
+ * ambiguous. An already-malformed legacy shape such as "15:43 3 PM" can no
+ * longer be produced: the whole string comes from a single Intl formatter.
  * @param {string|Date|null|undefined} value
  * @returns {string}
  */
@@ -164,7 +168,7 @@ export function formatWorkspaceDateTime(value) {
   if (value == null || value === "") return "—";
   const date = value instanceof Date ? value : new Date(value);
   if (isNaN(date)) return "—";
-  return workspaceDateTimeFormatter.format(date);
+  return upperPeriod(workspaceDateTimeFormatter.format(date));
 }
 
 /**
@@ -197,16 +201,22 @@ export function formatWorkspaceDateTimeParts(dateValue, timeValue) {
   const minute = Number(match[2]);
   const dateWithTime = new Date(date.getTime());
   dateWithTime.setHours(hour, minute, 0, 0);
-  return workspaceDateTimeFormatter.format(dateWithTime);
+  return upperPeriod(workspaceDateTimeFormatter.format(dateWithTime));
 }
 
-const workspaceDateTimeFormatter = new Intl.DateTimeFormat("en-IN", {
+/** "am" → "AM" so the workspace shows one consistent meridiem casing. */
+function upperPeriod(text) {
+  return text.replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase());
+}
+
+const workspaceDateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
   month: "short",
   year: "numeric",
-  hour: "numeric",
+  hour: "2-digit",
   minute: "2-digit",
-  hourCycle: "h12",
+  second: "2-digit",
+  hour12: true,
   timeZone: "Asia/Kolkata",
 });
 
@@ -227,6 +237,29 @@ export function pluralise(count, word, pluralWord) {
   return `${n} ${n === 1 ? word : plural}`;
 }
 
+/**
+ * Human duration: 5100 -> "1 hour, 25 minutes, 30 seconds" with correct
+ * singular/plural. Returns null for a missing value so callers can show
+ * "Not recorded" instead of a fabricated "0 seconds".
+ *
+ * @param {number|null|undefined} totalSeconds
+ * @returns {string|null}
+ */
+export function formatDuration(totalSeconds) {
+  if (totalSeconds === null || totalSeconds === undefined || totalSeconds === "") return null;
+  const seconds = Math.max(0, Math.floor(Number(totalSeconds)));
+  if (!Number.isFinite(seconds)) return null;
+  if (seconds === 0) return "0 seconds";
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  const parts = [];
+  if (hours) parts.push(pluralise(hours, "hour"));
+  if (minutes) parts.push(pluralise(minutes, "minute"));
+  if (secs) parts.push(pluralise(secs, "second"));
+  return parts.join(", ");
+}
+
 export default {
   formatISTDateTime,
   formatISTDate,
@@ -237,4 +270,5 @@ export default {
   formatWorkspaceDate,
   formatWorkspaceDateTimeParts,
   pluralise,
+  formatDuration,
 };
