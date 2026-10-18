@@ -236,6 +236,7 @@ const performanceRoutes  = require("./routes/performanceRoutes");
 const auditRoutes        = require("./routes/auditRoutes");
 const authorizedUsersRoutes = require("./routes/authorizedUsersRoutes");
 const batchRoutes        = require("./routes/batchRoutes");
+const cronRoutes         = require("./routes/cronRoutes");
 
 app.use("/api/auth",         authRoutes);
 app.use("/api/admin",        adminRoutes);
@@ -255,6 +256,10 @@ app.use("/api/performance",  performanceRoutes);
 app.use("/api/audit-logs",   auditRoutes);
 app.use("/api/authorized-users", authorizedUsersRoutes);
 app.use("/api/batches",      batchRoutes);
+// Vercel Cron target. Authenticated with CRON_SECRET (NOT a user JWT) because
+// a cron invocation has no signed-in user; see routes/cronRoutes.js and the
+// "crons" block in server/vercel.json.
+app.use("/api/cron",         cronRoutes);
 
 // ─── 404 ───────────────────────────────────────────────────────────────────
 app.use((req, res) => {
@@ -263,14 +268,19 @@ app.use((req, res) => {
 
 // ─── ERROR HANDLER ─────────────────────────────────────────────────────────
 app.use((error, req, res, next) => {
-  console.error("[ERROR]", error.message);
+  // The stack is logged (never sent to the client) so a 500 in Vercel logs
+  // points at the real throw site instead of just a message.
+  console.error("[ERROR]", req.method, req.originalUrl, "-", error.message);
+  if (error.stack) console.error(error.stack);
   if (error.message === "Not allowed by CORS") {
-    return res.status(403).json({ success: false, message: "CORS origin not allowed" });
+    return res.status(403).json({ success: false, data: null, error: { code: "CORS_NOT_ALLOWED", message: "CORS origin not allowed" }, message: "CORS origin not allowed" });
   }
   res.status(500).json({
     success: false,
+    data: null,
+    error: { code: "INTERNAL_ERROR", message: "Internal server error" },
     message: "Internal server error",
-    error: process.env.NODE_ENV === "production" ? undefined : error.message,
+    error_detail: process.env.NODE_ENV === "production" ? undefined : error.message,
   });
 });
 

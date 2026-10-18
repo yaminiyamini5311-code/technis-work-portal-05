@@ -333,6 +333,14 @@ test("full task lifecycle: assign -> submit -> revision -> resubmit -> approve -
   assert.equal(myTasks.status, 200);
   assert.ok(myTasks.json.tasks.some((t) => t.id === taskId), "assigned task missing from /api/tasks/my");
 
+  // Empty submission rejected (validation parity with the UI). Checked BEFORE
+  // the first successful submit: /submit now also refuses to create a second
+  // version (409), so the empty-body rule has to be exercised while the
+  // student still has no submission at all.
+  const empty = await api("POST", `/api/tasks/${taskId}/submit`, { token: studentToken, body: {} });
+  assert.equal(empty.status, 400, JSON.stringify(empty.json));
+  assert.equal(empty.json.error.code, "EMPTY_SUBMISSION");
+
   // First submission with a file + comment.
   const form = new FormData();
   form.append("comment", "First version from e2e test");
@@ -347,10 +355,6 @@ test("full task lifecycle: assign -> submit -> revision -> resubmit -> approve -
   assert.equal(status1.json.has_submission, true);
   assert.equal(status1.json.latest_submission.version, 1);
 
-  // Empty submission rejected (validation parity with the UI).
-  const empty = await api("POST", `/api/tasks/${taskId}/submit`, { token: studentToken, body: {} });
-  assert.equal(empty.status, 400);
-
   // Reviewer requests a revision -> student gains the resubmit path.
   const revision = await api("POST", "/api/tasks/review", {
     token: adminToken,
@@ -364,12 +368,20 @@ test("full task lifecycle: assign -> submit -> revision -> resubmit -> approve -
 
   // Resubmission creates version 2 (regression: the UI used to hide the
   // submit form after any prior submission, making this impossible).
+  // Version 2+ MUST go through /resubmit: that is the only endpoint that
+  // enforces the 24-hour revision window on the server clock, so routing it
+  // through /submit would be a way to bypass the deadline.
   const form2 = new FormData();
   form2.append("comment", "Second version with more detail");
-  const sub2 = await api("POST", `/api/tasks/${taskId}/submit`, { token: studentToken, form: form2 });
+  const sub2 = await api("POST", `/api/tasks/${taskId}/resubmit`, { token: studentToken, form: form2 });
   assert.equal(sub2.status, 201, JSON.stringify(sub2.json));
   assert.equal(sub2.json.version, 2);
   created.submissionIds.push(sub2.json.submissionId);
+
+  // /submit refuses to create a second version at all.
+  const submitAgain = await api("POST", `/api/tasks/${taskId}/submit`, { token: studentToken, form: form2 });
+  assert.equal(submitAgain.status, 409);
+  assert.equal(submitAgain.json.error.code, "ALREADY_SUBMITTED");
 
   // Approve the latest version.
   const approve = await api("POST", "/api/tasks/review", {

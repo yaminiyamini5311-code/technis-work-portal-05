@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
 import { useScrollReveal } from "../../components/useScrollReveal";
+import { formatISTDateShort } from "../../utils/dateHelper";
 import "./Missions.css";
 
 const API_URL =
@@ -274,9 +275,7 @@ function Missions() {
                                             <span>Due Date</span>
 
                                             <strong>
-                                                {
-                                                    mission.due_date
-                                                }
+                                                {formatISTDateShort(mission.due_date)}
                                             </strong>
                                         </div>
                                     )}

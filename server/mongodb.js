@@ -117,8 +117,19 @@ async function ensureIndexes(db) {
     await db.collection("task_assignments").createIndex({ student_id: 1 });
     await db.collection("submissions").createIndex({ task_id: 1 });
     await db.collection("submissions").createIndex({ student_id: 1 });
+    // Per-student version history for one task: the Task Manager viewer and the
+    // resubmission flow both read this exact pair.
+    await db.collection("submissions").createIndex({ task_id: 1, student_id: 1, version: -1 });
     await db.collection("notifications").createIndex({ user_id: 1, read_at: 1 });
     await db.collection("notifications").createIndex({ created_at: -1 });
+    // Workflow notification de-duplication.
+    // SPARSE is essential: historical rows have no dedupe_key at all, so they
+    // are skipped by the index and can never collide with each other.
+    await db.collection("notifications").createIndex(
+      { dedupe_key: 1 },
+      { unique: true, sparse: true, name: "notification_dedupe_unique" }
+    );
+    await db.collection("task_assignments").createIndex({ status: 1, revision_deadline: 1 }, { sparse: true });
     await db.collection("daily_activities").createIndex({ user_id: 1, date: -1 });
     await db.collection("missions").createIndex({ assigned_to: 1 });
     await db.collection("performance").createIndex({ user_id: 1 });

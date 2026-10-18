@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import TechinsIcon from "./TechinsIcon";
 import useModalBehavior from "./useModalBehavior";
+import { formatISTDateTime } from "../utils/dateHelper";
 import "./SubmissionsView.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -12,11 +13,6 @@ function formatBytes(n) {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function formatDateTime(v) {
-  if (!v) return "—";
-  try { return new Date(v).toLocaleString("en-US", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }); } catch { return String(v); }
 }
 
 async function downloadFile(file, onError) {
@@ -148,7 +144,7 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
             <div className="submission-avatar">{(item.student_name || "S").charAt(0).toUpperCase()}</div>
             <div>
               <strong>Version {v.version} · {v.submission_code || ""}</strong>
-              <small>{formatDateTime(v.submitted_at)} · {v.status}</small>
+              <small>{formatISTDateTime(v.submitted_at)} · {v.status}</small>
               {v.comment ? <p style={{ margin: '0.5rem 0', padding: '0.5rem', background: '#f5f5f5', borderRadius: '4px', whiteSpace: 'pre-wrap' }}><strong>Comment:</strong> {v.comment}</p> : null}
               {(v.files || []).length ? (
                 <div className="quick-actions" style={{ marginTop: '0.5rem' }}>
@@ -212,7 +208,7 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
           <div className="submission-list">
             {history.map(h => (
               <div className="submission-row" key={h.id || h.created_at}>
-                <div><strong>{h.from_status} → {h.to_status}</strong><small>{h.changed_by_name || ""} · {formatDateTime(h.created_at)}</small>{h.comment ? <p>{h.comment}</p> : null}</div>
+                <div><strong>{h.from_status} → {h.to_status}</strong><small>{h.changed_by_name || ""} · {formatISTDateTime(h.created_at)}</small>{h.comment ? <p>{h.comment}</p> : null}</div>
               </div>
             ))}
           </div>
@@ -222,7 +218,7 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
       <section className="panel">
         <div className="panel-head"><div><span className="section-kicker">FEEDBACK & REVIEW</span><h3>Evaluation status</h3></div></div>
         <p><strong>Reviewer:</strong> {item.reviewer_name || "Not reviewed yet"}<br />
-        <strong>Reviewed at:</strong> {item.reviewed_at ? formatDateTime(item.reviewed_at) : "—"}<br />
+        <strong>Reviewed at:</strong> {item.reviewed_at ? formatISTDateTime(item.reviewed_at) : "—"}<br />
         <strong>Review comments:</strong> {item.review_comments || "—"}</p>
         <p><strong>Task feedback:</strong> {item.task_feedback || detail?.task?.feedback || "No feedback given yet."}</p>
         <p><strong>Status:</strong> {item.status || "Submitted"} — drafts and submitted work are distinguished by this status.</p>
@@ -253,17 +249,26 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
 
   async function submitReview(decision) {
     if (reviewing) return;
-    if (!reviewComment.trim()) {
+    // Auto-set comment for approval/revision to avoid requiring manual entry
+    const comment = decision === "approve" ? "Approved" : 
+                   decision === "revision" ? "Revision requested" : reviewComment || "";
+    if (!reviewComment.trim() && decision !== "approve" && decision !== "revision") {
       setError("Add a review comment before approving or requesting revision.");
       return;
     }
     try {
       setReviewing(decision);
       setError("");
+      // Auto-set comment state for display in textarea when decision is approve/revision
+      if ((decision === "approve" || decision === "revision") && !reviewComment) {
+        setReviewComment(comment);
+      }
+      // Use the auto-generated comment for approval/revision, or the user-entered comment otherwise
+      const apiComment = comment || reviewComment.trim();
       const res = await fetch(`${API_URL}/api/tasks/review`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...auth() },
-        body: JSON.stringify({ submission_id: item.id, decision, comment: reviewComment.trim() }),
+        body: JSON.stringify({ submission_id: item.id, decision, comment: apiComment }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Unable to save review");
@@ -282,7 +287,7 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
           <div>
             <span className="section-kicker">SUBMISSION {item.submission_code || ""}</span>
             <h3>{item.task_title || item.title || "Submission"}</h3>
-            <p>{item.student_name || "Student"} · Version {item.version || 1} · {formatDateTime(item.submitted_at)}</p>
+            <p>{item.student_name || "Student"} · Version {item.version || 1} · {formatISTDateTime(item.submitted_at)}</p>
           </div>
         </div>
         {content}
@@ -297,7 +302,7 @@ function DetailModal({ item, onClose, onReviewed, inline = false }) {
           <div>
             <span className="section-kicker">SUBMISSION {item.submission_code || ""}</span>
             <h3>{item.task_title || item.title || "Submission"}</h3>
-            <p>{item.student_name || "Student"} · Version {item.version || 1} · {formatDateTime(item.submitted_at)}</p>
+            <p>{item.student_name || "Student"} · Version {item.version || 1} · {formatISTDateTime(item.submitted_at)}</p>
           </div>
           <button onClick={onClose}>Close</button>
         </div>
@@ -701,7 +706,7 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
                       )}
                     </td>
                     <td className="timestamp-column">
-                      {formatDateTime(item.submitted_at)}
+                      {formatISTDateTime(item.submitted_at)}
                     </td>
                     <td className="status-column">
                       <span className={`pill ${(item.status || '').toLowerCase().replace(/\s+/g, '_')}`}>

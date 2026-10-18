@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, Fragment } from "react";
 import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
 import { useScrollReveal } from "../../components/useScrollReveal";
+import { formatISTDateTime, formatISTDate } from "../../utils/dateHelper";
+import { remainingTime } from "../../utils/api";
 import "./MyTasks.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -9,7 +11,7 @@ const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` }
 
 function formatDateTime(value) {
   if (!value) return "—";
-  try { return new Date(value).toLocaleString(); } catch { return String(value); }
+  return formatISTDateTime(value);
 }
 
 function formatBytes(n) {
@@ -71,6 +73,8 @@ export default function MyTasks() {
   // duplicate request. Refs are read synchronously in the same tick.
   const submittingRef = useRef(false);
   const loadingRef = useRef(false);
+  // Bumped every minute purely to re-render the revision countdown.
+  const [now, setNow] = useState(0);
 
   // Scroll reveal effect for space theme - sophisticated animation
   useScrollReveal('.reveal-card', {
@@ -99,11 +103,27 @@ export default function MyTasks() {
               `${API_URL}/api/tasks/${task.id}/my-submission-status`,
               { headers: auth() }
             );
+            // The endpoint returns { success, data, error } plus a flat mirror
+            // of the same fields. Prefer `data`, fall back to the flat keys so
+            // the portal keeps working against either shape.
+            const status = subData?.data || subData || {};
             return {
               ...task,
-              has_submission: subData.has_submission || false,
-              student_workflow_status: subData.workflow_status || null,
-              latest_submission: subData.latest_submission || null
+              has_submission: status.has_submission || false,
+              student_workflow_status: status.workflow_status || null,
+              latest_submission: status.latest_submission || null,
+              // Canonical per-student status + the revision window. The
+              // backend is the source of truth for every one of these; the
+              // portal only renders them.
+              student_status: status.status || null,
+              revision_cycle: status.revision_cycle ?? 0,
+              revision_requested_at: status.revision_requested_at || null,
+              revision_deadline: status.revision_deadline || null,
+              revision_deadline_label: status.revision_deadline_label || null,
+              review_feedback: status.review_feedback || null,
+              resubmission_available: status.resubmission_available === true,
+              resubmission_blocked_reason: status.resubmission_blocked_reason || null,
+              resubmission_expires_in_ms: status.resubmission_expires_in_ms ?? 0,
             };
           } catch (err) {
             // If endpoint fails, fall back to task data
@@ -147,10 +167,16 @@ export default function MyTasks() {
     }
   };
 
-  const submitTask = async (task) => {
-    // Synchronous duplicate-submit guard (double-click / retry): the ref is
-    // set before the first await, so a second click in the same tick is a
-    // no-op. React state (`busy`) only drives the button's disabled look.
+  /**
+   * Submit a FIRST version (POST /submit) or a corrected version
+   * (POST /resubmit).
+   *
+   * The two are deliberately different endpoints on the server: /resubmit is
+   * the only one that checks the 24-hour revision window against the server
+   * clock, so a version can never be pushed after the deadline by calling the
+   * wrong route.
+   */
+  const sendSubmission = async (task, endpoint) => {
     if (submittingRef.current) return;
     const files = selectedFiles[task.id] || [];
     const comment = String(comments[task.id] || "").trim();
@@ -186,7 +212,10 @@ export default function MyTasks() {
       const form = new FormData();
       files.forEach((file) => form.append("files", file));
       if (comment) form.append("comment", comment);
-      const response = await axios.post(`${API_URL}/api/tasks/${task.id}/submit`, form, { headers: auth() });
+      // Only the files and the comment are sent. Status, feedback and
+      // deadlines are never accepted from a student (the server strips them
+      // too), so they cannot be forged from here.
+      const response = await axios.post(`${API_URL}/api/tasks/${task.id}/${endpoint}`, form, { headers: auth() });
       setSelectedFiles((value) => ({ ...value, [task.id]: [] }));
       setComments((value) => ({ ...value, [task.id]: "" }));
       // Show professional success popup with actual submission details
@@ -200,12 +229,18 @@ export default function MyTasks() {
       });
       await load();
     } catch (err) {
-      setError(err.response?.data?.message || "Unable to submit the task.");
+      setError(err.response?.data?.error?.message || err.response?.data?.message || "Unable to submit the task.");
+      // The window may have closed while the form was open: reload so the
+      // button state matches the server.
+      if (err.response?.status === 409) await load();
     } finally {
       setBusy(null);
       submittingRef.current = false;
     }
   };
+
+  const submitTask = (task) => sendSubmission(task, "submit");
+  const resubmitTask = (task) => sendSubmission(task, "resubmit");
 
   const toggleHistory = async (task) => {
     // Collapse when already open; otherwise fetch the versions on demand.
@@ -232,6 +267,24 @@ export default function MyTasks() {
   const inProgress = tasks.filter((t) => ["In Progress", "Acknowledged", "Revision Required"].includes(ts(t)) || t.status === "in_progress").length;
   const review = tasks.filter((t) => ["Submitted", "Under Review", "Resubmitted"].includes(ts(t))).length;
   const percent = tasks.length ? Math.round((completed / tasks.length) * 100) : 0;
+
+  /**
+   * DISPLAY-ONLY countdown for an open revision window.
+   * It renders the deadline the server already stored; it never grants or
+   * refuses permission. The Resubmit button's enabled state comes from
+   * `resubmission_available`, which the backend computed on its own clock.
+   */
+  const countdown = (task) => {
+    const remaining = remainingTime(task.revision_deadline, now);
+    if (!remaining) return "";
+    return remaining.overdue ? remaining.label : `· ${remaining.label}`;
+  };
+
+  // Tick once a minute so the countdown stays honest while the page is open.
+  useEffect(() => {
+    const id = setInterval(() => setNow((n) => n + 1), 60000);
+    return () => clearInterval(id);
+  }, []);
 
   if (loading && !tasks.length) return <div className="portal-loading"><div className="loader-dot" /><h2>Loading your tasks</h2><p>Syncing your latest assignments.</p></div>;
 
@@ -289,28 +342,35 @@ export default function MyTasks() {
             // Check if this specific student has submitted - use per-student submission status
             const hasStudentSubmission = task.has_submission === true;
             const studentStatus = task.student_workflow_status || workflow;
-            
-            const needsRevision = studentStatus === "Revision Required";
+            // Canonical status from the backend (pending | in_progress |
+            // submitted | approved | revision_required | resubmission_expired).
+            const canonical = task.student_status || null;
+
+            const needsRevision = canonical === "revision_required";
+            const windowExpired = canonical === "resubmission_expired";
+            // Resubmission is offered only while the SERVER says the window is
+            // open. The countdown below is display-only.
+            const canResubmit = needsRevision && task.resubmission_available === true;
             const startAt = task.start_at || (task.start_date ? `${task.start_date}T${task.start_time || "00:00"}:00` : null);
             const endAt = task.due_at || (task.due_date ? `${task.due_date}T${task.due_time || "23:59"}:00` : null);
             const nowDate = new Date();
             const beforeStart = !!startAt && nowDate < new Date(startAt);
             const expired = !!endAt && nowDate > new Date(endAt);
             const isClosed = ["Approved", "Cancelled", "Archived"].includes(studentStatus) || ["Cancelled", "Archived"].includes(workflow) || expired;
-            const canSubmit = !isClosed && (!hasStudentSubmission || needsRevision) && (hasStudentSubmission ? needsRevision : true);
+            const canSubmit = !isClosed && !hasStudentSubmission;
             
 
             // Show "awaiting review" only if this student actually submitted
             const showAwaitingReview = hasStudentSubmission && ["Submitted", "Under Review", "Resubmitted"].includes(studentStatus);
             
             // Check if task is overdue
-            const isOverdue = task.due_date && new Date(task.due_date) < new Date() && workflow !== "Approved";
+            const isOverdue = task.due_date && formatISTDateTime(task.due_date) !== "—" && new Date(task.due_date).toISOString() < new Date().toISOString() && workflow !== "Approved";
             
             // Format dates for display
             const formatDate = (dateStr) => {
               if (!dateStr) return null;
-              const d = new Date(dateStr + 'T00:00:00'); // Avoid timezone shifts
-              return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+              // Use shared IST formatter for consistent timezone
+              return formatISTDate(dateStr);
             };
             
             return (
@@ -380,14 +440,67 @@ export default function MyTasks() {
                     ))}
                   </div>
                 )}
-                {task.workflow_status === "Revision Required" && hasStudentSubmission && <div className="feedback-box"><strong>Revision requested</strong><p>{task.feedback || "Review the manager feedback and submit a new version."}</p></div>}
+                {/* ── Revision Required section ───────────────────────────────────────
+                 * Feedback is shown prominently, the deadline is the exact one
+                 * stored by the server, and the countdown is display-only.
+                 * Resubmit is enabled only while the server says the window is
+                 * open; after that the card says the window expired and the
+                 * student has to ask for a new revision.
+                 */}
+                {(needsRevision || windowExpired) && (
+                  <div className={`feedback-box revision-box ${windowExpired ? "revision-box-expired" : ""}`}>
+                    <div className="revision-box-head">
+                      <strong>
+                        <TechinsIcon name={windowExpired ? "alert" : "history"} size={14} variant="light" ariaHidden />
+                        {windowExpired ? "Resubmission Window Expired" : "Revision Required"}
+                      </strong>
+                      {task.revision_cycle > 0 && <span className="revision-cycle">Cycle {task.revision_cycle}</span>}
+                    </div>
+
+                    <p className="revision-feedback">{task.review_feedback || "Review the admin feedback and submit a corrected version."}</p>
+
+                    {task.revision_deadline && (
+                      <p className="revision-deadline">
+                        {windowExpired ? "The 24-hour window closed on" : "Resubmit within 24 hours, by"}{" "}
+                        <strong>{task.revision_deadline_label || formatDateTime(task.revision_deadline)}</strong>
+                        {!windowExpired && <span className="revision-countdown" aria-live="polite">{countdown(task)}</span>}
+                      </p>
+                    )}
+
+                    {windowExpired && (
+                      <p className="revision-note">
+                        This task cannot be resubmitted. Ask your administrator to request a new revision, which
+                        opens a fresh 24-hour window.
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {canSubmit && <div className="upload-box">
-                  <div><strong>{workflow === "Revision Required" ? "Submit revised work" : "Submit task work"}</strong><small>PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, ZIP, PNG, JPG · max 4 MB each</small></div>
+                  <div><strong>Submit task work</strong><small>PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, ZIP, PNG, JPG · max 4 MB each</small></div>
                   <textarea value={comments[task.id] || ""} onChange={(e) => setComments((value) => ({ ...value, [task.id]: e.target.value }))} placeholder="Submission comment / outcome (optional if files are selected)" />
                   <label className="upload-button">{selectedFiles[task.id]?.length ? `${selectedFiles[task.id].length} file(s) selected` : "Choose files"}<input type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.png,.jpg,.jpeg" onChange={(e) => setSelectedFiles((value) => ({ ...value, [task.id]: Array.from(e.target.files || []) }))} /></label>
                   <button className="gold-btn" disabled={busy === task.id} onClick={() => submitTask(task)}>{busy === task.id ? "Submitting…" : "Submit for Review"}</button>
                 </div>}
-                {task.feedback && workflow !== "Revision Required" && <div className="feedback-box"><strong>Feedback</strong><p>{task.feedback}</p></div>}
+
+                {canResubmit && <div className="upload-box revision-upload">
+                  <div>
+                    <strong>Submit your corrected version</strong>
+                    <small>Your previous submission and every older version are kept. PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, ZIP, PNG, JPG · max 4 MB each</small>
+                  </div>
+                  <textarea
+                    value={comments[task.id] || ""}
+                    onChange={(e) => setComments((value) => ({ ...value, [task.id]: e.target.value }))}
+                    placeholder="Describe what you changed in response to the feedback…"
+                  />
+                  <label className="upload-button">{selectedFiles[task.id]?.length ? `${selectedFiles[task.id].length} file(s) selected` : "Choose corrected file"}<input type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.png,.jpg,.jpeg" onChange={(e) => setSelectedFiles((value) => ({ ...value, [task.id]: Array.from(e.target.files || []) }))} /></label>
+                  <button className="gold-btn" disabled={busy === task.id} onClick={() => resubmitTask(task)}>
+                    {busy === task.id ? "Resubmitting…" : "Resubmit within the window"}
+                  </button>
+                </div>}
+
+                {/* Feedback for a task that has no open revision cycle. */}
+                {task.feedback && !needsRevision && !windowExpired && <div className="feedback-box"><strong>Feedback</strong><p>{task.feedback}</p></div>}
               </article>
             );
           }) : <div className="empty-state">No tasks assigned yet.</div>}
