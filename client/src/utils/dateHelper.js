@@ -138,4 +138,114 @@ export function isDeadlinePassedIST(deadlineISO, refDate) {
   return deadline < istRef;
 }
 
-export default { formatISTDateTime, formatISTDate, formatISTDateShort, formatDeadlineIST, isDeadlinePassedIST };
+/* ═══════════════════════════════════════════════════════════════════════════
+ * WORKSPACE DATE FORMAT
+ *
+ * One formatter for every table, card and badge in the CEO workspace. Before
+ * this existed the same page showed three different shapes:
+ *
+ *   "2026-10-16 00:30"            raw ISO, no timezone conversion
+ *   "18 October 2026"             no time at all
+ *   "Thursday, 15 October 202"    weekday + long month, then truncated
+ *
+ * Everything now renders as "15 Oct 2026, 12:33 PM" in Asia/Kolkata, and is
+ * never truncated — a table cell wraps the string instead of cutting it.
+ *
+ * `null` / `undefined` / unparseable input returns an em dash so a missing date
+ * is visibly missing rather than showing "Invalid Date".
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * "15 Oct 2026, 12:33 PM" in IST.
+ * @param {string|Date|null|undefined} value
+ * @returns {string}
+ */
+export function formatWorkspaceDateTime(value) {
+  if (value == null || value === "") return "—";
+  const date = value instanceof Date ? value : new Date(value);
+  if (isNaN(date)) return "—";
+
+  // en-GB gives "15 Oct 2026, 12:33"; en-US gives 12-hour AM/PM. Combine the
+  // numeric parts from en-GB with the meridiem from en-US so the output is
+  // exactly "15 Oct 2026, 12:33 PM".
+  const numeric = workspaceDateTimeFormatter.format(date);
+  const meridiem = workspaceMeridiemFormatter.format(date);
+  return `${numeric} ${meridiem}`;
+}
+
+/**
+ * Date only, same month format: "15 Oct 2026".
+ * Used where a time is meaningless (a task's deadline date, a batch label).
+ */
+export function formatWorkspaceDate(value) {
+  if (value == null || value === "") return "—";
+  const date = value instanceof Date ? value : new Date(value);
+  if (isNaN(date)) return "—";
+  return workspaceDateFormatter.format(date);
+}
+
+/**
+ * Combine a date and a separate time value ("18:30") into one display string.
+ * Task start/end are stored as two fields; this keeps them on one format.
+ * Returns null when neither part is present, so the caller can decide between
+ * an em dash and "Not available".
+ */
+export function formatWorkspaceDateTimeParts(dateValue, timeValue) {
+  if (dateValue == null || dateValue === "") return null;
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (isNaN(date)) return null;
+  if (timeValue == null || timeValue === "") return formatWorkspaceDate(date);
+  // "HH:MM" (possibly 24-hour) → 12-hour with meridiem, same date part.
+  const match = String(timeValue).match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return formatWorkspaceDate(date);
+  let hour = Number(match[1]);
+  const minute = match[2];
+  const suffix = hour >= 12 ? "PM" : "AM";
+  hour = hour % 12 || 12;
+  return `${workspaceDateFormatter.format(date)}, ${hour}:${minute} ${suffix}`;
+}
+
+const workspaceDateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "Asia/Kolkata",
+});
+
+const workspaceMeridiemFormatter = new Intl.DateTimeFormat("en-US", {
+  hour: "numeric",
+  hour12: true,
+  timeZone: "Asia/Kolkata",
+});
+
+const workspaceDateFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: "Asia/Kolkata",
+});
+
+/**
+ * Correctly pluralised count, e.g. pluralise(1, "file") -> "1 file",
+ * pluralise(2, "file") -> "2 files", pluralise(1, "hour") -> "1 hour".
+ */
+export function pluralise(count, word, pluralWord) {
+  const n = Number(count) || 0;
+  const plural = pluralWord || `${word}s`;
+  return `${n} ${n === 1 ? word : plural}`;
+}
+
+export default {
+  formatISTDateTime,
+  formatISTDate,
+  formatISTDateShort,
+  formatDeadlineIST,
+  isDeadlinePassedIST,
+  formatWorkspaceDateTime,
+  formatWorkspaceDate,
+  formatWorkspaceDateTimeParts,
+  pluralise,
+};

@@ -106,6 +106,16 @@ const icons = {
     </svg>
   ),
   
+  /* Delete/Remove. Danger actions carry this so they are distinguishable by
+     SHAPE as well as colour, not by a red outline alone. */
+  trash: (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 7h16M10 11v6M14 11v6" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="icon-accent-stroke"/>
+      <path d="M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="icon-stroke"/>
+      <path d="M6 7h12l-1 12a2 2 0 01-2 2H9a2 2 0 01-2-2L6 7z" fill="currentColor" opacity="0.08" className="icon-fill"/>
+    </svg>
+  ),
+
   gauge: (
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M12 18a6 6 0 110-12 6 6 0 010 12z" stroke="currentColor" strokeWidth="1.75" className="icon-stroke"/>
