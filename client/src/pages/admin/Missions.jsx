@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import TechinsIcon from "../../components/TechinsIcon";
 import FixedOverlay from "../../components/FixedOverlay";
+import StatusBadge from "../../components/StatusBadge";
 import { apiFetch, taskTitle } from "../../utils/api";
-import { formatISTDateTime } from "../../utils/dateHelper";
+import { formatWorkspaceDateTime, pluralise } from "../../utils/dateHelper";
 import "../../styles/admin.css";
+import "../../styles/ceo-ui.css";
 import "./Missions.css";
 
 /**
@@ -310,31 +312,43 @@ export default function Missions() {
       {successMsg && <div className="success-msg" role="status">{successMsg}</div>}
       {loadError && <div className="error-msg" role="alert">{loadError}</div>}
 
-      <div className="mission-mode-selector" role="tablist" aria-label="Assignment mode">
+      {/* A proper segmented control: equal padding, a visible gap, and a purple
+          active state. The two buttons previously touched and shared the
+          `.mode-btn.active` background with the rest of the button, so the
+          selection was only visible while hovering. `role="tab"` and
+          `aria-selected` are kept from the original markup. */}
+      <div className="ui-segmented" role="tablist" aria-label="Assignment mode">
         <button
           type="button"
           role="tab"
           aria-selected={mode === "individual"}
-          className={`mode-btn ${mode === "individual" ? "active" : ""}`}
+          aria-pressed={mode === "individual"}
+          className={mode === "individual" ? "is-active" : ""}
           onClick={() => switchMode("individual")}
         >
-          <TechinsIcon name="user" size={16} variant="dark" />
+          <TechinsIcon name="user" size={15} variant="light" ariaHidden />
           Individual Student
         </button>
         <button
           type="button"
           role="tab"
           aria-selected={mode === "group"}
-          className={`mode-btn ${mode === "group" ? "active" : ""}`}
+          aria-pressed={mode === "group"}
+          className={mode === "group" ? "is-active" : ""}
           onClick={() => switchMode("group")}
         >
-          <TechinsIcon name="users" size={16} variant="dark" />
+          <TechinsIcon name="user" size={15} variant="light" ariaHidden />
           Group / Batch
         </button>
       </div>
 
+      {/* Row 1: title | assignee. Row 2: start date | start time.
+          Row 3: end date | end time. Row 4: description, full width.
+          Then the action button, left-aligned with the fields.
+          The title used to be full width and the assignee half, which left an
+          empty cell on row 1. */}
       <form className="panel form-grid-admin" onSubmit={create} noValidate>
-        <div className="field field-full">
+        <div className="field">
           <label className="field-label" htmlFor="mission-title">Mission Title <span className="req">*</span></label>
           <input
             id="mission-title"
@@ -420,7 +434,9 @@ export default function Missions() {
           </div>
         )}
 
-        <div className="field field-full">
+        {/* Left-aligned with the fields, below the description. It used to sit
+            beside the Description box. */}
+        <div className="field field-full form-actions">
           <button className="gold-btn" type="submit" disabled={submitting}>
             {submitting ? "Creating…" : mode === "group" ? "Assign to Batch" : "Create Mission"}
           </button>
@@ -429,16 +445,25 @@ export default function Missions() {
 
       {/* All Missions */}
       <section className="panel">
-        <div className="panel-head">
+        {/* Heading and Refresh on one aligned row. */}
+        <div className="panel-head ui-toolbar">
           <div>
             <span className="section-kicker">ALL MISSIONS</span>
-            <h3>{missions.length} mission{missions.length === 1 ? "" : "s"}</h3>
+            <h3>{pluralise(missions.length, "mission")}</h3>
           </div>
-          <button type="button" onClick={load}>Refresh</button>
+          <div className="ui-toolbar-controls">
+            <button type="button" className="ui-btn ui-btn--neutral" onClick={load}>
+              <TechinsIcon name="refresh" size={14} variant="light" ariaHidden />
+              Refresh
+            </button>
+          </div>
         </div>
 
         {missions.length === 0 ? (
-          <div className="empty-state">No missions yet. Create your first mission above.</div>
+          /* Centred inside its card. */
+          <div className="empty-state empty-state--centred">
+            No missions yet. Create your first mission above.
+          </div>
         ) : (
           <div className="missions-grid">
             {missions.map((m) => (
@@ -449,20 +474,19 @@ export default function Missions() {
                     <small>Assigned to: {m.student_name || "Unknown"}{m.student_code ? ` (${m.student_code})` : ""}</small>
                     {m.batch_name && <small>Batch: {m.batch_name}</small>}
                   </div>
-                  <span className={`mission-status ${(m.status || "assigned").toLowerCase()}`}>
-                    {(m.status || "assigned").replace(/_/g, " ")}
-                  </span>
+                  <StatusBadge status={m.status || "assigned"} label={(m.status || "assigned").replace(/_/g, " ")} />
                 </div>
 
                 <dl className="mission-schedule">
-                  <div><dt>Starts</dt><dd>{m.start_at ? formatISTDateTime(m.start_at) : "—"}</dd></div>
-                  <div><dt>Ends</dt><dd>{m.end_at ? formatISTDateTime(m.end_at) : "—"}</dd></div>
+                  <div><dt>Starts</dt><dd>{m.start_at ? formatWorkspaceDateTime(m.start_at) : "—"}</dd></div>
+                  <div><dt>Ends</dt><dd>{m.end_at ? formatWorkspaceDateTime(m.end_at) : "—"}</dd></div>
                   <div>
                     <dt>Schedule</dt>
                     <dd>
-                      <span className={`mission-schedule-state ${m.schedule_status || "scheduled"}`}>
-                        {SCHEDULE_LABEL[m.schedule_status] || m.schedule_status || "Scheduled"}
-                      </span>
+                      <StatusBadge
+                        status={m.schedule_status === "overdue" ? "overdue" : m.schedule_status === "completed" ? "approved" : "pending"}
+                        label={SCHEDULE_LABEL[m.schedule_status] || m.schedule_status || "Scheduled"}
+                      />
                     </dd>
                   </div>
                 </dl>
@@ -474,10 +498,15 @@ export default function Missions() {
                   <span>{Math.min(100, Number(m.progress || 0))}%</span>
                 </div>
 
-                <div className="mission-card-actions">
-                  <button type="button" className="link-button" onClick={() => setDetail(m)}>View details</button>
-                  <button type="button" className="link-button" onClick={() => openEdit(m)}>Edit</button>
-                  <button type="button" className="link-button mission-delete" onClick={() => deleteMission(m.id)}>Delete</button>
+                {/* Equal-height buttons in one aligned group, from the shared
+                    action palette. These were bare underlined links. */}
+                <div className="mission-card-actions ui-actions">
+                  <button type="button" className="ui-btn ui-btn--primary" onClick={() => setDetail(m)}>View details</button>
+                  <button type="button" className="ui-btn ui-btn--info" onClick={() => openEdit(m)}>Edit</button>
+                  <button type="button" className="ui-btn ui-btn--danger" onClick={() => deleteMission(m.id)}>
+                    <TechinsIcon name="trash" size={13} variant="light" ariaHidden />
+                    Delete
+                  </button>
                 </div>
               </article>
             ))}
@@ -504,8 +533,8 @@ export default function Missions() {
           <dl className="sdd-grid">
             <div className="sdd-field"><span className="sdd-label">Assigned to</span><span className="sdd-value">{dash(detail?.student_name)}{detail?.student_code ? ` (${detail.student_code})` : ""}</span></div>
             <div className="sdd-field"><span className="sdd-label">Batch</span><span className="sdd-value">{dash(detail?.batch_name)}</span></div>
-            <div className="sdd-field"><span className="sdd-label">Starts</span><span className="sdd-value">{detail?.start_at ? formatISTDateTime(detail.start_at) : "—"}</span></div>
-            <div className="sdd-field"><span className="sdd-label">Ends</span><span className="sdd-value">{detail?.end_at ? formatISTDateTime(detail.end_at) : "—"}</span></div>
+            <div className="sdd-field"><span className="sdd-label">Starts</span><span className="sdd-value">{detail?.start_at ? formatWorkspaceDateTime(detail.start_at) : "—"}</span></div>
+            <div className="sdd-field"><span className="sdd-label">Ends</span><span className="sdd-value">{detail?.end_at ? formatWorkspaceDateTime(detail.end_at) : "—"}</span></div>
             <div className="sdd-field"><span className="sdd-label">Status</span><span className="sdd-value">{(detail?.status || "assigned").replace(/_/g, " ")}</span></div>
             <div className="sdd-field"><span className="sdd-label">Progress</span><span className="sdd-value">{Math.min(100, Number(detail?.progress || 0))}%</span></div>
           </dl>
