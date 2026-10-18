@@ -51,22 +51,30 @@ export default function RoleLayout({role}){
       </div>
     )}
     <Navbar role={role} />
-    <main className="role-main">
-      <header className="role-topbar">
-        {/* Hamburger is the first in-flow header item: full-width header
-            with no reserved gap when the drawer is closed. */}
-        <div className="role-topbar-lead"><NavbarToggle /><div><span className="role-eyebrow">TECHINS WORK PORTAL</span><h1>{getWorkspaceTitle()}</h1></div></div>
-        <div className="role-top-actions">
-          <NotificationBell/>
-          <div className="role-top-user">
-            <TechinsIcon name="user" size={16} variant="light" />
-            <div>
-              <span>{user.name||"User"}</span>
-              <small>{user.email||""}</small>
-            </div>
+    {/* The top bar is a SIBLING of <main>, not a child of it.
+        `.role-main` carries `perspective` (CeoMotion.css / ManagerMotion.css)
+        and `.role-content` carries a `transform`/`will-change` page-entry
+        animation — every one of those establishes a containing block for
+        `position: fixed` descendants, so nesting the bar inside <main> made
+        `position:fixed` resolve against the scrolling page instead of the
+        viewport and the bar scrolled away. Keeping it outside means no
+        ancestor can break it. */}
+    <header className="role-topbar">
+      {/* Hamburger is the first in-flow header item: full-width header
+          with no reserved gap when the drawer is closed. */}
+      <div className="role-topbar-lead"><NavbarToggle /><div><span className="role-eyebrow">TECHINS WORK PORTAL</span><h1>{getWorkspaceTitle()}</h1></div></div>
+      <div className="role-top-actions">
+        <NotificationBell/>
+        <div className="role-top-user">
+          <TechinsIcon name="user" size={16} variant="light" />
+          <div>
+            <span>{user.name||"User"}</span>
+            <small>{user.email||""}</small>
           </div>
         </div>
-      </header>
+      </div>
+    </header>
+    <main className="role-main">
       {/* Keyed on pathname so the page-entry transition replays on navigation
           (a deliberate state change), without re-triggering on data re-renders. */}
       <section className="role-content" key={pathname}><Outlet/></section>

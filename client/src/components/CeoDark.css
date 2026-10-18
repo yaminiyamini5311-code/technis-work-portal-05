@@ -86,6 +86,13 @@
 .role-layout.ceo-dark > .navbar-menu { position: fixed; z-index: 90; }
 .role-layout.ceo-dark > .ceo-stars { position: fixed; z-index: 0; }
 
+/* Same guard for the top bar. It moved out of <main> in RoleLayout.jsx so no
+   ancestor's `perspective`/`transform` can capture `position: fixed`; now that
+   it is a direct child of .role-layout the blanket `> *` rule above would
+   flatten it back to `position: relative`, so it needs the same 0,3,0 guard.
+   z-index 100 keeps the documented order: navbar < dropdowns (200) < modals. */
+.role-layout.ceo-dark > .role-topbar { position: fixed; z-index: 100; }
+
 /* ── Chrome ───────────────────────────────────────────────────────────── */
 /* Frosted blur is pointless over an opaque dark canvas and costs a full
    backdrop sample on every frame, so it is dropped inside the CEO scope.

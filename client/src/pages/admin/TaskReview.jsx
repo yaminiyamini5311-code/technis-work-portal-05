@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import TechinsIcon from "../../components/TechinsIcon";
 import useModalBehavior from "../../components/useModalBehavior";
+import FilePreview from "../../components/FilePreview";
 import { formatISTDateTime, formatISTDateShort } from "../../utils/dateHelper";
 import {
   STATUS_LABEL,
   apiFetch,
   downloadFile,
-  fetchFileObjectUrl,
   formatBytes,
   remainingTime,
   statusClass,
@@ -181,92 +181,9 @@ function ConfirmDialog({ title, description, confirmLabel, destructive, onClose,
 }
 
 /* ── File preview dialog ────────────────────────────────────────────────────
- * Bytes always come from the authenticated endpoint, so nothing is ever
- * loaded from a public storage URL.
+ * Shared component: the CEO Student Submissions page uses the same one, so the
+ * portal / near-full-screen / zoom behaviour is defined exactly once.
  */
-function PreviewDialog({ file, onClose }) {
-  const [url, setUrl] = useState(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-  const objectUrlRef = useRef(null);
-  const dialogRef = useModalBehavior(true, onClose);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const objectUrl = await fetchFileObjectUrl(file.preview_url || file.download_url);
-        if (cancelled) { URL.revokeObjectURL(objectUrl); return; }
-        objectUrlRef.current = objectUrl;
-        setUrl(objectUrl);
-      } catch (e) {
-        if (!cancelled) setError(e.message || "Unable to preview this file.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current); };
-  }, [file]);
-
-  const isImage = /^image\//.test(file.mime || "");
-
-  return (
-    <div className="tm-dialog-backdrop" ref={dialogRef} onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="tm-dialog" style={{ width: "min(1000px, 100%)" }} role="dialog" aria-modal="true" aria-labelledby="tm-preview-title">
-        <div className="panel-head" style={{ marginBottom: 12 }}>
-          <div>
-            <span className="section-kicker">FILE PREVIEW</span>
-            <h3 id="tm-preview-title" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{file.name}</h3>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" className="tm-btn" onClick={() => downloadFile(file).catch((e) => setError(e.message))}>
-              <TechinsIcon name="download" size={13} variant="light" ariaHidden /> Download
-            </button>
-            <button type="button" className="tm-btn" onClick={onClose}>Close</button>
-          </div>
-        </div>
-
-        {loading && <SkeletonRows count={3} />}
-        {!loading && error && <div className="tm-error" role="alert"><span>{error}</span></div>}
-        {!loading && !error && url && (
-          <div className="tm-preview">
-            <div className="tm-preview-head">
-              <span>{file.name}{file.size ? ` · ${formatBytes(file.size)}` : ""}</span>
-              <span>{file.mime}</span>
-            </div>
-            <div className="tm-preview-body">
-              {isImage
-                ? <img src={url} alt={file.name} />
-                : file.mime === "application/pdf"
-                  ? <iframe src={url} title={`Preview of ${file.name}`} />
-                  : /^text\/plain$/.test(file.mime || "")
-                    ? <TextPreview url={url} />
-                    : <p style={{ padding: 16, color: "#9aa6c2", fontSize: 13 }}>
-                        This file type cannot be shown inline. Use Download to open it.
-                      </p>}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** Plain-text preview: read the blob we already hold, never a second request. */
-function TextPreview({ url }) {
-  const [text, setText] = useState("");
-  const [error, setError] = useState("");
-  useEffect(() => {
-    let cancelled = false;
-    fetch(url)
-      .then((r) => r.text())
-      .then((t) => { if (!cancelled) setText(t.slice(0, 200000)); })
-      .catch(() => { if (!cancelled) setError("Unable to read this text file."); });
-    return () => { cancelled = true; };
-  }, [url]);
-  if (error) return <p style={{ padding: 16, color: "#ffd9e2", fontSize: 13 }}>{error}</p>;
-  return <pre>{text}</pre>;
-}
 
 /* ── Submission viewer (one student's exact submission) ──────────────────── */
 function SubmissionViewer({ taskId, studentId, onClose, onChanged }) {
@@ -565,7 +482,7 @@ function SubmissionViewer({ taskId, studentId, onClose, onChanged }) {
           onConfirm={doApprove}
         />
       )}
-      {previewFile && <PreviewDialog file={previewFile} onClose={() => setPreviewFile(null)} />}
+      {previewFile && <FilePreview file={previewFile} onClose={() => setPreviewFile(null)} />}
     </div>
   );
 }

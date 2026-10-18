@@ -1,0 +1,93 @@
+/*
+ * Fixed overlays rendered through <FixedOverlay /> (a React portal into
+ * document.body).
+ *
+ * The `inset: 0` here is measured against the VIEWPORT. That is the whole
+ * point: the markup used to live inside `.role-content` / `.student-content`,
+ * which carry `perspective` and a transform page-entry animation, so `fixed`
+ * resolved against the scrolling page instead — the overlay was thousands of
+ * pixels tall, centred inside the page, and clipped at the bottom.
+ *
+ * Layout contract:
+ *   .fixed-overlay  fixed inset-0 grid, internal scroll, never the scroller
+ *   .fixed-overlay-panel   max 95vw x 95vh, flex column, body scrolls inside
+ */
+
+.fixed-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(10px, 2.5vh, 28px);
+  background: rgba(4, 7, 16, 0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  /* Internal scroll for short viewports; the panel never overflows sideways. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.fixed-overlay-panel {
+  width: 100%;
+  max-width: 95vw;
+  max-height: 95vh;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--overlay-surface, #0d1426);
+  border: 1px solid var(--overlay-border, rgba(124, 92, 255, 0.35));
+  border-radius: 16px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  color: var(--text-on-dark, #eef2fb);
+  overflow: hidden;
+  outline: none;
+}
+
+/* Header / body / footer: only the body scrolls, so the close button and the
+   action bar stay reachable at every viewport height. */
+.fixed-overlay-panel > .panel-head {
+  flex: 0 0 auto;
+}
+
+.fixed-overlay-panel > .panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 18px 20px;
+  display: grid;
+  gap: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124, 92, 255, 0.5) transparent;
+}
+
+.fixed-overlay-panel > .panel-foot {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--overlay-border, rgba(124, 92, 255, 0.25));
+  background: rgba(124, 92, 255, 0.06);
+  flex-wrap: wrap;
+}
+
+/* Thin dark scrollbar inside the panel body. */
+.fixed-overlay-panel > .panel-body::-webkit-scrollbar { width: 10px; }
+.fixed-overlay-panel > .panel-body::-webkit-scrollbar-track { background: transparent; }
+.fixed-overlay-panel > .panel-body::-webkit-scrollbar-thumb {
+  background: rgba(124, 92, 255, 0.45);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+.fixed-overlay-panel > .panel-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 92, 255, 0.7);
+  background-clip: padding-box;
+}
+
+@media (max-width: 600px) {
+  .fixed-overlay { padding: 8px; }
+  .fixed-overlay-panel { max-width: 100vw; max-height: 96vh; border-radius: 12px; }
+  .fixed-overlay-panel > .panel-body { padding: 14px; }
+}

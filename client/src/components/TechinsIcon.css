@@ -157,8 +157,7 @@ a:focus-visible .techins-icon svg,
 .student-layout .detail-heading span,
 .student-layout .feedback-mark,
 .student-layout .summary-icon,
-.student-layout .workspace-quick-links a > span,
-.student-layout .notification-item > span {
+.student-layout .workspace-quick-links a > span {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 176, 32, 0.35);
   box-shadow: 0 0 14px rgba(255, 176, 32, 0.18);
@@ -171,11 +170,13 @@ a:focus-visible .techins-icon svg,
 .student-layout .detail-heading span:hover,
 .student-layout .feedback-mark:hover,
 .student-layout .summary-icon:hover,
-.student-layout .workspace-quick-links a > span:hover,
-.student-layout .notification-item > span:hover {
+.student-layout .workspace-quick-links a > span:hover {
   box-shadow: 0 0 20px rgba(255, 176, 32, 0.35);
   border-color: rgba(255, 176, 32, 0.6);
 }
+
+/* The notification icon tile is intentionally NOT in the groups above: it uses
+   a dark-purple tint defined in NotificationBell.css, not the amber glow. */
 
 /* Empty state icons - larger with glow */
 .student-layout .workspace-empty svg,

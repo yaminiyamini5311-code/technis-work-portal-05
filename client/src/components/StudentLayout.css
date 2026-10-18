@@ -77,21 +77,6 @@
 }
 
 .notification-wrap{position:relative}
-.notification-button{width:44px;height:44px;min-width:44px;min-height:44px;border:1px solid rgba(255,255,255,0.28);background:rgba(255,255,255,0.15);border-radius:11px;color:#F5F8FF;font-size:18px;position:relative;cursor:pointer;opacity:1 !important;visibility:visible !important;display:grid;place-items:center}
-.notification-button:hover{background:rgba(255,255,255,0.12);border-color:rgba(250,154,2,0.6);transform:translateY(-1px)}
-.notification-button:focus-visible{outline:2px solid #FA9A02;outline-offset:2px}
-.notification-button b{position:absolute;right:-4px;top:-5px;min-width:16px;height:16px;border-radius:20px;background:#FA9A02;color:#0B1220;font-size:8px;font-weight:900;display:grid;place-items:center}
-.notification-pop{position:absolute;right:0;top:47px;width:310px;background:rgba(20,28,20,0.98);backdrop-filter:blur(16px);border:1px solid rgba(250,154,2,0.25);border-radius:15px;box-shadow:0 22px 50px rgba(0,0,0,0.7);z-index:80;overflow:hidden}
-.notification-pop>div{padding:14px 15px;border-bottom:1px solid rgba(250,154,2,0.15);display:flex;justify-content:space-between;color:var(--text-on-dark)}
-.notification-pop>div small{color:var(--text-muted-on-dark);font-size:9px}
-.notification-item{width:100%;border:0;background:transparent;text-align:left;display:flex;gap:10px;padding:12px 15px;border-bottom:1px solid rgba(250,154,2,0.1)}
-.notification-item:hover{background:rgba(250,154,2,0.08)}
-.notification-item>span{width:28px;height:28px;border-radius:9px;background:rgba(250,154,2,0.15);color:#FA9A02;display:grid;place-items:center;flex:none}
-.notification-item div{display:flex;flex-direction:column}
-.notification-item strong{font-size:11px;color:var(--text-on-dark)}
-.notification-item small{font-size:10px;color:var(--text-muted-on-dark);margin-top:3px}
-.notification-item.read{opacity:.5}
-.notification-empty{padding:24px;text-align:center;color:var(--text-muted-on-dark);font-size:11px}
 
 @media(max-width:800px){
   .student-header{padding:0 16px 0 14px}
@@ -106,7 +91,6 @@
   .student-content{padding:12px}
   .student-header h1{font-size:17px}
   .student-header>div:first-child span{font-size:9px}
-  .notification-pop{position:fixed;right:10px;top:70px;width:min(310px,calc(100vw - 20px))}
 }
 
 /* =========================================================

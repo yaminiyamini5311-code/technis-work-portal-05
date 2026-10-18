@@ -1,0 +1,334 @@
+/*
+ * Notification bell + panel.
+ *
+ * Previously the panel inherited the LIGHT theme rule
+ * (`.notification-pop{background:#FFFFFF}`) while its text colour came from
+ * the dark workspace (#eef2fb) — i.e. near-white text on a white panel — and
+ * the icon tile was a pale peach rgba(250,154,2,.12). Every colour below is
+ * written out explicitly against the dark navy palette, with enough selector
+ * weight to beat those inherited rules in both the CEO dark workspace and the
+ * light manager theme.
+ *
+ * Z-index order in this app: navbar (60–100) < dropdown (200) < modals (1000+).
+ */
+
+.notification-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.notification-button {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e6ecfb;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+
+.notification-button:hover { background: rgba(124, 92, 255, 0.18); border-color: rgba(124, 92, 255, 0.5); }
+.notification-button:active { transform: translateY(1px); }
+
+.notification-button:focus-visible {
+  outline: 2px solid #8b5cf6;
+  outline-offset: 2px;
+}
+
+.notification-button b {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  border: 2px solid #080b14;
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Panel ─────────────────────────────────────────────────────────────── */
+
+/* ── Panel ─────────────────────────────────────────────────────────────── */
+
+.role-layout .notification-pop,
+.student-layout .notification-pop {
+  position: absolute;
+  /* Anchored to the bell and right-aligned, so it never runs off the right
+     edge on a narrow viewport. */
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 200;
+  width: 380px;
+  /* Clamped: always fits the viewport with a 1rem gutter on both sides. */
+  max-width: calc(100vw - 2rem);
+  max-height: min(560px, calc(100vh - var(--header-height, 84px) - 32px));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: #0a1020;
+  border: 1px solid rgba(124, 92, 255, 0.34);
+  border-radius: 14px;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.62), 0 0 0 1px rgba(0, 0, 0, 0.4);
+  color: #eef2fb;
+  text-align: left;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.notification-pop:focus { outline: none; }
+.notification-pop:focus-visible { outline: 2px solid #8b5cf6; outline-offset: 2px; }
+
+.notification-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 15px;
+  border-bottom: 1px solid rgba(124, 92, 255, 0.22);
+  background: rgba(124, 92, 255, 0.1);
+}
+
+.notification-head > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.notification-head strong {
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #f3f6ff;
+}
+
+.notification-head small {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #98a5c4;
+}
+
+.notification-mark-all {
+  flex-shrink: 0;
+  padding: 6px 11px;
+  border-radius: 8px;
+  border: 1px solid rgba(139, 92, 246, 0.55);
+  background: rgba(139, 92, 246, 0.16);
+  color: #cbb8ff;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+/* Selector is deliberately scoped and `!important`, mirroring the codebase's
+   existing opt-out for `.role-layout.ceo-dark .gold-btn`: the blanket
+   `.role-layout.ceo-dark button` rule paints EVERY button in the CEO
+   workspace with `!important`, so a component-owned button needs the same
+   treatment or it comes out generic grey. These overrides are the component's
+   own colours, not a second theme stacked on top. */
+.role-layout .notification-pop .notification-mark-all,
+.student-layout .notification-pop .notification-mark-all {
+  border: 1px solid rgba(139, 92, 246, 0.55) !important;
+  background: rgba(139, 92, 246, 0.16) !important;
+  color: #cbb8ff !important;
+  border-radius: 8px;
+}
+
+.role-layout .notification-pop .notification-mark-all:hover:not(:disabled),
+.student-layout .notification-pop .notification-mark-all:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.3) !important;
+  color: #efe9ff !important;
+}
+
+.role-layout .notification-wrap .notification-button,
+.student-layout .notification-wrap .notification-button {
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #e6ecfb !important;
+}
+
+.role-layout .notification-wrap .notification-button:hover:not(:disabled),
+.student-layout .notification-wrap .notification-button:hover:not(:disabled) {
+  background: rgba(124, 92, 255, 0.18) !important;
+  border-color: rgba(124, 92, 255, 0.5) !important;
+  transform: none;
+}
+.notification-mark-all:disabled { opacity: 0.55; cursor: not-allowed; }
+.notification-mark-all:focus-visible { outline: 2px solid #8b5cf6; outline-offset: 2px; }
+
+/* ── List: internal scroll with a thin dark scrollbar ──────────────────── */
+
+.notification-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.55) rgba(0, 0, 0, 0.25);
+}
+
+.notification-list::-webkit-scrollbar { width: 9px; }
+.notification-list::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.25); border-radius: 999px; }
+.notification-list::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.55);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.notification-list::-webkit-scrollbar-thumb:hover { background: rgba(139, 92, 246, 0.8); background-clip: padding-box; }
+
+/* ── Items: slightly lighter dark cards, purple accent for unread ──────── */
+
+.role-layout .notification-item,
+.student-layout .notification-item {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 11px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: #141c31;
+  color: #e6ecfb;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.role-layout .notification-item:hover,
+.student-layout .notification-item:hover {
+  background: #1b2540;
+  border-color: rgba(139, 92, 246, 0.42);
+}
+
+.role-layout .notification-item:focus-visible,
+.student-layout .notification-item:focus-visible {
+  outline: 2px solid #8b5cf6;
+  outline-offset: -1px;
+}
+
+/* Unread rows carry the purple accent; read rows recede. */
+.role-layout .notification-item.unread,
+.student-layout .notification-item.unread {
+  background: linear-gradient(90deg, rgba(124, 92, 255, 0.16), #141c31 62%);
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.role-layout .notification-item.read,
+.student-layout .notification-item.read { opacity: 0.72; }
+
+.notification-item.read:hover { opacity: 1; }
+
+/* Dark-purple icon tile — replaces the pale peach rgba(250,154,2,.12). */
+.notification-tile {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: rgba(139, 92, 246, 0.2);
+  border: 1px solid rgba(139, 92, 246, 0.36);
+  color: #cbb8ff;
+}
+
+.notification-item.unread .notification-tile {
+  background: rgba(139, 92, 246, 0.34);
+  border-color: rgba(139, 92, 246, 0.6);
+  color: #e6dcff;
+}
+
+.notification-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.notification-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.notification-row strong {
+  font-size: 12.8px;
+  font-weight: 800;
+  color: #f3f6ff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.notification-row time {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #7d8bad;
+  letter-spacing: 0.2px;
+}
+
+.notification-body small {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: #98a5c4;
+  /* Two-line clamp: a long message never stretches the panel. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.notification-dot {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.22);
+}
+
+.notification-empty {
+  margin: 0;
+  padding: 26px 14px;
+  text-align: center;
+  font-size: 12.5px;
+  color: #7d8bad;
+}
+
+@media (max-width: 600px) {
+  .role-layout .notification-pop,
+  .student-layout .notification-pop {
+    /* Anchored to the viewport on phones so it can never clip offscreen. */
+    position: fixed;
+    top: calc(var(--header-height, 84px) + 8px);
+    right: 1rem;
+    left: 1rem;
+    width: auto;
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100vh - var(--header-height, 84px) - 24px);
+  }
+}
