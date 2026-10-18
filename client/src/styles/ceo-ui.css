@@ -174,7 +174,14 @@
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  /* An explicit property list rather than `transition: all`.
+     These controls inherit `transition: all` from a legacy rule, and `all`
+     includes `outline`, so the focus ring FADED IN over ~200ms and measured
+     as a different colour on every run. A focus indicator must appear
+     immediately, so `outline` is deliberately excluded. */
+  transition-property: background-color, border-color, color, box-shadow, transform;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
 }
 
 .role-layout .ui-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); }
@@ -218,6 +225,47 @@
   gap: var(--ui-gap-1);
 }
 
+/* ── Focus ring: the app purple ────────────────────────────────────────────
+ * styles/buttons.css:814 declares
+ *   button:focus-visible { outline: 3px solid rgba(250,154,2,.4) !important }
+ * which paints an AMBER ring on every button in the app. That `!important`
+ * cannot be beaten by an ordinary rule, so the workspace declares its own
+ * with equal specificity plus the same `!important`, scoped to
+ * `.role-layout` so nothing outside the CEO workspace changes.
+ *
+ * This is a deliberate, scoped override of a legacy global rather than a
+ * blanket `!important` used to mask a layout problem.
+ */
+.role-layout .ui-btn:focus-visible,
+.role-layout .ui-toggle:focus-visible,
+.role-layout .ui-segmented > button:focus-visible,
+.role-layout .ui-chip:focus-visible,
+.role-layout .file-action-btn:focus-visible,
+.role-layout .fb-entry-actions button:focus-visible,
+/* The pre-existing primary submit button (.gold-btn) is part of the
+   workspace's form and was still ringing amber from buttons.css. */
+.role-layout .gold-btn:focus-visible,
+.role-layout .fbd-btn:focus-visible,
+.role-layout .ms-btn:focus-visible,
+.role-layout .sv-dialog-btn:focus-visible {
+  outline: 2px solid var(--ui-focus) !important;
+  outline-offset: 2px !important;
+  box-shadow: var(--ui-focus-ring) !important;
+}
+
+/* Inputs and selects: theme.css paints them with --control-focus (#b45309,
+ * amber). Same treatment so the whole workspace rings in one colour. */
+.role-layout .ui-input:focus-visible,
+.role-layout .ui-select:focus-visible,
+.role-layout .form-grid-admin input:focus-visible,
+.role-layout .form-grid-admin select:focus-visible,
+.role-layout .form-grid-admin textarea:focus-visible {
+  outline: 2px solid var(--ui-focus) !important;
+  outline-offset: 1px !important;
+  border-color: rgba(167, 139, 250, 0.7) !important;
+  box-shadow: var(--ui-focus-ring) !important;
+}
+
 /* ══ Form controls: one height everywhere ════════════════════════════════ */
 
 .role-layout .form-grid-admin input,
@@ -242,6 +290,10 @@
   color-scheme: dark; /* renders the native date/time picker icon for the dark theme */
   /* Same theme.css:466 trap: min-height:42px would otherwise beat height. */
   min-height: var(--ui-control-h);
+  /* `transition: all` is inherited app-wide and animates the focus ring. */
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
 }
 
 .role-layout .form-grid-admin textarea,
@@ -294,6 +346,10 @@
   font: inherit;
   font-size: 13px;
   color-scheme: dark;
+  /* See .ui-btn: `transition: all` would animate the focus ring. */
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
 }
 .role-layout .ui-input { min-width: 200px; }
 .role-layout .ui-select { cursor: pointer; }
@@ -411,18 +467,28 @@
 }
 
 .role-layout .ui-toggle {
+  /* `align-self: flex-start` matters: a flex item in a column flex container
+     stretches to the full cross axis by default, which turned this text link
+     into a full-width bar inside every card. */
+  align-self: flex-start;
   margin-top: 6px;
-  padding: 0;
+  padding: 2px 0;
   border: none;
   background: none;
   color: var(--ui-focus);
   font-size: 11.5px;
   font-weight: 700;
+  line-height: 1.4;
   cursor: pointer;
   text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .role-layout .ui-toggle:hover { color: #c4b5fd; }
-.role-layout .ui-toggle:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+.role-layout .ui-toggle:focus-visible {
+  outline: 2px solid var(--ui-focus) !important;
+  outline-offset: 2px !important;
+  box-shadow: var(--ui-focus-ring) !important;
+}
 
 /* "Not available" — a real, readable empty state instead of a bare em dash. */
 .role-layout .ui-na {
@@ -455,7 +521,17 @@
   align-items: center;
   gap: var(--ui-gap-2);
 }
-.role-layout .ui-toolbar-controls > * { min-width: 0; }
+/* Controls share the row at full size; below 900px each takes its own line at
+ * a usable width. Without this the selects collapsed to slivers (flex items
+ * default to min-width:0) and the buttons overlapped at 375px. */
+.role-layout .ui-toolbar-controls > * { min-width: 0; flex: 0 1 auto; }
+
+@media (max-width: 900px) {
+  .role-layout .ui-toolbar-controls { width: 100%; }
+  .role-layout .ui-toolbar-controls > .ui-select,
+  .role-layout .ui-toolbar-controls > .ui-input { flex: 1 1 100%; width: 100%; }
+  .role-layout .ui-toolbar-controls > .ui-btn { flex: 1 1 140px; }
+}
 
 /* Segmented control (Individual | Group). */
 .role-layout .ui-segmented {

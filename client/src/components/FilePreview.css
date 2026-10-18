@@ -103,16 +103,23 @@
   box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.35);
 }
 
-.fp-btn-close,
-.fp-panel .fp-btn-close {
+/* `.fp-panel .fp-btn-close` alone is (0,2,0) and loses to `.fp-panel button.fp-btn`
+   at (0,2,1), which is why Close was picking up the purple tint. Matching the
+   element selector fixes the specificity without `!important`. */
+.fp-panel button.fp-btn-close {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.2);
   color: #cbd5e1;
 }
-.fp-panel .fp-btn-close:hover:not(:disabled) {
+.fp-panel button.fp-btn-close:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.12);
   border-color: rgba(255, 255, 255, 0.32);
   color: #eef2fb;
+}
+.fp-panel button.fp-btn-close:focus-visible {
+  outline: 2px solid #a78bfa !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.35) !important;
 }
 
 /* Body fills the panel below the header and scrolls internally only. */
