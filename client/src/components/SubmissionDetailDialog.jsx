@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import FixedOverlay from "./FixedOverlay";
 import FilePreview, { isPreviewable } from "./FilePreview";
 import TechinsIcon from "./TechinsIcon";
-import { formatWorkspaceDateTime } from "../utils/dateHelper";
+import { formatWorkspaceDateTime, formatDuration } from "../utils/dateHelper";
 import { STATUS_LABEL, apiFetch, downloadFile, formatBytes, statusClass, taskTitle } from "../utils/api";
 import "./SubmissionDetailDialog.css";
 
@@ -227,6 +227,9 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
                   <Row label="Assigned">{task?.assigned_at ? formatWorkspaceDateTime(task.assigned_at) : null}</Row>
                   <Row label="Deadline">{task?.due_date ? formatWorkspaceDateTime(task.due_date) : null}</Row>
                   <Row label="Submitted">{submission?.submitted_at ? formatWorkspaceDateTime(submission.submitted_at) : null}</Row>
+                  <Row label="Task started">{submission?.task_started_at ? formatWorkspaceDateTime(submission.task_started_at) : null}</Row>
+                  <Row label="Task submitted">{submission?.task_submitted_at || submission?.submitted_at ? formatWorkspaceDateTime(submission.task_submitted_at || submission.submitted_at) : null}</Row>
+                  <Row label="Total time taken">{formatDuration(submission?.duration_seconds)}</Row>
                   <Row label="Reviewed">{submission?.reviewed_at ? formatWorkspaceDateTime(submission.reviewed_at) : null}</Row>
                 </div>
                 {task?.description && <p className="sdd-prose">{taskTitle(task.description)}</p>}

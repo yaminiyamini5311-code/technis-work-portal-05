@@ -3,7 +3,7 @@ import TechinsIcon from "./TechinsIcon";
 import FixedOverlay from "./FixedOverlay";
 import FilePreview, { isPreviewable } from "./FilePreview";
 import SubmissionDetailDialog from "./SubmissionDetailDialog";
-import { formatWorkspaceDateTime, pluralise } from "../utils/dateHelper";
+import { formatWorkspaceDateTime, formatDuration, pluralise } from "../utils/dateHelper";
 import { STATUS_LABEL, API_URL, apiFetch, downloadFile, taskTitle } from "../utils/api";
 import StatusBadge from "./StatusBadge";
 import "../styles/ceo-ui.css";
@@ -375,6 +375,7 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
                 <col className="col-response" />
                 <col className="col-files" />
                 <col className="col-submitted" />
+                <col className="col-timing" />
                 <col className="col-status" />
                 <col className="col-actions" />
               </colgroup>
@@ -385,6 +386,7 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
                   <th>Response</th>
                   <th>Files</th>
                   <th>Submitted</th>
+                  <th>Task Submission Timing</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -399,7 +401,7 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
                     <Fragment key={group.key}>
                       {/* Identity row: name + code + department/program/batch + version count */}
                       <tr className="sv-group-head">
-                        <td colSpan={7}>
+                        <td colSpan={8}>
                           <div className="sv-group-lead">
                             <div className="student-avatar">{((head.student_name || "S").charAt(0) || "S").toUpperCase()}</div>
                             <div className="sv-group-identity">
@@ -535,6 +537,20 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
                               "Thursday, 15 October 2026, 12:33 pm" inside a
                               nowrap cell and was cut mid-word. */}
                           <td className="timestamp-column">{formatWorkspaceDateTime(item.submitted_at)}</td>
+                          {/* Server-stored timing only. A pre-existing submission
+                              with no session shows "Not recorded" — never a
+                              fabricated duration. */}
+                          <td className="timing-column">
+                            {(item.task_started_at || item.duration_seconds !== null && item.duration_seconds !== undefined) ? (
+                              <div className="sv-timing">
+                                <span className="sv-timing-row"><span>Started</span><b>{formatWorkspaceDateTime(item.task_started_at)}</b></span>
+                                <span className="sv-timing-row"><span>Submitted</span><b>{formatWorkspaceDateTime(item.task_submitted_at || item.submitted_at)}</b></span>
+                                <span className="sv-timing-row"><span>Total</span><b>{formatDuration(item.duration_seconds) || "Not recorded"}</b></span>
+                              </div>
+                            ) : (
+                              <span className="no-timing">Not recorded</span>
+                            )}
+                          </td>
                           <td className="status-column">{statusPill(item)}</td>
                           <td className="actions-column">
                             {/* Equal-height group, fixed order, even wrap.

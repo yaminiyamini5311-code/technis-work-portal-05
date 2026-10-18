@@ -336,6 +336,7 @@
 .col-response { width: 280px; }
 .col-files { width: 240px; }
 .col-submitted { width: 160px; }
+.col-timing { width: 190px; }
 .col-status { width: 120px; }
 .col-actions { width: 240px; }
 
@@ -560,6 +561,20 @@
   color: #6B7280;
   white-space: nowrap;
 }
+
+/* Task Submission Timing Column — server-stored start / submit / total only. */
+.timing-column { font-size: 12px; min-width: 0; }
+.sv-timing { display: flex; flex-direction: column; gap: 3px; }
+.sv-timing-row { display: flex; gap: 6px; align-items: baseline; }
+.sv-timing-row > span {
+  flex: 0 0 62px;
+  color: #6B7280;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.sv-timing-row > b { color: #1F2937; font-weight: 600; font-variant-numeric: tabular-nums; }
+.no-timing { color: #9CA3AF; font-style: italic; }
 
 /* Status Column */
 .status-column {
@@ -841,6 +856,7 @@ textarea:focus {
   .col-response { width: 200px; }
   .col-files { width: 180px; }
   .col-submitted { width: 140px; }
+  .col-timing { width: 170px; }
   .col-status { width: 100px; }
   .col-actions { width: 160px; }
 }
@@ -877,6 +893,7 @@ textarea:focus {
   .col-response { width: 160px; }
   .col-files { width: 140px; }
   .col-submitted { width: 120px; }
+  .col-timing { width: 160px; }
   .col-status { width: 90px; }
   .col-actions { width: 140px; }
 
@@ -911,6 +928,7 @@ textarea:focus {
   .col-response { width: 140px; }
   .col-files { width: 120px; }
   .col-submitted { width: 100px; }
+  .col-timing { width: 150px; }
   .col-status { width: 80px; }
   .col-actions { width: 120px; }
 }
@@ -1237,7 +1255,7 @@ textarea:focus {
   /* Wide enough that no column is squeezed and the three action buttons fit on
      one line; the wrapper scrolls below this width rather than wrapping
      "Requirement" onto a line of its own. */
-  min-width: 1290px;
+  min-width: 1480px;
   table-layout: fixed;
 }
 
@@ -1246,6 +1264,7 @@ textarea:focus {
 .role-layout .submissions-table .col-response     { width: 232px; }
 .role-layout .submissions-table .col-files        { width: 196px; }
 .role-layout .submissions-table .col-submitted    { width: 122px; }
+.role-layout .submissions-table .col-timing       { width: 190px; }
 .role-layout .submissions-table .col-status       { width: 122px; }
 .role-layout .submissions-table .col-actions      { width: 318px; }
 
