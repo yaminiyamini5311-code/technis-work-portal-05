@@ -16,6 +16,8 @@
     "migrate:batches": "node scripts/migrate-batches.js",
     "migrate:task-review": "node scripts/migrate-task-review.js",
     "migrate:task-review:dry": "node scripts/migrate-task-review.js --dry-run",
+    "migrate:missions": "node scripts/migrate-mission-schedule.js",
+    "migrate:missions:dry": "node scripts/migrate-mission-schedule.js --dry-run",
     "generate:ceo-hash": "node scripts/generate-ceo-hash.js",
     "verify:config": "node scripts/verify-ceo-config.js",
     "verify:drive": "node scripts/verify-drive-access.js",
