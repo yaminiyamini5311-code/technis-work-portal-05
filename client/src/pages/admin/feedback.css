@@ -55,6 +55,164 @@
 
 .field-hint { display: block; margin-top: 4px; font-size: 11px; color: #aaa; }
 
+/* Focus ring in the app's purple, not the cyan it used to show. */
+.role-layout input:focus-visible,
+.role-layout textarea:focus-visible,
+.role-layout select:focus-visible,
+.role-layout .fb-toolbar input:focus,
+.fbd-input:focus-visible {
+  outline: 2px solid #8b5cf6;
+  outline-offset: 2px;
+  border-color: rgba(139, 92, 246, 0.8);
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.18);
+}
+
+/* ── Per-entry actions ────────────────────────────────────────────────── */
+
+.fb-entry-actions {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.fb-action {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #a78bfa;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.fb-action:hover { color: #c4b5fd; }
+.fb-action:focus-visible { outline: 2px solid #8b5cf6; outline-offset: 3px; }
+
+/* Delete is visually distinct (red/danger) from the primary purple Edit. */
+.fb-action-danger { color: #ff8fa3; }
+.fb-action-danger:hover { color: #ffb3c1; }
+
+/* ── Edit / delete dialogs ────────────────────────────────────────────── */
+
+.fbd { width: min(620px, 95vw); }
+
+.fbd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.07);
+  color: #e6ecfb;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.fbd-btn:hover:not(:disabled) { background: rgba(124, 92, 255, 0.22); border-color: rgba(124, 92, 255, 0.6); }
+.fbd-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.fbd-btn:focus-visible { outline: 2px solid #8b5cf6; outline-offset: 2px; }
+.fbd-btn-primary { background: linear-gradient(135deg, #7c5cff, #6d28d9); border-color: transparent; color: #fff; }
+.fbd-btn-danger { background: rgba(255, 77, 109, 0.14); border-color: rgba(255, 77, 109, 0.55); color: #ffc2cf; }
+.fbd-btn-danger:hover:not(:disabled) { background: rgba(255, 77, 109, 0.26); border-color: rgba(255, 77, 109, 0.85); }
+
+.fbd-provenance {
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12px;
+  line-height: 1.6;
+  color: #93a1c2;
+}
+
+.fbd-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 5px;
+  font-size: 11px;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: #7d8bad;
+  font-weight: 800;
+}
+
+.fbd-req { color: #ff8fa3; letter-spacing: 0.4px; }
+
+.fbd-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.3);
+  color: #eef2fb;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  min-height: 38px;
+}
+
+textarea.fbd-input { min-height: 96px; resize: vertical; }
+
+.fbd-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0 12px;
+}
+
+.fbd-error { display: block; margin-top: 5px; color: #ff9db0; font-size: 12px; font-weight: 700; }
+
+.fbd-message {
+  margin-top: 12px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.fbd-message-error { background: rgba(255, 77, 109, 0.11); border: 1px solid rgba(255, 77, 109, 0.38); color: #ffd9e2; }
+
+.fbd-target {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.fbd-target > div { display: flex; gap: 12px; align-items: baseline; }
+.fbd-target dt { min-width: 82px; font-size: 11px; letter-spacing: 0.7px; text-transform: uppercase; color: #7d8bad; font-weight: 800; }
+.fbd-target dd { margin: 0; font-size: 13px; color: #e6ecfb; overflow-wrap: anywhere; }
+.fbd-target-snippet dd { font-style: italic; color: #b9c4dd; }
+
+.fbd-hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #93a1c2;
+}
+
+.fbd-confirm-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 12px;
+  font-size: 12.5px;
+  color: #cfd8ee;
+  cursor: pointer;
+}
+
+.fbd-confirm-label input { width: 16px; height: 16px; accent-color: #7c5cff; cursor: pointer; }
+
 /* FIX C-10: dark navy card, light text — matches CEO Performance design */
 .fb-students { display: flex; flex-direction: column; gap: 18px; }
 .fb-student {
@@ -117,14 +275,22 @@
 }
 .fb-score { font-weight: 700; color: #FA9A02; }
 .fb-status {
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  font-size: 10px;
+  letter-spacing: 0.3px;
+  font-size: 10.5px;
   font-weight: 700;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 2px 9px;
   background: rgba(255, 255, 255, 0.04);
+  /* Sentence case: the old forced uppercase turned every row into the same
+     shouting "RECORDED" label. */
+  color: #b9c4dd;
+}
+
+.fb-status-updated {
+  background: rgba(139, 92, 246, 0.16);
+  border-color: rgba(139, 92, 246, 0.45);
+  color: #cbb8ff;
 }
 .fb-line { margin-top: 5px; font-size: 12px; color: #cbd5e1; }
 .fb-line b { color: #e8e8e8; }

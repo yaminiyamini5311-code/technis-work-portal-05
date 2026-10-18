@@ -300,3 +300,35 @@
         gap: 15px;
     }
 }
+
+/* Schedule state chip on the student mission card. */
+.mission-schedule-chip {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #cfd8ee;
+}
+
+.mission-schedule-chip.active {
+    background: rgba(52, 211, 153, 0.16);
+    border-color: rgba(52, 211, 153, 0.45);
+    color: #7fe8bd;
+}
+
+.mission-schedule-chip.overdue {
+    background: rgba(255, 77, 109, 0.16);
+    border-color: rgba(255, 77, 109, 0.45);
+    color: #ffb3c1;
+}
+
+.mission-schedule-chip.upcoming {
+    background: rgba(96, 165, 250, 0.16);
+    border-color: rgba(96, 165, 250, 0.45);
+    color: #a5ccff;
+}

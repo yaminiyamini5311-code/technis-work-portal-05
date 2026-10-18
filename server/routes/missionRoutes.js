@@ -61,7 +61,10 @@ function parseSchedule({ start_date, start_time, end_date, end_time, start_at, e
     if (Number.isNaN(parsed.getTime())) return { error: "INVALID_END", message: "The end date is not a valid value." };
     return { iso: parsed.toISOString() };
   }
-  return fromPair(start_date, start_time);
+  // Pick the pair for the bound actually being parsed. Returning the START pair
+  // for both made every window collapse to a single instant and every schedule
+  // look invalid.
+  return which === "end" ? fromPair(end_date, end_time) : fromPair(start_date, start_time);
 }
 
 /**

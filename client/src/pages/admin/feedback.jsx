@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import FixedOverlay from "../../components/FixedOverlay";
+import { apiFetch } from "../../utils/api";
 import "../../styles/admin.css";
 import "./feedback.css";
 
@@ -25,6 +27,16 @@ export default function Feedback() {
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+
+  // Edit / delete dialogs.
+  const [editing, setEditing] = useState(null);
+  const [editForm, setEditForm] = useState({ feedback: "", score: "", strengths: "", improvements: "" });
+  const [editErrors, setEditErrors] = useState({});
+  const [editError, setEditError] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deleting, setDeleting] = useState(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 
@@ -122,6 +134,101 @@ export default function Feedback() {
     setFieldErrors((e) => ({ ...e, [key]: "" }));
     setServerError("");
     setSuccessMsg("");
+  };
+
+  /* ── Edit ─────────────────────────────────────────────────────────────── */
+
+  const openEdit = (entry) => {
+    setEditing(entry);
+    setEditError("");
+    setEditErrors({});
+    setEditForm({
+      feedback: entry.feedback || "",
+      score: entry.score == null ? "" : String(entry.score),
+      strengths: entry.strengths || "",
+      improvements: entry.improvements || "",
+    });
+  };
+
+  const closeEdit = () => {
+    setEditing(null);
+    setEditForm({ feedback: "", score: "", strengths: "", improvements: "" });
+    setEditError("");
+    setEditErrors({});
+  };
+
+  const validateEdit = () => {
+    const errs = {};
+    if (!editForm.feedback.trim()) errs.feedback = "Feedback text is required";
+    if (editForm.score !== "") {
+      const n = Number(editForm.score);
+      if (!Number.isFinite(n) || n < 0 || n > 100) errs.score = "Score must be between 0 and 100";
+    }
+    return errs;
+  };
+
+  const saveEdit = async () => {
+    if (!editing || savingEdit) return;
+    const errs = validateEdit();
+    if (Object.keys(errs).length) {
+      setEditErrors(errs);
+      return;
+    }
+    setSavingEdit(true);
+    setEditError("");
+    try {
+      await apiFetch(`/api/admin/feedback/${encodeURIComponent(editing.id)}`, {
+        method: "PUT",
+        body: {
+          feedback: editForm.feedback.trim(),
+          score: editForm.score === "" ? null : Number(editForm.score),
+          strengths: editForm.strengths.split(",").map((v) => v.trim()).filter(Boolean),
+          improvements: editForm.improvements.split(",").map((v) => v.trim()).filter(Boolean),
+        },
+      });
+      setSuccessMsg("Feedback updated.");
+      closeEdit();
+      await loadEntries();
+    } catch (err) {
+      // Show the server's own message (403 / 409 / validation), never a fake one.
+      setEditError(err.message || "Unable to update feedback");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  /* ── Delete ───────────────────────────────────────────────────────────── */
+
+  const openDelete = (entry) => {
+    setDeleting(entry);
+    setDeleteError("");
+    setConfirmDelete(false);
+  };
+
+  const closeDelete = () => {
+    setDeleting(null);
+    setDeleteError("");
+    setConfirmDelete(false);
+  };
+
+  const runDelete = async () => {
+    if (!deleting) return;
+    setDeleteError("");
+    try {
+      await apiFetch(`/api/admin/feedback/${encodeURIComponent(deleting.id)}`, { method: "DELETE" });
+      setSuccessMsg("Feedback deleted.");
+      closeDelete();
+      await loadEntries();
+    } catch (err) {
+      setDeleteError(err.message || "Unable to delete feedback");
+    }
+  };
+
+  /** Short excerpt used to name the entry in the confirmation dialog. */
+  const snippet = (entry) => {
+    const text = String(entry?.feedback || "").trim().replace(/\s+/g, " ");
+    if (!text) return "(no text)";
+    return text.length > 90 ? `${text.slice(0, 90)}…` : text;
   };
 
   const submit = async (ev) => {
@@ -338,10 +445,30 @@ export default function Feedback() {
                             <span>{fmtDate(e.created_at)}</span>
                             {e.updated_at && e.updated_at !== e.created_at && <span>Updated {fmtDate(e.updated_at)}</span>}
                             {e.score != null && <span className="fb-score">Score {e.score}</span>}
-                            <span className="fb-status">{e.status}</span>
+                            {/* Every entry was "recorded", so the chip said
+                                RECORDED on every row and carried no
+                                information. It now states the state that
+                                actually varies: whether it was edited. */}
+                            <span className={`fb-status ${e.updated_at && e.updated_at !== e.created_at ? "fb-status-updated" : ""}`}>
+                              {e.updated_at && e.updated_at !== e.created_at ? "Updated" : "Recorded"}
+                            </span>
                           </div>
                           {e.strengths && <div className="fb-line"><b>Strengths:</b> {e.strengths}</div>}
                           {e.improvements && <div className="fb-line"><b>Improvements:</b> {e.improvements}</div>}
+
+                          {/* Actions appear only when the backend says this
+                              user may make the change (admin/CEO always; a
+                              manager only their own entries). */}
+                          {(e.can_edit || e.can_delete) && (
+                            <div className="fb-entry-actions">
+                              {e.can_edit && (
+                                <button type="button" className="fb-action" onClick={() => openEdit(e)}>Edit</button>
+                              )}
+                              {e.can_delete && (
+                                <button type="button" className="fb-action fb-action-danger" onClick={() => openDelete(e)}>Delete</button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </article>
@@ -351,6 +478,152 @@ export default function Feedback() {
           })}
         </div>
       )}
+
+      {/* ── Edit feedback ───────────────────────────────────────────────── */}
+      <FixedOverlay
+        open={Boolean(editing)}
+        onClose={closeEdit}
+        label="Edit feedback"
+        panelClassName="fixed-overlay-panel fbd"
+        zIndex={1000}
+      >
+        <div className="panel-head">
+          <div>
+            <span className="section-kicker">EDIT FEEDBACK</span>
+            <h3>
+              {editing?.student_name || "Student"}
+              {editing?.student_code ? ` · ${editing.student_code}` : ""}
+            </h3>
+            <p>{editing?.task_title || "General feedback"}</p>
+          </div>
+          <button type="button" className="fbd-btn" onClick={closeEdit}>Close</button>
+        </div>
+
+        <div className="panel-body">
+          <div className="fbd-provenance">
+            Recorded by {editing?.reviewer_name || "an unknown reviewer"} on {fmtDate(editing?.created_at)}.
+            {editing?.updated_at && editing.updated_at !== editing.created_at
+              ? ` Last updated ${fmtDate(editing.updated_at)}.`
+              : ""}
+            {" "}The original reviewer and date are kept when you save.
+          </div>
+
+          <label className="fbd-label" htmlFor="fbd-feedback">Feedback <span className="fbd-req">required</span></label>
+          <textarea
+            id="fbd-feedback"
+            className="fbd-input"
+            rows={4}
+            value={editForm.feedback}
+            onChange={(e) => { setEditForm(f => ({ ...f, feedback: e.target.value })); setEditErrors(x => ({ ...x, feedback: "" })); }}
+            aria-invalid={!!editErrors.feedback}
+            data-autofocus
+          />
+          {editErrors.feedback && <small className="fbd-error" role="alert">{editErrors.feedback}</small>}
+
+          <div className="fbd-grid">
+            <div>
+              <label className="fbd-label" htmlFor="fbd-score">Score (0–100)</label>
+              <input
+                id="fbd-score"
+                className="fbd-input"
+                type="number"
+                min="0"
+                max="100"
+                value={editForm.score}
+                onChange={(e) => { setEditForm(f => ({ ...f, score: e.target.value })); setEditErrors(x => ({ ...x, score: "" })); }}
+                aria-invalid={!!editErrors.score}
+              />
+              {editErrors.score && <small className="fbd-error" role="alert">{editErrors.score}</small>}
+            </div>
+            <div>
+              <label className="fbd-label" htmlFor="fbd-strengths">Strengths</label>
+              <input
+                id="fbd-strengths"
+                className="fbd-input"
+                placeholder="Comma separated"
+                value={editForm.strengths}
+                onChange={(e) => setEditForm(f => ({ ...f, strengths: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="fbd-label" htmlFor="fbd-improvements">Improvement areas</label>
+              <input
+                id="fbd-improvements"
+                className="fbd-input"
+                placeholder="Comma separated"
+                value={editForm.improvements}
+                onChange={(e) => setEditForm(f => ({ ...f, improvements: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          {editError && <div className="fbd-message fbd-message-error" role="alert">{editError}</div>}
+        </div>
+
+        <div className="panel-foot">
+          <button type="button" className="fbd-btn" onClick={closeEdit} disabled={savingEdit}>Cancel</button>
+          <button type="button" className="fbd-btn fbd-btn-primary" onClick={saveEdit} disabled={savingEdit}>
+            {savingEdit ? "Saving…" : "Save changes"}
+          </button>
+        </div>
+      </FixedOverlay>
+
+      {/* ── Delete feedback ─────────────────────────────────────────────── */}
+      <FixedOverlay
+        open={Boolean(deleting)}
+        onClose={closeDelete}
+        label="Confirm delete feedback"
+        panelClassName="fixed-overlay-panel fbd"
+        zIndex={1200}
+      >
+        <div className="panel-head">
+          <div>
+            <span className="section-kicker">DELETE FEEDBACK</span>
+            <h3>Delete this feedback entry?</h3>
+          </div>
+          <button type="button" className="fbd-btn" onClick={closeDelete}>Close</button>
+        </div>
+
+        <div className="panel-body">
+          <dl className="fbd-target">
+            <div><dt>Student</dt><dd>{deleting?.student_name || "—"}{deleting?.student_code ? ` (${deleting.student_code})` : ""}</dd></div>
+            <div><dt>Task</dt><dd>{deleting?.task_title || "General feedback"}</dd></div>
+            <div><dt>Recorded</dt><dd>{fmtDate(deleting?.created_at)}</dd></div>
+            <div><dt>Reviewer</dt><dd>{deleting?.reviewer_name || "—"}</dd></div>
+            <div className="fbd-target-snippet"><dt>Feedback</dt><dd>{snippet(deleting)}</dd></div>
+          </dl>
+
+          <p className="fbd-hint">
+            Only this one entry is affected. The record is soft-deleted, so it disappears from the list but the
+            audit trail keeps who removed it and when.
+          </p>
+
+          <label className="fbd-confirm-label" htmlFor="fbd-confirm">
+            <input
+              id="fbd-confirm"
+              type="checkbox"
+              checked={confirmDelete}
+              onChange={(e) => setConfirmDelete(e.target.checked)}
+            />
+            I understand this will remove this feedback entry.
+          </label>
+
+          {deleteError && <div className="fbd-message fbd-message-error" role="alert">{deleteError}</div>}
+        </div>
+
+        <div className="panel-foot">
+          <button type="button" className="fbd-btn" onClick={closeDelete}>Cancel</button>
+          <button
+            type="button"
+            className="fbd-btn fbd-btn-danger"
+            onClick={runDelete}
+            disabled={!confirmDelete}
+            title={!confirmDelete ? "Tick the confirmation box first" : undefined}
+          >
+            Delete feedback
+          </button>
+        </div>
+      </FixedOverlay>
     </div>
   );
 }
