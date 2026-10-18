@@ -55,16 +55,21 @@
 
 .field-hint { display: block; margin-top: 4px; font-size: 11px; color: #aaa; }
 
-/* Focus ring in the app's purple, not the cyan it used to show. */
-.role-layout input:focus-visible,
-.role-layout textarea:focus-visible,
-.role-layout select:focus-visible,
-.role-layout .fb-toolbar input:focus,
+/* Focus ring in the app's purple. The page-level ring now comes from the
+   `--control-focus` token in theme.css, which was amber rather than a colour
+   that matched the workspace. Only the search box — which is not a themed
+   native control — needs its own rule. */
+.role-layout .fb-toolbar input[type="search"]:focus {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.18);
+  outline: 2px solid #8b5cf6;
+  outline-offset: 1px;
+}
+
 .fbd-input:focus-visible {
   outline: 2px solid #8b5cf6;
-  outline-offset: 2px;
-  border-color: rgba(139, 92, 246, 0.8);
-  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.18);
+  outline-offset: 1px;
+  border-color: rgba(139, 92, 246, 0.7);
 }
 
 /* ── Per-entry actions ────────────────────────────────────────────────── */

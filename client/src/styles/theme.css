@@ -431,7 +431,13 @@
 }
 
 /* Shared native-control behavior. Keep this after portal styles so every
-   input, including controls in modals and filters, uses the same contract. */
+   input, including controls in modals and filters, uses the same contract.
+
+   `--control-focus` is the focus ring colour for EVERY native control. It used
+   to be amber #b45309 in the admin/login scope and the amber --accent in the
+   student scope, so the Feedback textarea showed a ring in a colour that
+   matched nothing else in the workspace. It is now the app's purple, the same
+   #8b5cf6 the component focus rings use. */
 .role-layout,
 .login-page {
   --control-bg: #ffffff;
@@ -439,7 +445,7 @@
   --control-text: #111827;
   --control-placeholder: #667085;
   --control-border: #cbd5e1;
-  --control-focus: #b45309;
+  --control-focus: #8b5cf6;
   --control-disabled-bg: #f1f5f9;
   --control-disabled-text: #64748b;
 }
@@ -450,7 +456,7 @@
   --control-text: var(--text-primary);
   --control-placeholder: var(--text-muted);
   --control-border: rgba(250,154,2,0.38);
-  --control-focus: var(--accent);
+  --control-focus: #8b5cf6;
   --control-disabled-bg: rgba(10,18,40,0.5);
   --control-disabled-text: var(--text-subtle);
 }
