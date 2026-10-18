@@ -14,8 +14,8 @@
   ],
   "crons": [
     {
-      "src": "/api/cron/expire-resubmissions",
-      "schedule": "0 * * * *"
+      "path": "/api/cron/expire-resubmissions",
+      "schedule": "0 2 * * *"
     }
   ]
 }

@@ -12,7 +12,12 @@
  * the route is mounted on the existing serverless function.
  *
  *   vercel.json → { "crons": [{ "path": "/api/cron/expire-resubmissions",
- *                               "schedule": "0 * * * *" }] }
+ *                               "schedule": "0 2 * * *" }] }
+ *
+ * Note the key is "path", not "src" — Vercel's schema rejects a cron entry
+ * without it ("crons[0] missing required property `path`"). The daily 02:00
+ * schedule is the Hobby-plan limit; the lazy sweep below is what actually
+ * enforces the window, so running once a day is sufficient.
  *
  * CRON_SECRET must be set in the Vercel project settings. Without it the
  * endpoint answers 503 and says so, rather than running unprotected.
