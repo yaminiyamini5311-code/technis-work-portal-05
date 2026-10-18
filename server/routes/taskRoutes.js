@@ -1653,12 +1653,20 @@ async function handleApprove(req, res) {
     const scoreUpdate = parseScorePair(req.body, res);
     if (scoreUpdate === undefined) return;
 
-    const latest = await db.collection("submissions")
-      .find({ task_id: String(task._id), student_id: studentId })
-      .sort({ version: -1 })
-      .limit(1)
-      .toArray();
-    const submission = submissionId ? latest.find(s => String(s._id) === String(submissionId)) : latest[0];
+    const latest = submissionId
+      // A specific version was named (the Submissions page addresses one
+      // submission by id). Fetch exactly that row: taking only the newest
+      // version first made approving an EARLIER version return 404 whenever the
+      // two existed side by side.
+      ? await db.collection("submissions")
+        .find({ _id: toId(submissionId), task_id: String(task._id), student_id: studentId })
+        .toArray()
+      : await db.collection("submissions")
+        .find({ task_id: String(task._id), student_id: studentId })
+        .sort({ version: -1 })
+        .limit(1)
+        .toArray();
+    const submission = latest[0];
     if (!submission) {
       return fail(res, 404, "SUBMISSION_NOT_FOUND", "This student has not submitted anything to review.");
     }
