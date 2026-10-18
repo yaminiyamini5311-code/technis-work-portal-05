@@ -2,9 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useExclusiveSelect } from "../../hooks/useExclusiveSelect";
 import useModalBehavior from "../../components/useModalBehavior";
+import TechinsIcon from "../../components/TechinsIcon";
 import "../../styles/admin.css";
-import { formatISTDateShort } from "../../utils/dateHelper";
+import "../../styles/ceo-ui.css";
+import { formatWorkspaceDateTimeParts, pluralise } from "../../utils/dateHelper";
 import { remainingTime, taskTitle, titleCase } from "../../utils/api";
+import StatusBadge from "../../components/StatusBadge";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
@@ -31,12 +34,12 @@ const DOMAINS = [
    counts returned by the backend aggregation — one row per task used to show a
    single task-wide status, which was wrong as soon as one of 38 students acted. */
 const WORKFLOW_CHIPS = [
-  { key: "submitted", label: "Submitted", className: "st st-submitted" },
-  { key: "pending", label: "Pending", className: "st st-pending" },
-  { key: "in_progress", label: "In Progress", className: "st st-in-progress" },
-  { key: "revision_required", label: "Revision", className: "st st-revision" },
-  { key: "resubmission_expired", label: "Expired", className: "st st-expired" },
-  { key: "approved", label: "Approved", className: "st st-approved" },
+  { key: "submitted", label: "Submitted", status: "submitted" },
+  { key: "pending", label: "Pending", status: "pending" },
+  { key: "in_progress", label: "In Progress", status: "in_progress" },
+  { key: "revision_required", label: "Revision", status: "revision_required" },
+  { key: "resubmission_expired", label: "Expired", status: "resubmission_expired" },
+  { key: "approved", label: "Approved", status: "approved" },
 ];
 
 /* Blank form for CREATE mode. Editing reuses the same fields, so this object
@@ -490,15 +493,20 @@ export default function Tasks() {
         <div className="field">
           <label className="field-label" htmlFor="task-start-date">Starting Date</label>
           <input id="task-start-date" name="task-start-date" type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} autoComplete="off" />
-          <input id="task-start-time" name="task-start-time" type="time" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })} autoComplete="off" style={{ marginTop: "6px" }} />
+          <label className="field-label" htmlFor="task-start-time">Starting Time</label>
+          <input id="task-start-time" name="task-start-time" type="time" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })} autoComplete="off" />
         </div>
 
         <div className="field">
           <label className="field-label" htmlFor="task-due-date">Ending Date</label>
           <input id="task-due-date" name="task-due-date" type="date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} autoComplete="off" />
-          <input id="task-due-time" name="task-due-time" type="time" value={form.due_time} onChange={e => setForm({ ...form, due_time: e.target.value })} autoComplete="off" style={{ marginTop: "6px" }} />
+          <label className="field-label" htmlFor="task-due-time">Ending Time</label>
+          <input id="task-due-time" name="task-due-time" type="time" value={form.due_time} onChange={e => setForm({ ...form, due_time: e.target.value })} autoComplete="off" />
         </div>
 
+        {/* The three free-text fields share one row and one min-height so they
+            line up. Submission Requirements previously sat alone on a half-width
+            row and left a visible hole beside it. */}
         <div className="field">
           <label className="field-label" htmlFor="task-description">Description</label>
           <textarea
@@ -535,7 +543,8 @@ export default function Tasks() {
           />
         </div>
 
-        <div className="field">
+        {/* Full width: the last field of the group, so the grid closes cleanly. */}
+        <div className="field field-full">
           <label className="field-label" htmlFor="task-submission-requirements">Submission Requirements</label>
           <textarea
             id="task-submission-requirements"
@@ -547,35 +556,58 @@ export default function Tasks() {
           />
         </div>
 
-        <button className="gold-btn" type="submit" disabled={submitting}>
-          {editing
-            ? (submitting ? "Saving…" : "Save Changes")
-            : (submitting ? "Assigning…" : "Assign Task")}
-        </button>
+        {/* Left-aligned with the form's fields and a consistent top margin. */}
+        <div className="field field-full form-actions">
+          <button className="gold-btn" type="submit" disabled={submitting}>
+            {editing
+              ? (submitting ? "Saving…" : "Save Changes")
+              : (submitting ? "Assigning…" : "Assign Task")}
+          </button>
+        </div>
       </form>
 
       <div className="panel table-wrap">
-        <div className="panel-head">
+        {/* Title, domain filter and Refresh share one row (wrapping on mobile). */}
+        <div className="panel-head ui-toolbar">
           <div>
             <span className="section-kicker">LIVE TASKS</span>
             <h3>All assignments</h3>
           </div>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div className="ui-toolbar-controls">
             <select
+              className="ui-select"
               value={domainFilter}
               onChange={e => setDomainFilter(e.target.value)}
-              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #D0D0D0', fontSize: '13px' }}
+              aria-label="Filter by domain"
             >
               <option value="">All Domains</option>
               {DOMAINS.map(d => (
                 <option key={d.value} value={d.value}>{d.label}</option>
               ))}
             </select>
-            <button onClick={load}>Refresh</button>
+            <button type="button" className="ui-btn ui-btn--neutral" onClick={load}>Refresh</button>
           </div>
         </div>
 
-        <table>
+        {/* The wrapper is the horizontal scroller. Previously the table had
+            `table-layout: auto`, so on a narrow viewport every column was
+            squeezed until the content wrapped into a column thousands of
+            pixels tall (measured 3092px for 31 rows). */}
+        <div className="ui-table-wrap">
+
+        <table className="ui-table tasks-table">
+          <colgroup>
+            <col style={{ width: "22%" }} />
+            <col style={{ width: "9%" }} />
+            <col style={{ width: "13%" }} />
+            <col style={{ width: "9%" }} />
+            <col style={{ width: "16%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "12%" }} />
+          </colgroup>
           <thead>
             <tr>
               <th>Task</th>
@@ -603,18 +635,10 @@ export default function Tasks() {
                   <small style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{taskTitle(t.title)}</small>
                 </td>
                 <td>
-                  <span className="domain-chip" style={{
-                    padding: '4px 10px',
-                    borderRadius: '20px',
-                    background: '#F7F7F7',
-                    color: '#0C120C',
-                    fontSize: '11px',
-                    fontWeight: '700',
-                    textTransform: 'capitalize'
-                  }}>
-                    {/* effective_domain maps the legacy "program" pseudo-domain
-                        to the real owning domain (EduTins) instead of printing
-                        "Program" here on every row. */}
+                  {/* Themed badge. This was a pure-white pill (#F7F7F7 on a
+                      dark canvas) with dark text — unreadable in the CEO
+                      workspace. */}
+                  <span className="ui-chip ui-chip--pending">
                     {t.effective_domain
                       ? (DOMAINS.find(d => d.value === t.effective_domain)?.label || titleCase(t.effective_domain))
                       : '—'}
@@ -624,61 +648,91 @@ export default function Tasks() {
                   {t.target_type === "batch" ? (
                     <>
                       <strong>{t.batch_name || "Batch"}</strong>
-                      <small>{t.assignee_count || 0} assignees</small>
+                      <small>{pluralise(t.assignee_count || 0, "assignee")}</small>
                     </>
                   ) : (
-                    t.student_name
+                    <>
+                      <strong>{t.student_name || "—"}</strong>
+                      {t.student_code && <small>{t.student_code}</small>}
+                    </>
                   )}
                 </td>
                 {/* Real program: the task's own value, or the one shared by
                     its assignees. Previously this read tasks.program only,
                     which is null for every batch task, so it always showed "—". */}
-                <td>{t.program ? titleCase(t.program) : '—'}</td>
+                <td>{t.program ? titleCase(t.program) : <span className="ui-na">Not available</span>}</td>
                 {/* Per-student aggregate. A task with 38 assignees cannot be
                     described by one status, so the backend returns the counts
                     and each non-zero bucket is shown as its own chip. */}
                 <td>
-                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                  {/* A wrapping group of equal-height chips in a column with a
+                      stable width, so they never wrap unevenly between rows. */}
+                  <div className="ui-chip-group">
                     {WORKFLOW_CHIPS.map((chip) => {
                       const value = counts[chip.key] || 0;
                       if (!value) return null;
-                      return <span key={chip.key} className={chip.className}>{value} {chip.label}</span>;
+                      return (
+                        <StatusBadge
+                          key={chip.key}
+                          status={chip.status}
+                          label={chip.label}
+                          count={value}
+                        />
+                      );
                     })}
-                    {(!counts.assigned) && <span className="st st-pending">No assignees</span>}
+                    {!counts.assigned && <StatusBadge status="pending" label="No assignees" />}
                   </div>
                 </td>
-                <td>{t.priority}</td>
-                <td>{t.start_date ? `${t.start_date}${t.start_time ? ` ${t.start_time}` : ""}` : "—"}</td>
                 <td>
-                  {t.due_date ? formatISTDateShort(t.due_date) : "—"}
+                  <span className={`ui-chip ui-chip--${t.priority === "high" ? "progress" : t.priority === "low" ? "pending" : "submitted"}`}>
+                    {titleCase(t.priority || "medium")}
+                  </span>
+                </td>
+                {/* Both window columns use the shared formatter, so Start and
+                    End always show the same shape with a time. Previously Start
+                    printed the raw "2026-10-16 00:30" and End printed a date
+                    with no time at all. */}
+                <td className="cell-date">
+                  {formatWorkspaceDateTimeParts(t.start_date, t.start_time) || <span className="ui-na">Not set</span>}
+                </td>
+                <td className="cell-date">
+                  {formatWorkspaceDateTimeParts(t.due_date, t.due_time) || <span className="ui-na">Not set</span>}
                   {/* "Overdue" is a derived flag, not a stored status. */}
                   {deadline && deadline.overdue && (
-                    <small style={{ display: 'block', color: '#B42318', fontWeight: 700 }}>{deadline.label}</small>
+                    <small className="cell-overdue">{deadline.label}</small>
                   )}
                 </td>
                 {/* Distinct students who submitted, not versions. */}
                 <td>
                   <strong>{t.submission_count || 0}</strong>
-                  <small style={{ display: 'block' }}>
-                    of {t.assignee_count || 0} assignee{t.assignee_count === 1 ? "" : "s"}
+                  <small className="cell-sub">
+                    of {pluralise(t.assignee_count || 0, "assignee")}
                   </small>
                 </td>
                 <td>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {/* One group, equal height, fixed order Edit · Review ·
+                      Remove. Remove no longer drops onto its own line. */}
+                  <div className="ui-actions">
                     <button
+                      type="button"
+                      className="ui-btn ui-btn--neutral"
                       onClick={() => openEdit(t)}
                       disabled={deleting || submitting}
                       aria-label={`Edit task ${t.task_code || t.title}`}
                     >
                       Edit
                     </button>
-                    <button onClick={() => openReview(t)}>Review</button>
+                    <button type="button" className="ui-btn ui-btn--info" onClick={() => openReview(t)}>
+                      Review
+                    </button>
                     <button
+                      type="button"
+                      className="ui-btn ui-btn--danger"
                       onClick={() => askDelete(t)}
                       disabled={deleting}
                       aria-label={`Remove task ${t.task_code || t.title}`}
-                      style={{ color: '#B42318', borderColor: '#F0C7C2', background: '#FEF3F2' }}
                     >
+                      <TechinsIcon name="trash" size={13} variant="light" ariaHidden />
                       Remove
                     </button>
                   </div>
@@ -688,6 +742,7 @@ export default function Tasks() {
             })}
           </tbody>
         </table>
+        </div>
 
         {!filteredTasks.length && (
           <div className="empty-state">
