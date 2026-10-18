@@ -4,6 +4,7 @@ const { authenticateToken, authorizeRoles } = require("../middleware/authMiddlew
 const { MAX_STUDENT_ACCOUNTS } = require("../config");
 const { writeAudit } = require("../utils/audit_mongo");
 const { isActiveFlag, normalizeRegistrationStatus } = require("../utils/userAccount");
+const { studentCode: studentCodeOf, STUDENT_PROFILE_PROJECTION } = require("../utils/students");
 const bcrypt = require("bcryptjs");
 const multer = require("multer");
 const fs = require("fs");
@@ -964,6 +965,9 @@ router.post("/feedback", authenticateToken, authorizeRoles("admin", "manager", "
       improvements: Array.isArray(improvements) ? improvements.join(", ") : (improvements || ""),
       feedback: String(feedback).trim(),
       reviewed_by: req.user.id,
+      // Immutable author, separate from reviewed_by: it is what decides
+      // whether a manager may later edit or delete this entry.
+      created_by: String(req.user.id),
       // Task linkage (nullable): records created before this change keep
       // task_id === null and are reported under "Unassigned task".
       task_id: linkedTaskId,
@@ -978,6 +982,107 @@ router.post("/feedback", authenticateToken, authorizeRoles("admin", "manager", "
     console.error("Create feedback error:", error);
     res.status(500).json({ success: false, message: "Unable to save feedback" });
   }
+});
+
+/* ─── EDIT / DELETE FEEDBACK ─────────────────────────────────────────────────
+ * Rules enforced on the server, not just hidden in the UI:
+ *   • Only an admin or CEO may edit or delete ANY entry.
+ *   • A manager may edit or delete ONLY feedback they authored themselves.
+ *   • A student / member can never reach these routes at all (403).
+ *   • reviewer_id and created_at are immutable — an edit records updated_by
+ *     and updated_at instead of rewriting the history.
+ *   • Delete is a SOFT delete (deleted_at / deleted_by): the audit trail keeps
+ *     the row, the list stops showing it, and it can still be audited.
+ */
+function canManageFeedback(user, record) {
+  if (!user) return false;
+  const role = String(user.role || "").toLowerCase();
+  if (role === "admin" || role === "ceo") return true;
+  if (role !== "manager") return false;
+  const author = String(record.created_by || record.reviewed_by || "");
+  return author === String(user.id);
+}
+
+const FEEDBACK_TEXT_LIMIT = 4000;
+
+router.put("/feedback/:id", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
+  const db = req.db;
+  const record = await db.collection("performance").findOne({ _id: toId(req.params.id) });
+  if (!record) return res.status(404).json({ success: false, data: null, error: { code: "NOT_FOUND", message: "That feedback entry no longer exists." }, message: "That feedback entry no longer exists." });
+  if (record.deleted_at) {
+    return res.status(409).json({ success: false, data: null, error: { code: "ALREADY_DELETED", message: "That feedback entry was deleted and can no longer be edited." }, message: "That feedback entry was deleted and can no longer be edited." });
+  }
+  if (!canManageFeedback(req.user, record)) {
+    return res.status(403).json({ success: false, data: null, error: { code: "FORBIDDEN", message: "You can only edit feedback you recorded." }, message: "You can only edit feedback you recorded." });
+  }
+
+  const { feedback, score, strengths, improvements } = req.body || {};
+  const text = feedback === undefined ? record.feedback : String(feedback).trim();
+  if (!text) {
+    return res.status(400).json({ success: false, data: null, error: { code: "FEEDBACK_REQUIRED", message: "Feedback text cannot be empty." }, message: "Feedback text cannot be empty." });
+  }
+  if (text.length > FEEDBACK_TEXT_LIMIT) {
+    return res.status(400).json({ success: false, data: null, error: { code: "FEEDBACK_TOO_LONG", message: `Feedback must be ${FEEDBACK_TEXT_LIMIT} characters or fewer.` }, message: `Feedback must be ${FEEDBACK_TEXT_LIMIT} characters or fewer.` });
+  }
+
+  const update = { feedback: text, updated_at: new Date().toISOString(), updated_by: String(req.user.id) };
+
+  if (score !== undefined) {
+    if (score === null || score === "") {
+      update.score = null;
+    } else {
+      const num = Number(score);
+      if (!Number.isFinite(num) || num < 0 || num > 100) {
+        return res.status(400).json({ success: false, data: null, error: { code: "INVALID_SCORE", message: "Score must be a number between 0 and 100." }, message: "Score must be a number between 0 and 100." });
+      }
+      update.score = num;
+    }
+  }
+  if (strengths !== undefined) update.strengths = Array.isArray(strengths) ? strengths.join(", ") : String(strengths).trim();
+  if (improvements !== undefined) update.improvements = Array.isArray(improvements) ? improvements.join(", ") : String(improvements).trim();
+
+  // `created_at`, `reviewed_by` and `user_id` are deliberately absent: the
+  // original reviewer and creation time are part of the record's provenance.
+  await db.collection("performance").updateOne({ _id: record._id }, { $set: update });
+  await writeAudit(db, {
+    actorId: req.user.id,
+    action: "feedback_updated",
+    entityType: "performance",
+    entityId: String(record._id),
+    previousValue: { feedback: record.feedback, score: record.score ?? null, strengths: record.strengths || "", improvements: record.improvements || "" },
+    newValue: { feedback: update.feedback, score: update.score ?? null, strengths: update.strengths ?? record.strengths, improvements: update.improvements ?? record.improvements },
+  });
+  const updated = await db.collection("performance").findOne({ _id: record._id });
+  res.json({ success: true, data: { entry: { id: String(record._id), feedback: updated.feedback, score: updated.score ?? null, strengths: updated.strengths || "", improvements: updated.improvements || "", updated_at: updated.updated_at, updated_by: updated.updated_by || null, reviewer_name: null } }, error: null, message: "Feedback updated" });
+});
+
+router.delete("/feedback/:id", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
+  const db = req.db;
+  const record = await db.collection("performance").findOne({ _id: toId(req.params.id) });
+  if (!record) return res.status(404).json({ success: false, data: null, error: { code: "NOT_FOUND", message: "That feedback entry no longer exists." }, message: "That feedback entry no longer exists." });
+  if (!canManageFeedback(req.user, record)) {
+    return res.status(403).json({ success: false, data: null, error: { code: "FORBIDDEN", message: "You can only delete feedback you recorded." }, message: "You can only delete feedback you recorded." });
+  }
+  if (record.deleted_at) {
+    return res.status(409).json({ success: false, data: null, error: { code: "ALREADY_DELETED", message: "That feedback entry was already deleted." }, message: "That feedback entry was already deleted." });
+  }
+
+  const now = new Date().toISOString();
+  // Soft delete: the document (and its audit trail) survives; only the list
+  // stops returning it. Only the single confirmed record is touched.
+  await db.collection("performance").updateOne(
+    { _id: record._id },
+    { $set: { deleted_at: now, deleted_by: String(req.user.id), updated_at: now, updated_by: String(req.user.id) } }
+  );
+  await writeAudit(db, {
+    actorId: req.user.id,
+    action: "feedback_deleted",
+    entityType: "performance",
+    entityId: String(record._id),
+    previousValue: { feedback: record.feedback, deleted_at: null },
+    newValue: { deleted_at: now, deleted_by: String(req.user.id) },
+  });
+  res.json({ success: true, data: { id: String(record._id), deleted_at: now, deleted_by: String(req.user.id) }, error: null, message: "Feedback deleted" });
 });
 
 /* ─── TASK-WISE FEEDBACK (CEO → Student Report → Feedback) ─────────────────
@@ -999,7 +1104,7 @@ router.get("/feedback/tasks", authenticateToken, authorizeRoles("admin", "manage
     const reviewerIds = [...new Set(records.map((r) => r.reviewed_by).filter(Boolean).map(String))];
 
     const [students, tasks, reviewers] = await Promise.all([
-      studentIds.length ? db.collection("users").find({ _id: { $in: studentIds.map(toId) } }, { projection: { name: 1, email: 1, student_id: 1, program: 1, department: 1 } }).toArray() : [],
+      studentIds.length ? db.collection("users").find({ _id: { $in: studentIds.map(toId) } }, { projection: STUDENT_PROFILE_PROJECTION }).toArray() : [],
       taskIds.length ? db.collection("tasks").find({ _id: { $in: taskIds.map(toId) } }, { projection: { title: 1, task_code: 1, day_number: 1, day: 1 } }).toArray() : [],
       reviewerIds.length ? db.collection("users").find({ _id: { $in: reviewerIds.map(toId) } }, { projection: { name: 1 } }).toArray() : [],
     ]);
@@ -1007,44 +1112,64 @@ router.get("/feedback/tasks", authenticateToken, authorizeRoles("admin", "manage
     const taskById = new Map(tasks.map((t) => [String(t._id), t]));
     const reviewerById = new Map(reviewers.map((r) => [String(r._id), r.name]));
 
-    const entries = records.map((r) => {
-      const student = studentById.get(String(r.user_id));
-      const task = r.task_id ? taskById.get(String(r.task_id)) : null;
-      // FIX C-8: never expose raw DB ObjectId — show "—" when student_id is null
-      const studentCode = student?.student_id || "—";
-      // FIX C-11: CEO is not in users collection; resolve name from env
-      const reviewerName = r.reviewed_by
-        ? (String(r.reviewed_by) === "ceo"
-          ? (process.env.CEO_NAME || "TECHINS CEO")
-          : (reviewerById.get(String(r.reviewed_by)) || null))
-        : null;
-      return {
-        id: String(r._id),
-        student_id: String(r.user_id),
-        student_name: student?.name || null,
-        student_code: studentCode,
-        student_email: student?.email || null,
-        task_id: r.task_id ? String(r.task_id) : null,
-        task_code: task?.task_code || null,
-        task_title: task?.title || null,
-        task_day: task ? (task.day_number ?? task.day ?? null) : null,
-        // A task_id that no longer resolves (deleted task) is kept visible
-        // rather than silently dropped.
-        task_missing: Boolean(r.task_id) && !task,
-        submission_id: r.submission_id || null,
-        feedback: r.feedback || "",
-        strengths: r.strengths || "",
-        improvements: r.improvements || "",
-        score: r.score ?? null,
-        reviewer_name: reviewerName,
-        status: r.status || "recorded",
-        period: r.period || null,
-        created_at: r.created_at || null,
-        updated_at: r.updated_at || r.created_at || null,
-      };
-    });
+    const entries = records
+      // Soft-deleted entries stay out of the default list but are still
+      // counted, so an accidental delete can be audited rather than vanish.
+      .filter((r) => !r.deleted_at)
+      .map((r) => {
+        const student = studentById.get(String(r.user_id));
+        const task = r.task_id ? taskById.get(String(r.task_id)) : null;
+        // The TECHINS display code lives in `learner_id`; reading
+        // `users.student_id` (which no document carries) is what rendered
+        // "ID: —". Null (not a fabricated em dash) when the student is gone,
+        // so the client can distinguish "no code" from "deleted student".
+        const studentCode = studentCodeOf(student);
+        // FIX C-11: CEO is not in users collection; resolve name from env
+        const reviewerName = r.reviewed_by
+          ? (String(r.reviewed_by) === "ceo"
+            ? (process.env.CEO_NAME || "TECHINS CEO")
+            : (reviewerById.get(String(r.reviewed_by)) || null))
+          : null;
+        return {
+          id: String(r._id),
+          student_id: String(r.user_id),
+          student_name: student?.name || null,
+          student_code: studentCode,
+          student_email: student?.email || null,
+          task_id: r.task_id ? String(r.task_id) : null,
+          task_code: task?.task_code || null,
+          task_title: task?.title || null,
+          task_day: task ? (task.day_number ?? task.day ?? null) : null,
+          // A task_id that no longer resolves (deleted task) is kept visible
+          // rather than silently dropped.
+          task_missing: Boolean(r.task_id) && !task,
+          submission_id: r.submission_id || null,
+          feedback: r.feedback || "",
+          strengths: r.strengths || "",
+          improvements: r.improvements || "",
+          score: r.score ?? null,
+          // Who may change this entry: the original reviewer, or any
+          // admin/CEO. A manager can only change feedback they authored.
+          can_edit: canManageFeedback(req.user, r),
+          can_delete: canManageFeedback(req.user, r),
+          reviewer_id: r.reviewed_by ? String(r.reviewed_by) : null,
+          reviewer_name: reviewerName,
+          status: r.status || "recorded",
+          period: r.period || null,
+          created_at: r.created_at || null,
+          created_by: r.created_by ? String(r.created_by) : (r.reviewed_by ? String(r.reviewed_by) : null),
+          updated_at: r.updated_at || r.created_at || null,
+          updated_by: r.updated_by ? String(r.updated_by) : null,
+        };
+      });
 
-    res.json({ success: true, entries, count: entries.length });
+    res.json({
+      success: true,
+      data: { entries, count: entries.length, deleted_count: records.filter((r) => r.deleted_at).length },
+      entries,
+      count: entries.length,
+      error: null,
+    });
   } catch (error) {
     console.error("Task-wise feedback error:", error);
     res.status(500).json({ success: false, message: "Unable to fetch task feedback" });

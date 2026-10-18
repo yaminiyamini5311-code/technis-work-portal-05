@@ -30,22 +30,26 @@ export default function StudentLayout(){
 
           <NavProvider>
           <Navbar role="student" />
-          <main className="student-main">
-            <header className="student-header">
-              <div className="student-header-lead"><NavbarToggle /><div><span>TECHINS WORK PORTAL</span><h1>Student Workspace</h1></div></div>
-              <div className="student-header-actions">
-                <NotificationBell/>
-                <Link to="/student/profile" style={{ textDecoration: 'none' }}>
-                  <div className="student-header-user">
-                    <TechinsIcon name="user" size={20} variant="dark" />
-                    <div>
-                      <strong>{user.name||"Student"}</strong>
-                      <small>{user.email||""}</small>
-                    </div>
+          {/* Sibling of <main>, for the same reason as RoleLayout: an ancestor
+              with `transform` / `perspective` becomes the containing block for
+              `position: fixed` descendants and the bar scrolls away with the
+              page. */}
+          <header className="student-header">
+            <div className="student-header-lead"><NavbarToggle /><div><span>TECHINS WORK PORTAL</span><h1>Student Workspace</h1></div></div>
+            <div className="student-header-actions">
+              <NotificationBell/>
+              <Link to="/student/profile" style={{ textDecoration: 'none' }}>
+                <div className="student-header-user">
+                  <TechinsIcon name="user" size={20} variant="dark" />
+                  <div>
+                    <strong>{user.name||"Student"}</strong>
+                    <small>{user.email||""}</small>
                   </div>
-                </Link>
-              </div>
-            </header>
+                </div>
+              </Link>
+            </div>
+          </header>
+          <main className="student-main">
             <section className="student-content"><Outlet/></section>
           </main>
           </NavProvider>

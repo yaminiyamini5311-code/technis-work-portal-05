@@ -356,12 +356,19 @@ test("full task lifecycle: assign -> submit -> revision -> resubmit -> approve -
   assert.equal(status1.json.latest_submission.version, 1);
 
   // Reviewer requests a revision -> student gains the resubmit path.
+  // POST /api/tasks/review delegates to the same handler the Task Manager
+  // uses, so the response is the canonical { success, data, error } envelope
+  // and the status is the shared enum value — not a duplicated top-level
+  // free-text label (which used to drift from the enum).
   const revision = await api("POST", "/api/tasks/review", {
     token: adminToken,
     body: { submission_id: sub1.json.submissionId, decision: "revision", comment: "Please add more detail" },
   });
   assert.equal(revision.status, 200, JSON.stringify(revision.json));
-  assert.equal(revision.json.status, "Revision Required");
+  assert.equal(revision.json.data.status, "revision_required");
+  assert.equal(revision.json.error, null);
+  assert.ok(revision.json.data.resubmission_deadline, "a 24h deadline must be returned");
+  assert.equal(revision.json.data.resubmission_cycle ?? revision.json.data.revision_cycle, 1);
 
   const status2 = await api("GET", `/api/tasks/${taskId}/my-submission-status`, { token: studentToken });
   assert.equal(status2.json.workflow_status, "Revision Required");
@@ -389,7 +396,8 @@ test("full task lifecycle: assign -> submit -> revision -> resubmit -> approve -
     body: { submission_id: sub2.json.submissionId, decision: "approve", comment: "Looks good" },
   });
   assert.equal(approve.status, 200, JSON.stringify(approve.json));
-  assert.equal(approve.json.status, "Approved");
+  assert.equal(approve.json.data.status, "approved");
+  assert.equal(approve.json.error, null);
 
   // The owning student can download their own file (regression: the download
   // endpoint used to be reviewer-only). Version 1 carried the file; version

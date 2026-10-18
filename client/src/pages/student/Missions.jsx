@@ -270,12 +270,50 @@ function Missions() {
                                         </strong>
                                     </div>
 
-                                    {mission.due_date && (
+                                    {/* Start, deadline and schedule state all
+                                        come from the backend, which reads
+                                        start_at / end_at (falling back to the
+                                        legacy due_date) in IST. */}
+                                    {mission.start_at && (
+                                        <div>
+                                            <span>Starts</span>
+
+                                            <strong>
+                                                {formatISTDateShort(mission.start_at)}
+                                            </strong>
+                                        </div>
+                                    )}
+
+                                    {mission.end_at && (
+                                        <div>
+                                            <span>Deadline</span>
+
+                                            <strong>
+                                                {formatISTDateShort(mission.end_at)}
+                                            </strong>
+                                        </div>
+                                    )}
+
+                                    {!mission.end_at && mission.due_date && (
                                         <div>
                                             <span>Due Date</span>
 
                                             <strong>
                                                 {formatISTDateShort(mission.due_date)}
+                                            </strong>
+                                        </div>
+                                    )}
+
+                                    {mission.schedule_status && mission.schedule_status !== "completed" && (
+                                        <div>
+                                            <span>Schedule</span>
+
+                                            <strong className={`mission-schedule-chip ${mission.schedule_status}`}>
+                                                {mission.schedule_status === "overdue"
+                                                    ? "Past deadline"
+                                                    : mission.schedule_status === "active"
+                                                      ? "Open now"
+                                                      : "Scheduled"}
                                             </strong>
                                         </div>
                                     )}

@@ -1,286 +1,153 @@
-/* CEO Missions page — matches admin.css / performance.css design system */
+/* Mission control: schedule grid on the cards, detail/edit dialog controls. */
 
-.form-grid-admin {
+/* The schedule block is the point of the card — it must be readable at a glance. */
+.mission-schedule {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.form-grid-admin .field-full {
-  grid-column: 1 / -1;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.field-label {
-  font-size: 13px;
-  font-weight: 700;
-  color: #182018;
-}
-
-.req {
-  color: #d32f2f;
-}
-
-/* FIX C-3: dark inputs with visible text */
-.field input,
-.field select,
-.field textarea {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px 14px;
+  margin: 12px 0;
   padding: 10px 12px;
-  border: 1px solid #D0D0D0;
   border-radius: 10px;
-  font-size: 14px;
-  background: #1a1a2e;
-  color: #e8e8e8;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  width: 100%;
-  box-sizing: border-box;
+  border: 1px solid rgba(124, 92, 255, 0.24);
+  background: rgba(124, 92, 255, 0.07);
 }
 
-.field input::placeholder,
-.field textarea::placeholder {
-  color: #888;
+.mission-schedule dt {
+  font-size: 10.5px;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: #7d8bad;
+  margin: 0 0 2px;
 }
 
-.field input:focus,
-.field select:focus,
-.field textarea:focus {
-  outline: none;
-  border-color: #FA9A02;
-  box-shadow: 0 0 0 3px rgba(250, 154, 2, 0.15);
-}
-
-.field select {
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23e8e8e8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 32px;
-}
-
-.field select option {
-  background: #1a1a2e;
-  color: #e8e8e8;
-}
-
-.field-error {
-  color: #d32f2f;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-/* FIX C-4: gold-btn with proper focus-visible */
-.gold-btn {
-  padding: 10px 20px;
-  border-radius: 10px;
-  cursor: pointer;
-  border: 1px solid #0C120C;
-  background: #0C120C;
-  color: #fff;
-  font-weight: 700;
-  font-size: 14px;
-  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
-}
-
-.gold-btn:hover:not(:disabled) {
-  background: #172117;
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(12, 18, 12, 0.22);
-}
-
-.gold-btn:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: none;
-}
-
-.gold-btn:focus-visible {
-  outline: 2px solid #FA9A02;
-  outline-offset: 2px;
-}
-
-.gold-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-/* Assignment mode selector */
-.mission-mode-selector {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.mode-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 18px;
-  border-radius: 10px;
-  border: 1px solid #D0D0D0;
-  background: #FFFFFF;
-  color: #182018;
-  font-weight: 700;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.mode-btn:hover {
-  border-color: #FA9A02;
-  background: rgba(250, 154, 2, 0.05);
-}
-
-.mode-btn.active {
-  background: #0C120C;
-  color: #FFFFFF;
-  border-color: #0C120C;
-}
-
-.mode-btn:focus-visible {
-  outline: 2px solid #FA9A02;
-  outline-offset: 2px;
-}
-
-/* Group assignment preview */
-.group-preview {
-  padding: 14px 16px;
-  border-radius: 10px;
-  background: rgba(250, 154, 2, 0.08);
-  border: 1px solid rgba(250, 154, 2, 0.25);
-}
-
-.group-preview p {
-  margin: 0 0 8px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #182018;
-}
-
-.group-preview ul {
+.mission-schedule dd {
   margin: 0;
-  padding-left: 20px;
-  font-size: 13px;
-  color: #4b5563;
-}
-
-.group-preview li {
-  margin: 4px 0;
-}
-
-.group-preview-warning {
-  color: #d32f2f !important;
-  font-weight: 600 !important;
-}
-
-/* Missions list */
-.missions-list {
-  margin-top: 8px;
-}
-
-.missions-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
-}
-
-.mission-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.mission-card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.mission-card h4 {
-  margin: 0 0 4px;
-  font-size: 16px;
+  font-size: 12.5px;
   font-weight: 700;
-  color: #182018;
+  color: #e6ecfb;
+  overflow-wrap: anywhere;
 }
 
-.mission-card small {
-  display: block;
-  color: #6b7280;
-  font-size: 12px;
-}
+.role-layout.ceo-dark .mission-schedule dd { color: var(--ceo-text); }
+.role-layout.ceo-dark .mission-schedule dt { color: var(--ceo-text-mute); }
 
-.mission-card p {
-  margin: 0;
-  color: #4b5563;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.mission-status {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 10px;
+.mission-schedule-state {
+  display: inline-block;
+  padding: 3px 9px;
   border-radius: 999px;
-  text-transform: capitalize;
-  background: rgba(0, 0, 0, 0.06);
-  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #cfd8ee;
 }
 
-.mission-status.completed {
-  background: rgba(34, 197, 94, 0.15);
-  color: #15803d;
+.mission-schedule-state.active { background: rgba(52, 211, 153, 0.16); border-color: rgba(52, 211, 153, 0.45); color: #7fe8bd; }
+.mission-schedule-state.overdue { background: rgba(255, 77, 109, 0.16); border-color: rgba(255, 77, 109, 0.45); color: #ffb3c1; }
+.mission-schedule-state.upcoming { background: rgba(96, 165, 250, 0.16); border-color: rgba(96, 165, 250, 0.45); color: #a5ccff; }
+.mission-schedule-state.completed { background: rgba(52, 211, 153, 0.16); border-color: rgba(52, 211, 153, 0.45); color: #7fe8bd; }
+
+.mission-description {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #9aa6c2;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
-.mission-status.in_progress {
-  background: rgba(250, 154, 2, 0.15);
-  color: #b45309;
-}
-
-.mission-progress {
+.mission-card-actions {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.mission-progress span {
-  font-size: 12px;
-  font-weight: 700;
-  color: #4b5563;
-}
-
-.link-button {
+.mission-card-actions .link-button {
+  padding: 0;
   background: none;
   border: none;
-  color: #d32f2f;
+  color: #a78bfa;
   font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
+  font-weight: 800;
   text-decoration: underline;
+  cursor: pointer;
 }
 
-.admin-progress {
-  flex: 1;
-  height: 6px;
-  background: rgba(0, 0, 0, 0.08);
-  border-radius: 999px;
-  overflow: hidden;
+.mission-card-actions .link-button:hover { color: #c4b5fd; }
+.mission-card-actions .link-button:focus-visible { outline: 2px solid #8b5cf6; outline-offset: 2px; }
+.mission-card-actions .mission-delete { color: #ff8fa3; }
+.mission-card-actions .mission-delete:hover { color: #ffb3c1; }
+
+/* ── Dialogs ──────────────────────────────────────────────────────────── */
+
+.ms-dialog { width: min(620px, 95vw); }
+
+.ms-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.07);
+  color: #e6ecfb;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.admin-progress i {
+.ms-btn:hover:not(:disabled) { background: rgba(124, 92, 255, 0.22); border-color: rgba(124, 92, 255, 0.6); }
+.ms-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ms-btn:focus-visible { outline: 2px solid #8b5cf6; outline-offset: 2px; }
+.ms-btn-primary { background: linear-gradient(135deg, #7c5cff, #6d28d9); border-color: transparent; color: #fff; }
+
+.ms-label {
   display: block;
-  height: 100%;
-  background: linear-gradient(90deg, #FA9A02, #f57c00);
-  border-radius: 999px;
-  transition: width 0.4s ease;
+  margin: 10px 0 5px;
+  font-size: 11px;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: #7d8bad;
+  font-weight: 800;
 }
 
-@media (max-width: 640px) {
-  .form-grid-admin {
-    grid-template-columns: 1fr;
-  }
+.ms-label .req { color: #ff8fa3; }
+
+.ms-input {
+  width: 100%;
+  padding: 9px 11px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.3);
+  color: #eef2fb;
+  font: inherit;
+  font-size: 13px;
+  min-height: 38px;
+}
+
+.ms-input:focus-visible { outline: 2px solid #8b5cf6; outline-offset: 1px; border-color: rgba(139, 92, 246, 0.7); }
+textarea.ms-input { min-height: 80px; resize: vertical; line-height: 1.6; }
+
+.ms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0 12px;
+}
+
+.ms-hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #93a1c2;
+}
+
+@media (max-width: 600px) {
+  .ms-grid { grid-template-columns: 1fr 1fr; }
 }

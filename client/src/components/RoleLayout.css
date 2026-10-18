@@ -43,22 +43,6 @@ html{scroll-padding-top:var(--header-height,84px)}
 }
 
 .notification-wrap{position:relative}
-.notification-button{width:44px;height:44px;min-width:44px;min-height:44px;border:1px solid #D1D5DB;background:#FFFFFF;border-radius:11px;color:#0B1220;font-size:18px;position:relative;cursor:pointer;transition:all 0.2s ease;opacity:1 !important;visibility:visible !important;display:grid;place-items:center}
-.notification-button:hover{background:#F9FAFB;border-color:#FA9A02;color:#FA9A02;transform:translateY(-1px)}
-.notification-button:focus-visible{outline:2px solid #FA9A02;outline-offset:2px}
-.notification-button b{position:absolute;right:-4px;top:-5px;min-width:16px;height:16px;border-radius:20px;background:#FA9A02;color:#FFFFFF;font-size:8px;font-weight:900;display:grid;place-items:center}
-.notification-pop{position:absolute;right:0;top:47px;width:310px;background:#FFFFFF;border:1px solid #E6E6E6;border-radius:15px;box-shadow:0 22px 50px rgba(7,26,61,.14);z-index:80;overflow:hidden}
-.notification-pop>div{padding:14px 15px;border-bottom:1px solid #E6E6E6;display:flex;justify-content:space-between}
-.notification-pop>div h4{font-size:13px;color:#111827;margin:0;font-weight:700}
-.notification-pop>div small{color:#6B7280;font-size:9px;font-weight:600;letter-spacing:0.5px}
-.notification-item{width:100%;border:0;background:#FFFFFF;text-align:left;display:flex;gap:10px;padding:12px 15px;border-bottom:1px solid #E6E6E6;cursor:pointer;transition:all 0.2s ease}
-.notification-item:hover{background:#F9FAFB}
-.notification-item>span{width:28px;height:28px;border-radius:9px;background:rgba(250,154,2,0.12);color:#FA9A02;display:grid;place-items:center;flex:none;font-weight:700}
-.notification-item div{display:flex;flex-direction:column}
-.notification-item strong{font-size:11px;color:#111827;font-weight:700}
-.notification-item small{font-size:10px;color:#4B5563;margin-top:3px;font-weight:500}
-.notification-item.read{opacity:.6}
-.notification-empty{padding:40px 24px;text-align:center;color:#6B7280;font-size:12px;font-weight:600;line-height:1.6}
 
 @media(max-width:800px){
   .role-topbar{padding:0 16px 0 14px}
@@ -73,5 +57,4 @@ html{scroll-padding-top:var(--header-height,84px)}
   .role-content{padding:12px}
   .role-topbar h1{font-size:17px}
   .role-eyebrow{font-size:9px}
-  .notification-pop{position:fixed;right:10px;top:70px;width:min(310px,calc(100vw - 20px))}
 }

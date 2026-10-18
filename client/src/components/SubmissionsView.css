@@ -935,3 +935,258 @@ textarea:focus {
 .role-content {
   overflow-x: hidden;
 }
+
+/* ══ Grouping: one identity block per student + task ═════════════════════
+ * Every version keeps its own row, but the identity (name, ID, email,
+ * department, program, batch) is stated once per group instead of being
+ * repeated down the column, and the versions underneath are collapsible.
+ */
+.submissions-table tbody tr.sv-group-head {
+  background: linear-gradient(90deg, rgba(124, 92, 255, 0.13), rgba(124, 92, 255, 0.03) 60%);
+  border-bottom: 1px solid rgba(124, 92, 255, 0.3);
+}
+
+.submissions-table tbody tr.sv-group-head:hover {
+  background: linear-gradient(90deg, rgba(124, 92, 255, 0.2), rgba(124, 92, 255, 0.05) 60%);
+}
+
+.submissions-table tr.sv-group-head > td {
+  padding: 12px 14px;
+}
+
+.sv-group-lead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sv-group-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.sv-group-identity > strong {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.3;
+}
+
+.sv-group-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 11.5px;
+  color: #6B7280;
+}
+
+.sv-group-meta b { color: #374151; font-weight: 700; }
+
+.sv-group-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.sv-version-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(124, 92, 255, 0.16);
+  border: 1px solid rgba(124, 92, 255, 0.4);
+  color: #5b3fd6;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.sv-toggle {
+  padding: 4px 10px;
+  border: 1px solid rgba(124, 92, 255, 0.45);
+  border-radius: 7px;
+  background: transparent;
+  color: #5b3fd6;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.sv-toggle:hover { background: rgba(124, 92, 255, 0.14); }
+.sv-toggle:focus-visible { outline: 2px solid #8b5cf6; outline-offset: 2px; }
+
+.sv-group-task {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 6px;
+  padding-left: 48px;
+  min-width: 0;
+}
+
+.sv-group-task-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #374151;
+  /* Wrap rather than truncate; the full string is also in the tooltip. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Version rows sit indented under their group. */
+.submissions-table tbody tr.sv-version-row { background: rgba(0, 0, 0, 0.012); }
+.submissions-table tbody tr.sv-version-row:hover { background: #F3F1FE; }
+.submissions-table tr.sv-version-row > td { border-bottom: 1px solid #F0F1F3; }
+
+/* Wrap instead of ellipsis for anything the reader must be able to read. */
+.sv-wrap {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  overflow: visible;
+  text-overflow: clip;
+  display: block;
+  max-height: 8.5em;
+  overflow-y: auto;
+}
+
+/* Screen-reader-only label for the icon-only file buttons. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.file-action-btn { position: relative; }
+
+.more-files {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border: 1px solid rgba(124, 92, 255, 0.4);
+  border-radius: 6px;
+  background: rgba(124, 92, 255, 0.08);
+  color: #5b3fd6;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.more-files:hover { background: rgba(124, 92, 255, 0.18); }
+
+/* Loading skeleton rows */
+.submissions-skeleton { display: grid; gap: 10px; margin-top: 16px; }
+.submissions-skeleton .sk-row {
+  height: 46px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #F3F4F6 25%, #E9EBF0 37%, #F3F4F6 63%);
+  background-size: 400% 100%;
+  animation: sk-shimmer 1.4s ease infinite;
+}
+
+@keyframes sk-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
+/* ══ Small dialogs (delete / requirement) ══════════════════════════════ */
+
+.sv-dialog { width: min(520px, 95vw); }
+
+.sv-dialog-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.07);
+  color: #e6ecfb;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.sv-dialog-btn:hover:not(:disabled) { background: rgba(124, 92, 255, 0.22); border-color: rgba(124, 92, 255, 0.6); }
+.sv-dialog-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.sv-dialog-btn:focus-visible { outline: 2px solid #8b5cf6; outline-offset: 2px; }
+
+/* Delete is visually distinct (red/danger) from the primary purple action. */
+.sv-dialog-btn-danger {
+  background: rgba(255, 77, 109, 0.14);
+  border-color: rgba(255, 77, 109, 0.55);
+  color: #ffc2cf;
+}
+
+.sv-dialog-btn-danger:hover:not(:disabled) { background: rgba(255, 77, 109, 0.26); border-color: rgba(255, 77, 109, 0.85); }
+
+.sv-dialog-btn-primary { background: linear-gradient(135deg, #7c5cff, #6d28d9); border-color: transparent; color: #fff; }
+
+.sv-dialog-text {
+  margin: 0 0 10px;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: #e2e8f8;
+}
+
+.sv-dialog-text strong { color: #fff; }
+
+.sv-dialog-muted { color: #93a1c2; font-size: 12.5px; }
+
+.sv-form { gap: 4px; }
+
+.sv-dialog-label {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: #7d8bad;
+  font-weight: 800;
+}
+
+.sv-req { color: #ff8fa3; }
+
+.sv-form textarea {
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.3);
+  color: #eef2fb;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+  min-height: 92px;
+}
+
+.sv-form textarea:focus-visible {
+  outline: 2px solid #8b5cf6;
+  outline-offset: 1px;
+  border-color: rgba(139, 92, 246, 0.7);
+}
+
+.sv-form .field-error { color: #ff9db0; font-size: 12px; font-weight: 700; }
+
+.sv-form-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
+
+@media (max-width: 768px) {
+  .sv-group-lead { flex-wrap: wrap; }
+  .sv-group-right { width: 100%; justify-content: flex-start; }
+  .sv-group-task { padding-left: 0; }
+}

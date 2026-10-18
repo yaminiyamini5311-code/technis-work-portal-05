@@ -431,7 +431,13 @@
 }
 
 /* Shared native-control behavior. Keep this after portal styles so every
-   input, including controls in modals and filters, uses the same contract. */
+   input, including controls in modals and filters, uses the same contract.
+
+   `--control-focus` is the focus ring colour for EVERY native control. It used
+   to be amber #b45309 in the admin/login scope and the amber --accent in the
+   student scope, so the Feedback textarea showed a ring in a colour that
+   matched nothing else in the workspace. It is now the app's purple, the same
+   #8b5cf6 the component focus rings use. */
 .role-layout,
 .login-page {
   --control-bg: #ffffff;
@@ -439,7 +445,7 @@
   --control-text: #111827;
   --control-placeholder: #667085;
   --control-border: #cbd5e1;
-  --control-focus: #b45309;
+  --control-focus: #8b5cf6;
   --control-disabled-bg: #f1f5f9;
   --control-disabled-text: #64748b;
 }
@@ -450,7 +456,7 @@
   --control-text: var(--text-primary);
   --control-placeholder: var(--text-muted);
   --control-border: rgba(250,154,2,0.38);
-  --control-focus: var(--accent);
+  --control-focus: #8b5cf6;
   --control-disabled-bg: rgba(10,18,40,0.5);
   --control-disabled-text: var(--text-subtle);
 }
@@ -621,99 +627,11 @@
   color: var(--text-muted-on-dark) !important;
 }
 
-/* Notification Popup - Admin/Manager (Light Theme) */
-.role-layout .notification-pop {
-  background: #FFFFFF !important;
-  border-color: #E6E6E6 !important;
-}
 
-.role-layout .notification-item {
-  background: #FFFFFF !important;
-  border-color: #E6E6E6 !important;
-}
-
-.role-layout .notification-item strong {
-  color: #111827 !important;
-  font-weight: 600;
-}
-
-.role-layout .notification-item small {
-  color: #4B5563 !important;
-  opacity: 1 !important;
-}
-
-.role-layout .notification-item:hover {
-  background: #F9FAFB !important;
-}
-
-.role-layout .notification-item.read strong {
-  color: #6B7280 !important;
-}
-
-.role-layout .notification-item.read small {
-  color: #9CA3AF !important;
-}
-
-/* Notification Popup - Student Portal (Dark Theme) */
-.student-layout .notification-pop {
-  background: var(--surface) !important;
-  border-color: var(--border-color) !important;
-}
-
-.student-layout .notification-item {
-  background: var(--surface) !important;
-  border-color: var(--border-light) !important;
-}
-
-.student-layout .notification-item strong {
-  color: var(--text-primary) !important;
-  font-weight: 600;
-}
-
-.student-layout .notification-item small {
-  color: var(--text-secondary) !important;
-  opacity: 1 !important;
-}
-
-.student-layout .notification-item:hover {
-  background: var(--surface-hover) !important;
-}
-
-.student-layout .notification-item.read strong {
-  color: var(--text-muted) !important;
-}
-
-.student-layout .notification-item.read small {
-  color: var(--text-subtle) !important;
-}
-
-/* Notification dropdown positioning - prevent clipping on mobile */
-.notification-pop {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  min-width: 320px;
-  max-width: 400px;
-  max-height: 500px;
-  overflow-y: auto;
-  z-index: 1000;
-}
-
-@media (max-width: 480px) {
-  .notification-pop {
-    right: -50%;
-    min-width: 280px;
-    max-width: 320px;
-  }
-}
-
-@media (max-width: 375px) {
-  .notification-pop {
-    right: -80%;
-    min-width: 260px;
-    max-width: 300px;
-  }
-}
+/* Notification popup styling and positioning now live in
+   components/NotificationBell.css. The rules that used to be here set a white
+   `!important` panel (and a second set of per-portal offsets), which is what
+   made the dropdown unreadable on the dark workspace. */
 
 /* Empty States - Student Portal */
 .student-layout .empty-state,

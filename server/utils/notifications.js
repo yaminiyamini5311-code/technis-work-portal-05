@@ -25,8 +25,15 @@ function toId(id) {
   try { return new ObjectId(String(id)); } catch { return id; }
 }
 
-function buildDedupeKey({ userId, type, taskId = null, submissionId = null, cycle = null }) {
-  return [String(userId), String(type), taskId ? String(taskId) : "", submissionId ? String(submissionId) : "", cycle != null ? String(cycle) : ""].join("|");
+function buildDedupeKey({ userId, type, taskId = null, submissionId = null, missionId = null, cycle = null }) {
+  return [
+    String(userId),
+    String(type),
+    taskId ? String(taskId) : "",
+    submissionId ? String(submissionId) : "",
+    missionId ? String(missionId) : "",
+    cycle != null ? String(cycle) : "",
+  ].join("|");
 }
 
 /**
@@ -60,6 +67,7 @@ async function notifyOnce(db, {
   message,
   taskId = null,
   submissionId = null,
+  missionId = null,
   cycle = null,
   recipientRole = null,
   revisionRequestedAt = null,
@@ -69,7 +77,7 @@ async function notifyOnce(db, {
 }) {
   if (!db || !userId || !type || !title || !message) return { created: false, notification: null };
 
-  const dedupe_key = buildDedupeKey({ userId, type, taskId, submissionId, cycle });
+  const dedupe_key = buildDedupeKey({ userId, type, taskId, submissionId, missionId, cycle });
   const now = new Date().toISOString();
   const doc = {
     user_id: String(userId),
@@ -81,6 +89,7 @@ async function notifyOnce(db, {
     related_task_id: taskId ? String(taskId) : null,
     task_id: taskId ? String(taskId) : null,
     submission_id: submissionId ? String(submissionId) : null,
+    mission_id: missionId ? String(missionId) : null,
     student_id: studentId ? String(studentId) : null,
     cycle: cycle != null ? (Number.isFinite(Number(cycle)) ? Number(cycle) : String(cycle)) : null,
     revision_requested_at: revisionRequestedAt || null,

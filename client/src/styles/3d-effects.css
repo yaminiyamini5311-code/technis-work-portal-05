@@ -13,7 +13,6 @@
 .student-profile-card,
 .activity-card,
 .feedback-item,
-.notification-item,
 .list-row,
 .overall-progress,
 .login-card {
@@ -52,11 +51,9 @@
               -6px 8px 25px rgba(250, 154, 2, 0.2);
 }
 
-/* Notification items: lighter shift */
-.notification-item:hover {
-  transform: translateX(8px) translateZ(15px);
-  box-shadow: -4px 8px 20px rgba(12, 18, 12, 0.1);
-}
+/* Notification items: hover is defined in NotificationBell.css. The old 3D
+   lift (translateX/translateZ) is removed so the row no longer slides sideways
+   inside the scrollable dropdown. */
 
 /* Login Card: Subtle effect */
 .login-card:hover {
@@ -98,7 +95,6 @@
 .student-profile-card:not(:hover),
 .activity-card:not(:hover),
 .feedback-item:not(:hover),
-.notification-item:not(:hover),
 .list-row:not(:hover),
 .overall-progress:not(:hover),
 .login-card:not(:hover) {

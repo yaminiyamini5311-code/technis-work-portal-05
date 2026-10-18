@@ -29,6 +29,7 @@ const { notifyOnce, notifyAdmins, revisionMessage } = require("../utils/notifica
 const { formatISTDeadlineLabel } = require("../utils/time");
 const { createCeoNotification, createUserNotification } = require("../utils/ceoNotification");
 const { normalizeRegistrationStatus } = require("../utils/userAccount");
+const { studentCode, STUDENT_PROFILE_PROJECTION } = require("../utils/students");
 const { uploadFile, downloadFile, migrateFileToGridFS } = require("../utils/fileStorage");
 
 const router = express.Router();
@@ -297,9 +298,9 @@ router.get("/submissions", authenticateToken, authorizeRoles("admin", "manager",
       const sid = String(s._id);
       const [task, student, files, assignment, reviewer] = await Promise.all([
         db.collection("tasks").findOne({ _id: toId(s.task_id) }, { projection: { task_code: 1, title: 1, description: 1, status: 1, workflow_status: 1, feedback: 1, outcome: 1, outcome_submitted_at: 1, priority: 1, due_date: 1 } }),
-        db.collection("users").findOne({ _id: toId(s.student_id) }, { projection: { name: 1, email: 1, phone: 1, program: 1, batch_id: 1, created_at: 1, student_id: 1, department: 1 } }),
+        db.collection("users").findOne({ _id: toId(s.student_id) }, { projection: STUDENT_PROFILE_PROJECTION }),
         db.collection("submission_files").find({ submission_id: sid }, { projection: { original_name: 1, size: 1, mime_type: 1, created_at: 1, drive_file_id: 1, drive_folder_id: 1 } }).toArray(),
-        db.collection("task_assignments").findOne({ task_id: String(s.task_id), student_id: String(s.student_id) }, { projection: { progress: 1, status: 1 } }),
+        db.collection("task_assignments").findOne({ task_id: String(s.task_id), student_id: String(s.student_id) }, { projection: { progress: 1, status: 1, revision_cycle: 1, revision_requested_at: 1, revision_deadline: 1, revision_status: 1 } }),
         s.reviewer_id ? db.collection("users").findOne({ _id: toId(s.reviewer_id) }, { projection: { name: 1 } }) : null,
       ]);
       let batchName = null;
@@ -307,6 +308,7 @@ router.get("/submissions", authenticateToken, authorizeRoles("admin", "manager",
         const batch = await db.collection("batches").findOne({ _id: toId(student.batch_id) }, { projection: { name: 1 } });
         batchName = batch?.name || null;
       }
+      const code = studentCode(student);
       return {
         id: sid,
         submission_code: s.submission_code,
@@ -326,7 +328,10 @@ router.get("/submissions", authenticateToken, authorizeRoles("admin", "manager",
         task_feedback: task?.feedback || null,
         outcome: task?.outcome || null,
         outcome_submitted_at: task?.outcome_submitted_at || s.submitted_at || null,
-        student_id: student?.student_id || null,
+        student_id: code,
+        // Same value under an explicit name so new callers do not have to
+        // know that TECHINS stores the display code in `learner_id`.
+        student_code: code,
         // The users._id (DB ObjectId) is the only identifier the student
         // routes accept. String(null) yields the literal text "null", which
         // would travel into /admin/students/null as a truthy id, so a
@@ -343,6 +348,13 @@ router.get("/submissions", authenticateToken, authorizeRoles("admin", "manager",
         files: files.map(f => ({ id: String(f._id), name: f.original_name, size: f.size, mime: f.mime_type, download_url: `/api/tasks/files/${String(f._id)}/download` })),
         assignment_progress: assignment?.progress ?? null,
         assignment_status: assignment?.status ?? null,
+        // The 24-hour resubmission window for THIS student's revision cycle,
+        // so the submissions table can show the exact deadline without a
+        // second round trip.
+        revision_cycle: assignment?.revision_cycle ?? s.revision_cycle ?? null,
+        revision_requested_at: assignment?.revision_requested_at ?? null,
+        revision_deadline: assignment?.revision_deadline ?? null,
+        revision_status: assignment?.revision_status ?? null,
       };
     }));
     res.json({ success: true, submissions: rows });
@@ -538,6 +550,120 @@ router.get("/submissions/export", authenticateToken, authorizeRoles("admin", "ma
   } catch (e) {
     console.error("EXPORT SUBMISSIONS TO EXCEL:", e);
     res.status(500).json({ success: false, message: "Unable to export submissions to Excel" });
+  }
+});
+
+/* ─── SINGLE SUBMISSION DETAIL ──────────────────────────────────────────────
+ * GET /api/tasks/submissions/:submissionId
+ *
+ * Backs "View Details". Everything the review dialog renders is assembled from
+ * ONE lookup of the submission id, so the dialog can never mix two students'
+ * data: the student, the task, this version's files and every sibling version
+ * all come from the same submission row.
+ *
+ * Reviewer roles only, and the response is scoped to the requested
+ * submission — an unknown id is a 404, never another student's record.
+ */
+router.get("/submissions/:submissionId", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+    const submission = await db.collection("submissions").findOne({ _id: toId(req.params.submissionId) });
+    if (!submission) {
+      return fail(res, 404, "SUBMISSION_NOT_FOUND", "That submission no longer exists.");
+    }
+
+    const [task, student, files, assignment] = await Promise.all([
+      db.collection("tasks").findOne({ _id: toId(submission.task_id) }, { projection: { task_code: 1, title: 1, description: 1, instructions: 1, status: 1, workflow_status: 1, feedback: 1, priority: 1, domain: 1, program: 1, due_date: 1, start_date: 1, created_at: 1, assigned_at: 1 } }),
+      db.collection("users").findOne({ _id: toId(submission.student_id) }, { projection: STUDENT_PROFILE_PROJECTION }),
+      filesForSubmission(db, submission._id),
+      db.collection("task_assignments").findOne(
+        { task_id: String(submission.task_id), student_id: String(submission.student_id) },
+        { projection: { progress: 1, status: 1, revision_cycle: 1, revision_requested_at: 1, revision_deadline: 1, revision_status: 1, revision_history: 1, assigned_at: 1, created_at: 1 } }
+      ),
+    ]);
+    if (!task) {
+      return fail(res, 404, "TASK_NOT_FOUND", "The task for this submission no longer exists.");
+    }
+
+    let batch = null;
+    if (student?.batch_id) {
+      batch = await db.collection("batches").findOne({ _id: toId(student.batch_id) }, { projection: { name: 1, start_date: 1, end_date: 1 } });
+    }
+
+    const versions = await versionsForStudent(db, task._id, submission.student_id);
+    const reviewerIds = versions.map(v => v.reviewer_id).filter(Boolean);
+    const reviewers = reviewerIds.length
+      ? await db.collection("users").find({ _id: { $in: reviewerIds.map(toId) } }, { projection: { name: 1, email: 1 } }).toArray()
+      : [];
+    const reviewerById = new Map(reviewers.map(r => [String(r._id), r]));
+    const code = studentCode(student);
+
+    ok(res, {
+      submission: {
+        id: String(submission._id),
+        submission_code: submission.submission_code || null,
+        version: submission.version || 1,
+        comment: submission.comment || null,
+        status: submission.status || null,
+        review_status: normalizeSubmissionStatus(submission.status),
+        review_status_label: STATUS_LABELS[normalizeSubmissionStatus(submission.status)],
+        submitted_at: submission.submitted_at || null,
+        reviewer_id: submission.reviewer_id || null,
+        reviewer_name: submission.reviewer_id ? (reviewerById.get(String(submission.reviewer_id))?.name || null) : null,
+        reviewed_at: submission.reviewed_at || null,
+        review_comments: submission.review_comments || null,
+        revision_cycle: submission.revision_cycle ?? assignment?.revision_cycle ?? null,
+        score: submission.score ?? null,
+        max_marks: submission.max_marks ?? null,
+      },
+      student: {
+        id: submission.student_id ? String(submission.student_id) : null,
+        code,
+        name: student?.name || null,
+        email: student?.email || null,
+        phone: student?.phone || null,
+        department: student?.department || null,
+        program: student?.program || null,
+        batch: batch?.name || null,
+        joined_at: student?.created_at || null,
+      },
+      task: {
+        id: String(task._id),
+        code: task.task_code || null,
+        title: task.title || null,
+        description: task.description || null,
+        instructions: task.instructions || null,
+        domain: task.domain || null,
+        program: task.program || null,
+        priority: task.priority || null,
+        status: task.status || null,
+        workflow_status: task.workflow_status || null,
+        assigned_at: assignment?.assigned_at || task.assigned_at || task.created_at || null,
+        start_date: task.start_date || null,
+        due_date: task.due_date || null,
+        feedback: task.feedback || null,
+      },
+      assignment: assignment ? {
+        progress: assignment.progress ?? null,
+        status: assignment.status ?? null,
+        revision_cycle: assignment.revision_cycle ?? null,
+        revision_requested_at: assignment.revision_requested_at ?? null,
+        revision_deadline: assignment.revision_deadline ?? null,
+        revision_status: assignment.revision_status ?? null,
+      } : null,
+      files,
+      versions: versions.map(v => ({
+        ...v,
+        reviewer_name: v.reviewer_id ? (reviewerById.get(String(v.reviewer_id))?.name || null) : null,
+        is_current: String(v.id) === String(submission._id),
+      })),
+      can_approve: ["submitted", "revision_required"].includes(normalizeSubmissionStatus(submission.status)),
+      can_request_revision: ["submitted", "revision_required", "approved"].includes(normalizeSubmissionStatus(submission.status)),
+      message: "Submission loaded",
+    });
+  } catch (e) {
+    console.error("GET SUBMISSION DETAIL:", e);
+    fail(res, 500, "SUBMISSION_DETAIL_FAILED", "Unable to load this submission. Please retry.");
   }
 });
 
@@ -1502,12 +1628,16 @@ router.get("/:id/review/assignments/:studentId", authenticateToken, authorizeRol
 
 /**
  * POST /api/tasks/:id/review/approve
- * Body: { studentId } or { submissionId }
+ * Body: { studentId } or { submissionId }, optional { feedback, score, max_marks }
  *
  * Affects ONLY that student's submission — never the whole task — and rejects
  * a duplicate approval with 409 instead of silently re-notifying.
+ *
+ * Shared implementation: `POST /api/tasks/review` (submission-id addressed,
+ * used by the CEO Submissions page and the Manager dashboard) delegates here,
+ * so there is exactly one approval rule in the codebase.
  */
-router.post("/:id/review/approve", authenticateToken, authorizeRoles("admin", "ceo", "manager"), async (req, res) => {
+async function handleApprove(req, res) {
   try {
     const db = req.db;
     const task = await loadReviewTask(req, res);
@@ -1517,12 +1647,26 @@ router.post("/:id/review/approve", authenticateToken, authorizeRoles("admin", "c
     const { studentId, submissionId } = await resolveReviewTarget(db, task, req.body || {}, res);
     if (!studentId) return;
 
-    const latest = await db.collection("submissions")
-      .find({ task_id: String(task._id), student_id: studentId })
-      .sort({ version: -1 })
-      .limit(1)
-      .toArray();
-    const submission = submissionId ? latest.find(s => String(s._id) === String(submissionId)) : latest[0];
+    // Optional scoring. Both halves must be present and the score may not
+    // exceed the maximum; when omitted the task is simply left un-scored —
+    // nothing is invented.
+    const scoreUpdate = parseScorePair(req.body, res);
+    if (scoreUpdate === undefined) return;
+
+    const latest = submissionId
+      // A specific version was named (the Submissions page addresses one
+      // submission by id). Fetch exactly that row: taking only the newest
+      // version first made approving an EARLIER version return 404 whenever the
+      // two existed side by side.
+      ? await db.collection("submissions")
+        .find({ _id: toId(submissionId), task_id: String(task._id), student_id: studentId })
+        .toArray()
+      : await db.collection("submissions")
+        .find({ task_id: String(task._id), student_id: studentId })
+        .sort({ version: -1 })
+        .limit(1)
+        .toArray();
+    const submission = latest[0];
     if (!submission) {
       return fail(res, 404, "SUBMISSION_NOT_FOUND", "This student has not submitted anything to review.");
     }
@@ -1543,17 +1687,16 @@ router.post("/:id/review/approve", authenticateToken, authorizeRoles("admin", "c
     const now = new Date().toISOString();
     const feedback = String((req.body && req.body.feedback) || "").trim() || "Approved";
 
-    await db.collection("submissions").updateOne(
-      { _id: submission._id },
-      { $set: {
-        status: "Approved",
-        reviewer_id: req.user.id,
-        reviewed_at: now,
-        review_comments: feedback,
-        approved_at: now,
-        approved_by: req.user.id,
-      } }
-    );
+    const approvalFields = {
+      status: "Approved",
+      reviewer_id: req.user.id,
+      reviewed_at: now,
+      review_comments: feedback,
+      approved_at: now,
+      approved_by: req.user.id,
+    };
+    if (scoreUpdate) Object.assign(approvalFields, scoreUpdate, { scored_at: now, scored_by: req.user.id });
+    await db.collection("submissions").updateOne({ _id: submission._id }, { $set: approvalFields });
 
     const { updateAssignment, ensureAssignment, getAssignment } = require("../models/TaskAssignment");
     await ensureAssignment(db, String(task._id), studentId);
@@ -1607,6 +1750,8 @@ router.post("/:id/review/approve", authenticateToken, authorizeRoles("admin", "c
       reviewed_at: now,
       reviewed_by: req.user.id,
       feedback,
+      score: scoreUpdate ? scoreUpdate.score : null,
+      max_marks: scoreUpdate ? scoreUpdate.max_marks : null,
       counts,
       message: "Submission approved",
     });
@@ -1614,7 +1759,41 @@ router.post("/:id/review/approve", authenticateToken, authorizeRoles("admin", "c
     console.error("APPROVE SUBMISSION:", e);
     fail(res, 500, "APPROVE_FAILED", "Unable to approve this submission. Please retry.");
   }
-});
+}
+router.post("/:id/review/approve", authenticateToken, authorizeRoles("admin", "ceo", "manager"), handleApprove);
+
+/**
+ * Validate an optional { score, max_marks } pair.
+ * Returns null when neither is supplied (scoring is optional), a `$set`
+ * fragment when valid, or `undefined` after it has already answered the
+ * request with a 400 — so callers do `if (scoreUpdate === undefined) return;`.
+ */
+function parseScorePair(body, res) {
+  const rawScore = body?.score;
+  const rawMax = body?.max_marks ?? body?.maxMarks;
+  const hasScore = rawScore !== undefined && rawScore !== null && rawScore !== "";
+  const hasMax = rawMax !== undefined && rawMax !== null && rawMax !== "";
+  if (!hasScore && !hasMax) return null;
+  if (!hasScore || !hasMax) {
+    fail(res, 400, "INCOMPLETE_SCORE", "Provide both score and max_marks when scoring a submission.");
+    return undefined;
+  }
+  const score = Number(rawScore);
+  const maxMarks = Number(rawMax);
+  if (!Number.isFinite(score) || score < 0) {
+    fail(res, 400, "INVALID_SCORE", "Score must be a number of zero or more.");
+    return undefined;
+  }
+  if (!Number.isFinite(maxMarks) || maxMarks <= 0) {
+    fail(res, 400, "INVALID_MAX_MARKS", "Max marks must be a number greater than zero.");
+    return undefined;
+  }
+  if (score > maxMarks) {
+    fail(res, 400, "SCORE_EXCEEDS_MAX", "Score cannot exceed max marks.");
+    return undefined;
+  }
+  return { score, earned_score: score, max_marks: maxMarks };
+}
 
 /**
  * POST /api/tasks/:id/review/request-revision
@@ -1623,8 +1802,11 @@ router.post("/:id/review/approve", authenticateToken, authorizeRoles("admin", "c
  * Feedback is mandatory (min 10 chars, validated here — the client mirrors it).
  * Opens a NEW revision cycle with a fresh 24-hour window measured from the
  * SERVER clock. The original submission and all its history are preserved.
+ *
+ * Shared implementation: `POST /api/tasks/review` delegates here, so there is
+ * exactly one revision rule (and one notification) in the codebase.
  */
-router.post("/:id/review/request-revision", authenticateToken, authorizeRoles("admin", "ceo", "manager"), async (req, res) => {
+async function handleRequestRevision(req, res) {
   try {
     const db = req.db;
     const task = await loadReviewTask(req, res);
@@ -1747,7 +1929,8 @@ router.post("/:id/review/request-revision", authenticateToken, authorizeRoles("a
     console.error("REQUEST REVISION:", e);
     fail(res, 500, "REVISION_FAILED", "Unable to request a revision. Please retry.");
   }
-});
+}
+router.post("/:id/review/request-revision", authenticateToken, authorizeRoles("admin", "ceo", "manager"), handleRequestRevision);
 
 /**
  * POST /api/tasks/:id/review/remind
@@ -2476,163 +2659,45 @@ router.post("/:id/resubmit", authenticateToken, checkStudentRegistrationStatus, 
   }
 });
 
-/* ─── REVIEW SUBMISSION ─────────────────────────────────────────────────── */
+/* ─── REVIEW SUBMISSION (submission-id addressed) ────────────────────────
+ * POST /api/tasks/review  Body: { submission_id, decision, comment, score?, max_marks? }
+ *
+ * Kept because the CEO Student Submissions page and the Manager dashboard are
+ * addressed by SUBMISSION id rather than by (task, student). It deliberately
+ * contains no business rules of its own: it resolves the task, then delegates to
+ * the exact same handlers the Task Manager uses, so there is one approval rule,
+ * one revision rule, one 24-hour window and one notification per event.
+ */
 router.post("/review", authenticateToken, authorizeRoles("admin", "ceo", "manager"), async (req, res) => {
-  try {
-    const db = req.db;
-    const sub = await db.collection("submissions").findOne({ _id: toId(req.body?.submission_id) });
-    if (!sub) return res.status(404).json({ success: false, message: "Submission not found" });
+  const db = req.db;
+  const sub = await db.collection("submissions").findOne({ _id: toId(req.body?.submission_id) });
+  if (!sub) return fail(res, 404, "SUBMISSION_NOT_FOUND", "That submission no longer exists.");
 
-    const task = await db.collection("tasks").findOne({ _id: toId(sub.task_id) });
-    if (!task) return res.status(404).json({ success: false, message: "Task not found" });
+  const task = await db.collection("tasks").findOne({ _id: toId(sub.task_id) });
+  if (!task) return fail(res, 404, "TASK_NOT_FOUND", "The task for this submission no longer exists.");
 
-    const effectiveRole = req.user.role === "ceo" ? "admin" : req.user.role;
-    if (effectiveRole === "manager" && task.assigned_by !== req.user.id) return res.status(403).json({ success: false, message: "You can only review tasks assigned by you" });
+  // A manager may only review their own tasks (unchanged pre-existing rule).
+  const effectiveRole = req.user.role === "ceo" ? "admin" : req.user.role;
+  if (effectiveRole === "manager" && String(task.assigned_by) !== String(req.user.id)) {
+    return fail(res, 403, "FORBIDDEN", "You can only review tasks assigned by you.");
+  }
 
-    const decision = String(req.body?.decision || "").toLowerCase();
-    if (!["approve", "revision"].includes(decision)) {
-      return res.status(400).json({ success: false, error: { code: "BAD_DECISION", message: "Decision must be approve or revision" }, message: "Decision must be approve or revision" });
-    }
+  const decision = String(req.body?.decision || "").trim().toLowerCase();
+  if (!["approve", "revision"].includes(decision)) {
+    return fail(res, 400, "BAD_DECISION", "Decision must be approve or revision.");
+  }
 
-    const comment = String(req.body?.comment || "").trim();
-    if (decision === "revision") {
-      // Mandatory feedback, minimum length — the same rule the Task Manager
-      // dialog enforces, so the legacy caller cannot create a revision with
-      // no usable feedback either.
-      const validation = validateRevisionFeedback(comment);
-      if (!validation.ok) {
-        return res.status(400).json({ success: false, error: { code: validation.code, message: validation.message }, message: validation.message });
-      }
-    }
-
-    // OPTIONAL scoring. The schema has no mandatory score/max_marks pair, so
-    // scoring stays opt-in: when both are supplied they are validated and
-    // stored on the submission (and mirrored on the assignment). When they
-    // are omitted the task is simply left "awaiting evaluation" — no score
-    // is invented and no division by zero can occur downstream.
-    const rawScore = req.body?.score;
-    const rawMax = req.body?.max_marks;
-    const hasScoreInput = rawScore !== undefined && rawScore !== null && rawScore !== "";
-    const hasMaxInput = rawMax !== undefined && rawMax !== null && rawMax !== "";
-    let scoreValue = null, maxMarksValue = null;
-    if (hasScoreInput || hasMaxInput) {
-      if (!hasScoreInput || !hasMaxInput) {
-        return res.status(400).json({ success: false, message: "Provide both score and max_marks when scoring a submission" });
-      }
-      scoreValue = Number(rawScore);
-      maxMarksValue = Number(rawMax);
-      if (!Number.isFinite(scoreValue) || scoreValue < 0) {
-        return res.status(400).json({ success: false, message: "Score must be a non-negative number" });
-      }
-      if (!Number.isFinite(maxMarksValue) || maxMarksValue <= 0) {
-        return res.status(400).json({ success: false, message: "Max marks must be a number greater than zero" });
-      }
-      if (scoreValue > maxMarksValue) {
-        return res.status(400).json({ success: false, message: "Score cannot exceed max marks" });
-      }
-    }
-
-    const now = new Date().toISOString();
-    const submissionUpdate = {
-      status: decision === "approve" ? "Approved" : "Revision Required",
-      reviewer_id: req.user.id,
-      reviewed_at: now,
-      review_comments: comment || null,
-    };
-    if (scoreValue !== null) {
-      submissionUpdate.score = scoreValue;
-      submissionUpdate.earned_score = scoreValue;
-      submissionUpdate.max_marks = maxMarksValue;
-      submissionUpdate.scored_at = now;
-      submissionUpdate.scored_by = req.user.id;
-    }
-
-    // A revision opens a NEW cycle with a fresh 24h window from the server
-    // clock; an approval closes the loop for that student only.
-    let cycle = null;
-    let deadline = null;
-    if (decision === "revision") {
-      const { getAssignment, ensureAssignment, updateAssignment } = require("../models/TaskAssignment");
-      const { assignment: prior } = await ensureAssignment(db, String(task._id), String(sub.student_id));
-      cycle = Number(prior?.revision_cycle || 0) + 1;
-      deadline = new Date(Date.now() + resubmissionWindowHours() * 3600 * 1000).toISOString();
-      submissionUpdate.revision_cycle = cycle;
-      await updateAssignment(db, String(task._id), String(sub.student_id), {
-        status: "revision_required",
-        revision_cycle: cycle,
-        revision_requested_at: now,
-        revision_deadline: deadline,
-        revision_status: "open",
-        revision_history: [
-          ...(Array.isArray(prior?.revision_history) ? prior.revision_history : []),
-          {
-            cycle,
-            requestedBy: String(req.user.id),
-            requestedAt: now,
-            feedback: comment,
-            deadline,
-            window_hours: resubmissionWindowHours(),
-            status: "open",
-          },
-        ],
-      });
-    } else {
-      const { ensureAssignment, updateAssignment } = require("../models/TaskAssignment");
-      await ensureAssignment(db, String(task._id), String(sub.student_id));
-      await updateAssignment(db, String(task._id), String(sub.student_id), {
-        status: "approved",
-        progress: 100,
-        revision_status: "closed",
-      });
-    }
-
-    await db.collection("submissions").updateOne({ _id: sub._id }, { $set: submissionUpdate });
-    await transition(db, task, submissionUpdate.status, req.user.id, comment || null);
-    await syncTaskWorkflowFromStudents(db, task);
-
-    if (decision === "approve") {
-      await notifyOnce(db, {
-        userId: String(sub.student_id),
-        type: "task_approved",
-        title: "Submission approved",
-        message: `Your submission for ${task.title} has been approved.${comment ? ` Reviewer note: ${comment}` : ""}`,
-        taskId: String(task._id),
-        submissionId: String(sub._id),
-        recipientRole: "student",
-      });
-    } else {
-      const deadlineLabel = formatISTDeadlineLabel(deadline);
-      await notifyOnce(db, {
-        userId: String(sub.student_id),
-        type: "revision_required",
-        title: "Revision required",
-        message: revisionMessage({ taskTitle: task.title, feedback: comment, deadlineLabel }),
-        taskId: String(task._id),
-        submissionId: String(sub._id),
-        cycle,
-        revisionRequestedAt: now,
-        revisionDeadline: deadline,
-        recipientRole: "student",
-      });
-    }
-    await writeAudit(db, { actorId: req.user.id, action: decision === "approve" ? "submission_approved" : "revision_requested", entityType: "submission", entityId: String(sub._id), previousValue: { status: sub.status }, newValue: { status: submissionUpdate.status, review_comments: comment, cycle } });
-
-    res.json({
-      success: true,
-      data: {
-        status: submissionUpdate.status,
-        score: scoreValue,
-        max_marks: maxMarksValue,
-        revision_cycle: cycle,
-        resubmission_deadline: deadline,
-      },
-      error: null,
-      message: decision === "approve" ? "Submission approved" : "Revision requested",
-      status: submissionUpdate.status,
-      score: scoreValue,
-      max_marks: maxMarksValue,
-    });
-  } catch (e) { console.error("Review error:", e); res.status(500).json({ success: false, message: "Unable to review submission" }); }
+  // Rewrite the request into the task-scoped shape the shared handlers expect.
+  // Nothing else differs between the two routes.
+  const comment = req.body?.comment ?? req.body?.feedback ?? "";
+  req.params = { ...req.params, id: String(task._id) };
+  req.body = {
+    submissionId: String(sub._id),
+    studentId: String(sub.student_id),
+    feedback: comment,
+    ...(decision === "approve" ? { score: req.body?.score, max_marks: req.body?.max_marks ?? req.body?.maxMarks } : {}),
+  };
+  return decision === "approve" ? handleApprove(req, res) : handleRequestRevision(req, res);
 });
 
 /* ─── TASK FEEDBACK ─────────────────────────────────────────────────────── */
