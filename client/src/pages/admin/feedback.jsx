@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FixedOverlay from "../../components/FixedOverlay";
+import TechinsIcon from "../../components/TechinsIcon";
+import StatusBadge from "../../components/StatusBadge";
 import { apiFetch } from "../../utils/api";
+import { formatWorkspaceDateTime, pluralise } from "../../utils/dateHelper";
 import "../../styles/admin.css";
+import "../../styles/ceo-ui.css";
 import "./feedback.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-function fmtDate(value) {
-  if (!value) return "—";
-  try { return new Date(value).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }); } catch { return String(value); }
-}
-
-function pluralise(n, word) {
-  return n === 1 ? `${n} ${word}` : `${n} ${word}s`;
-}
 
 export default function Feedback() {
   const [students, setStudents] = useState([]);
@@ -325,45 +320,50 @@ export default function Feedback() {
           </small>
         </div>
 
-        <div className="field">
-          <label htmlFor="feedback-score" className="field-label">Score (0–100, optional)</label>
-          <input
-            id="feedback-score"
-            name="feedback-score"
-            type="number"
-            min="0"
-            max="100"
-            placeholder="Score (optional)"
-            value={form.score}
-            onChange={(e) => updateField("score", e.target.value)}
-            autoComplete="off"
-            aria-invalid={!!fieldErrors.score}
-          />
-          {fieldErrors.score && <small className="field-error" role="alert">{fieldErrors.score}</small>}
-        </div>
+        {/* Score, Strengths and Improvement Areas share one three-column row so the
+          grid closes cleanly. Previously the five short fields sat in a
+          two-column grid, which left an empty cell beside Improvement Areas. */}
+        <div className="field field-full form-row-3">
+          <div className="field">
+            <label htmlFor="feedback-score" className="field-label">Score (0–100, optional)</label>
+            <input
+              id="feedback-score"
+              name="feedback-score"
+              type="number"
+              min="0"
+              max="100"
+              placeholder="Score (optional)"
+              value={form.score}
+              onChange={(e) => updateField("score", e.target.value)}
+              autoComplete="off"
+              aria-invalid={!!fieldErrors.score}
+            />
+            {fieldErrors.score && <small className="field-error" role="alert">{fieldErrors.score}</small>}
+          </div>
 
-        <div className="field">
-          <label htmlFor="feedback-strengths" className="field-label">Strengths</label>
-          <input
-            id="feedback-strengths"
-            name="feedback-strengths"
-            placeholder="Strengths (comma separated)"
-            value={form.strengths}
-            onChange={(e) => updateField("strengths", e.target.value)}
-            autoComplete="off"
-          />
-        </div>
+          <div className="field">
+            <label htmlFor="feedback-strengths" className="field-label">Strengths</label>
+            <input
+              id="feedback-strengths"
+              name="feedback-strengths"
+              placeholder="Strengths (comma separated)"
+              value={form.strengths}
+              onChange={(e) => updateField("strengths", e.target.value)}
+              autoComplete="off"
+            />
+          </div>
 
-        <div className="field">
-          <label htmlFor="feedback-improvements" className="field-label">Improvement areas</label>
-          <input
-            id="feedback-improvements"
-            name="feedback-improvements"
-            placeholder="Improvement areas (comma separated)"
-            value={form.improvements}
-            onChange={(e) => updateField("improvements", e.target.value)}
-            autoComplete="off"
-          />
+          <div className="field">
+            <label htmlFor="feedback-improvements" className="field-label">Improvement areas</label>
+            <input
+              id="feedback-improvements"
+              name="feedback-improvements"
+              placeholder="Improvement areas (comma separated)"
+              value={form.improvements}
+              onChange={(e) => updateField("improvements", e.target.value)}
+              autoComplete="off"
+            />
+          </div>
         </div>
 
         <div className="field field-full">
@@ -382,16 +382,29 @@ export default function Feedback() {
           {fieldErrors.feedback && <small className="field-error" role="alert">{fieldErrors.feedback}</small>}
         </div>
 
-        <div className="field field-full">
+        {/* Left-aligned with the form's fields. */}
+        <div className="field field-full form-actions">
           <button className="gold-btn" type="submit" disabled={loading}>{loading ? "Saving…" : "Save Feedback"}</button>
         </div>
       </form>
 
-      <div className="fb-toolbar">
-        <input type="search" aria-label="Search feedback" placeholder="Search by student, task or feedback text…"
-          value={search} onChange={(e) => setSearch(e.target.value)} />
-        {search && <button type="button" onClick={() => setSearch("")}>Clear</button>}
-        <button type="button" onClick={loadEntries} disabled={dataLoading}>{dataLoading ? "Loading…" : "Refresh"}</button>
+      {/* Search and Refresh on one row at one control height. */}
+      <div className="fb-toolbar ui-toolbar-controls">
+        <input
+          className="ui-input"
+          type="search"
+          aria-label="Search feedback"
+          placeholder="Search by student, task or feedback text…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        {search && (
+          <button type="button" className="ui-btn ui-btn--neutral" onClick={() => setSearch("")}>Clear</button>
+        )}
+        <button type="button" className="ui-btn ui-btn--neutral" onClick={loadEntries} disabled={dataLoading}>
+          <TechinsIcon name="refresh" size={14} variant="light" ariaHidden />
+          {dataLoading ? "Loading…" : "Refresh"}
+        </button>
       </div>
 
       {loadError && <div className="error-msg">{loadError}</div>}
@@ -413,8 +426,14 @@ export default function Feedback() {
                 <header className="fb-student-head">
                   <div>
                     <h3>{g.student.student_name || "Unknown student"}</h3>
+                    {/* GET /api/admin/feedback/tasks returns student_code
+                        (the TECHINS code, e.g. T60-001). It rendered as an
+                        empty "ID:" when the record predates the field; the
+                        label is now omitted entirely rather than left blank. */}
                     <small>
-                      ID: {g.student.student_code}
+                      {g.student.student_code
+                        ? <>ID: <b>{g.student.student_code}</b></>
+                        : <span className="ui-na" title={`Database id: ${g.student.student_id}`}>ID: Not available</span>}
                       {g.student.student_email ? ` · ${g.student.student_email}` : ""}
                     </small>
                   </div>
@@ -437,21 +456,29 @@ export default function Feedback() {
                       {t.entries.length === 0 ? (
                         <p className="fb-empty">No feedback for this task yet.</p>
                       ) : t.entries.map((e) => (
-                        <div className="fb-entry" key={e.id}>
-                          <p>{e.feedback}</p>
+                        <div
+                          className={`fb-entry${editing?.id === e.id ? " is-editing" : ""}`}
+                          key={e.id}
+                        >
+                          <p className="fb-body">{e.feedback}</p>
+                          {/* One meta row: reviewer, dates, score and state chip
+                              all share a line, so they line up across entries. */}
                           <div className="fb-meta">
-                            {/* FIX C-11: show reviewer name or "—" */}
+                            {/* FIX C-11: show reviewer name or an em dash */}
                             <span>{e.reviewer_name ? `By ${e.reviewer_name}` : "—"}</span>
-                            <span>{fmtDate(e.created_at)}</span>
-                            {e.updated_at && e.updated_at !== e.created_at && <span>Updated {fmtDate(e.updated_at)}</span>}
+                            <span>{formatWorkspaceDateTime(e.created_at)}</span>
+                            {e.updated_at && e.updated_at !== e.created_at && (
+                              <span>Updated {formatWorkspaceDateTime(e.updated_at)}</span>
+                            )}
                             {e.score != null && <span className="fb-score">Score {e.score}</span>}
                             {/* Every entry was "recorded", so the chip said
                                 RECORDED on every row and carried no
                                 information. It now states the state that
                                 actually varies: whether it was edited. */}
-                            <span className={`fb-status ${e.updated_at && e.updated_at !== e.created_at ? "fb-status-updated" : ""}`}>
-                              {e.updated_at && e.updated_at !== e.created_at ? "Updated" : "Recorded"}
-                            </span>
+                            <StatusBadge
+                              status={e.updated_at && e.updated_at !== e.created_at ? "submitted" : "pending"}
+                              label={e.updated_at && e.updated_at !== e.created_at ? "Updated" : "Recorded"}
+                            />
                           </div>
                           {e.strengths && <div className="fb-line"><b>Strengths:</b> {e.strengths}</div>}
                           {e.improvements && <div className="fb-line"><b>Improvements:</b> {e.improvements}</div>}
@@ -460,12 +487,18 @@ export default function Feedback() {
                               user may make the change (admin/CEO always; a
                               manager only their own entries). */}
                           {(e.can_edit || e.can_delete) && (
-                            <div className="fb-entry-actions">
+                            <div className="fb-entry-actions ui-actions">
                               {e.can_edit && (
-                                <button type="button" className="fb-action" onClick={() => openEdit(e)}>Edit</button>
+                                <button type="button" className="ui-btn ui-btn--info" onClick={() => openEdit(e)}>
+                                  <TechinsIcon name="notepad" size={13} variant="light" ariaHidden />
+                                  Edit
+                                </button>
                               )}
                               {e.can_delete && (
-                                <button type="button" className="fb-action fb-action-danger" onClick={() => openDelete(e)}>Delete</button>
+                                <button type="button" className="ui-btn ui-btn--danger" onClick={() => openDelete(e)}>
+                                  <TechinsIcon name="trash" size={13} variant="light" ariaHidden />
+                                  Delete
+                                </button>
                               )}
                             </div>
                           )}
@@ -501,9 +534,9 @@ export default function Feedback() {
 
         <div className="panel-body">
           <div className="fbd-provenance">
-            Recorded by {editing?.reviewer_name || "an unknown reviewer"} on {fmtDate(editing?.created_at)}.
+            Recorded by {editing?.reviewer_name || "an unknown reviewer"} on {formatWorkspaceDateTime(editing?.created_at)}.
             {editing?.updated_at && editing.updated_at !== editing.created_at
-              ? ` Last updated ${fmtDate(editing.updated_at)}.`
+              ? ` Last updated ${formatWorkspaceDateTime(editing.updated_at)}.`
               : ""}
             {" "}The original reviewer and date are kept when you save.
           </div>
@@ -588,7 +621,7 @@ export default function Feedback() {
           <dl className="fbd-target">
             <div><dt>Student</dt><dd>{deleting?.student_name || "—"}{deleting?.student_code ? ` (${deleting.student_code})` : ""}</dd></div>
             <div><dt>Task</dt><dd>{deleting?.task_title || "General feedback"}</dd></div>
-            <div><dt>Recorded</dt><dd>{fmtDate(deleting?.created_at)}</dd></div>
+            <div><dt>Recorded</dt><dd>{formatWorkspaceDateTime(deleting?.created_at)}</dd></div>
             <div><dt>Reviewer</dt><dd>{deleting?.reviewer_name || "—"}</dd></div>
             <div className="fbd-target-snippet"><dt>Feedback</dt><dd>{snippet(deleting)}</dd></div>
           </dl>
