@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import TechinsLoader, { LOADER_DURATION_MS } from "./components/TechinsLoader";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -7,6 +7,7 @@ import StudentLayout from "./components/StudentLayout";
 import RoleLayout from "./components/RoleLayout";
 import StudentDashboard from "./pages/student/StudentDashboard";
 import MyTasks from "./pages/student/MyTasks";
+import TaskDetail from "./pages/student/TaskDetail";
 import DailyActivity from "./pages/student/DailyActivity";
 import Missions from "./pages/student/Missions";
 import WorkHistory from "./pages/student/WorkHistory";
@@ -43,6 +44,16 @@ function Protected({ role, children }) {
     return <Navigate to={effectiveRole === "admin" ? "/admin" : effectiveRole === "manager" ? "/manager" : "/student"} replace />;
   }
   return children;
+}
+
+/**
+ * Alias for the canonical student task route. Notifications and deep links may
+ * arrive as /tasks/:taskId; the real page lives under the existing student
+ * router convention (/student/tasks/:taskId). The id is preserved verbatim.
+ */
+function TaskAliasRedirect() {
+  const { taskId } = useParams();
+  return <Navigate to={`/student/tasks/${taskId}`} replace />;
 }
 
 export default function App() {
@@ -107,6 +118,13 @@ export default function App() {
         <Route element={<Protected role="student"><StudentLayout /></Protected>}>
           <Route path="/student" element={<StudentDashboard />} />
           <Route path="/student/tasks" element={<MyTasks />} />
+          {/* The task's own page. Declared BEFORE nothing conflicts: the id is a
+              real Mongo ObjectId and is preserved across refresh, Back/Forward,
+              notification clicks and a full page reload. */}
+          <Route path="/student/tasks/:taskId" element={<TaskDetail />} />
+          {/* Deep-link alias so /tasks/:taskId (notification action_url) lands on
+              the same page inside the student workspace. */}
+          <Route path="/tasks/:taskId" element={<TaskAliasRedirect />} />
           <Route path="/student/daily-activity" element={<DailyActivity />} />
           <Route path="/student/missions" element={<Missions />} />
           <Route path="/student/work-history" element={<WorkHistory />} />

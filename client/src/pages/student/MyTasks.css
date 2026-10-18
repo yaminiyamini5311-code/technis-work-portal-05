@@ -1000,3 +1000,33 @@
 .revision-upload {
   border-color: rgba(250, 154, 2, 0.35);
 }
+
+/* Task title links to the detail page (/student/tasks/:taskId). */
+.task-title-link {
+  color: inherit;
+  text-decoration: none;
+}
+.task-title-link:hover,
+.task-title-link:focus-visible {
+  color: #FFC24D;
+  text-decoration: underline;
+}
+
+/* Inline live timer inside the task meta grid. Server-owned value; this only
+   renders it. Tabular figures stop the width jittering as the seconds tick. */
+.inline-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #FFC24D;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* "Open task" is an <a> carrying the action-progress look. */
+.task-actions a.action-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}

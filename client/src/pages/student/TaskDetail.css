@@ -1,0 +1,139 @@
+/**
+ * Student task detail page — /student/tasks/:taskId.
+ * Layered on the dark space theme; reuses the MyTasks.css card vocabulary and
+ * adds only the page-specific shell.
+ */
+
+.task-detail-page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 28px 22px 60px;
+  color: var(--text-primary);
+}
+
+.td-head { margin-bottom: 18px; }
+
+.td-back {
+  display: inline-block;
+  margin-bottom: 14px;
+  color: rgba(255, 194, 77, 0.9);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+.td-back:hover { color: #FFC24D; text-decoration: underline; }
+
+.td-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.td-head-row h1 {
+  margin: 4px 0 0;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.25;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.td-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin: 18px 0 6px;
+  padding: 16px;
+  background: rgba(10, 18, 40, 0.72);
+  border: 1px solid rgba(250, 154, 2, 0.2);
+  border-radius: 14px;
+}
+.td-meta-grid > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.td-meta-grid span {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.td-meta-grid strong { font-size: 14px; color: var(--text-primary); overflow-wrap: anywhere; }
+
+.td-section {
+  margin: 18px 0;
+  padding: 18px;
+  background: rgba(10, 18, 40, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+}
+.td-section h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 194, 77, 0.9);
+}
+.td-section p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-secondary); line-height: 1.6; }
+
+.td-timer { text-align: center; }
+.td-timer-value {
+  display: block;
+  font-size: 30px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #FFC24D;
+  margin: 6px 0;
+}
+.td-timer small { color: var(--text-secondary); }
+
+.td-submitted {
+  margin: 18px 0;
+  padding: 18px;
+  border-radius: 14px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.td-submitted strong { display: flex; align-items: center; gap: 8px; font-size: 16px; }
+.td-submitted small { color: var(--text-secondary); }
+.td-submitted p { margin: 0; color: var(--text-secondary); }
+
+.td-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0; }
+
+.td-history-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.td-history-head h3 { margin: 0; }
+
+.td-foot { margin-top: 26px; }
+.td-back-btn {
+  display: inline-block;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 194, 77, 0.4);
+  background: rgba(255, 255, 255, 0.08);
+  color: #F5F8FF;
+  font-weight: 600;
+  text-decoration: none;
+}
+.td-back-btn:hover { background: rgba(255, 255, 255, 0.14); }
+
+.td-blocked {
+  max-width: 520px;
+  margin: 60px auto;
+  text-align: center;
+  padding: 32px;
+  background: rgba(10, 18, 40, 0.85);
+  border: 1px solid rgba(250, 154, 2, 0.3);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.td-blocked h2 { margin: 0; }
+.td-blocked p { color: var(--text-secondary); margin: 0; }
+
+@media (max-width: 640px) {
+  .task-detail-page { padding: 18px 14px 48px; }
+  .td-head-row { flex-direction: column; }
+  .td-timer-value { font-size: 24px; }
+}
