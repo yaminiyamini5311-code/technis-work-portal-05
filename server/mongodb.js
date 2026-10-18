@@ -120,6 +120,23 @@ async function ensureIndexes(db) {
     // Per-student version history for one task: the Task Manager viewer and the
     // resubmission flow both read this exact pair.
     await db.collection("submissions").createIndex({ task_id: 1, student_id: 1, version: -1 });
+    // A student may create exactly ONE first version (v1) per task. The partial
+    // filter leaves resubmissions (v2, v3, …) completely unconstrained, so a
+    // race or a direct API call can never create a duplicate initial
+    // submission. Existing data with duplicates only makes createIndex log a
+    // (non-fatal) error — no record is ever modified or removed.
+    await db.collection("submissions").createIndex(
+      { student_id: 1, task_id: 1 },
+      { unique: true, partialFilterExpression: { version: 1 }, name: "submission_first_version_unique" }
+    );
+    // Task timing sessions (see utils/taskSession.js). The partial unique index
+    // is the hard guard against two concurrent "Start" requests creating two
+    // active sessions for one student + task.
+    await db.collection("task_sessions").createIndex(
+      { student_id: 1, task_id: 1 },
+      { unique: true, partialFilterExpression: { status: "active" }, name: "task_session_active_unique" }
+    );
+    await db.collection("task_sessions").createIndex({ student_id: 1, task_id: 1, created_at: -1 });
     await db.collection("notifications").createIndex({ user_id: 1, read_at: 1 });
     await db.collection("notifications").createIndex({ created_at: -1 });
     // Workflow notification de-duplication.
