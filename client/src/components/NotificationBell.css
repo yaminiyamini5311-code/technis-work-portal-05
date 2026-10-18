@@ -17,6 +17,25 @@
   flex-shrink: 0;
 }
 
+/* Positioning context.
+ *
+ * The panel is anchored to `.notification-wrap` so its right edge tracks the
+ * bell at every breakpoint. The wrap is the 38px bell box vertically centred
+ * inside a bar of `--header-height`, so the wrap's top sits (H - bell)/2 below
+ * the bar's top. To place the panel's top edge 12px BELOW the bottom of the
+ * bar — the old `top: calc(100% + 12px)` put it at 50px, behind the bar it
+ * hangs from — the offset from the wrap's top is (H + bell)/2 + 12.
+ *
+ * It is written against the variable rather than a fixed pixel count so it
+ * stays correct at the 78px and 72px bar heights in the responsive rules. */
+.notification-wrap { display: flex; align-items: center; }
+
+.role-layout .notification-pop,
+.student-layout .notification-pop {
+  top: calc((var(--header-height, 84px) + 38px) / 2 + 12px);
+  right: 0;
+}
+
 .notification-button {
   position: relative;
   width: 38px;
@@ -66,9 +85,8 @@
 .student-layout .notification-pop {
   position: absolute;
   /* Anchored to the bell and right-aligned, so it never runs off the right
-     edge on a narrow viewport. */
-  top: calc(100% + 12px);
-  right: 0;
+     edge on a narrow viewport. The `top` override is further down, next to the
+     wrap, because it depends on the bar geometry. */
   z-index: 200;
   width: 380px;
   /* Clamped: always fits the viewport with a 1rem gutter on both sides. */

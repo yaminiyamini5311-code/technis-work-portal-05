@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import "./FixedOverlay.css";
 
 /**
  * A full-screen overlay rendered into `document.body` through a React portal.
