@@ -56,9 +56,11 @@ export function getNotificationTarget(notification, role) {
     if (role === "student") return "/student/missions";
   }
 
-  // Task-related notifications for students - navigate to their task list.
+  // Task-related notifications for students land on that task's own page
+  // (/student/tasks/:taskId), where the live timer, the resubmit section and
+  // the revision countdown are. A notification without a task keeps the list.
   if (role === "student" && taskId) {
-    return "/student/tasks";
+    return `/student/tasks/${taskId}`;
   }
 
   // Feedback notifications
