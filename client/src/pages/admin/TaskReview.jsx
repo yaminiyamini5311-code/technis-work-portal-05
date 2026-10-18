@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import TechinsIcon from "../../components/TechinsIcon";
 import useModalBehavior from "../../components/useModalBehavior";
 import FilePreview from "../../components/FilePreview";
-import { formatISTDateTime, formatISTDateShort } from "../../utils/dateHelper";
+import { formatISTDateShort, formatWorkspaceDateTime } from "../../utils/dateHelper";
 import {
   STATUS_LABEL,
   apiFetch,
@@ -290,7 +290,7 @@ function SubmissionViewer({ taskId, studentId, onClose, onChanged }) {
                       <div className="tm-grid" style={{ marginBottom: 12 }}>
                         <div className="tm-field"><span>Version</span><strong>v{latest.version}</strong></div>
                         <div className="tm-field"><span>Submission code</span><strong>{latest.submission_code || "—"}</strong></div>
-                        <div className="tm-field"><span>Submitted at</span><strong>{formatISTDateTime(latest.submitted_at)}</strong></div>
+                        <div className="tm-field"><span>Submitted at</span><strong>{formatWorkspaceDateTime(latest.submitted_at)}</strong></div>
                         <div className="tm-field"><span>Review status</span><strong>{latest.status_label || STATUS_LABEL[latest.status]}</strong></div>
                       </div>
 
@@ -328,7 +328,7 @@ function SubmissionViewer({ taskId, studentId, onClose, onChanged }) {
                           <span className="tm-comment-label">Reviewer feedback on this version</span>
                           <p className="tm-comment tm-feedback">{latest.review_comments}</p>
                           <p className="tm-hint">
-                            {latest.reviewer_name || "Reviewer"} · {formatISTDateTime(latest.reviewed_at)}
+                            {latest.reviewer_name || "Reviewer"} · {formatWorkspaceDateTime(latest.reviewed_at)}
                           </p>
                         </div>
                       )}
@@ -345,7 +345,7 @@ function SubmissionViewer({ taskId, studentId, onClose, onChanged }) {
                         <li key={v.id}>
                           <strong>v{v.version} · {v.status_label || STATUS_LABEL[v.status]}</strong>
                           <small>
-                            {formatISTDateTime(v.submitted_at)}
+                            {formatWorkspaceDateTime(v.submitted_at)}
                             {v.submission_code ? ` · ${v.submission_code}` : ""}
                             {(v.files || []).length ? ` · ${v.files.length} file${v.files.length === 1 ? "" : "s"}` : " · no files"}
                           </small>
@@ -379,8 +379,8 @@ function SubmissionViewer({ taskId, studentId, onClose, onChanged }) {
                 <div className="tm-section">
                   <h4>Assignment</h4>
                   <div className="tm-grid">
-                    <div className="tm-field"><span>Assigned at</span><strong>{formatISTDateTime(assignment?.assigned_at)}</strong></div>
-                    <div className="tm-field"><span>Last activity</span><strong>{formatISTDateTime(assignment?.submitted_at)}</strong></div>
+                    <div className="tm-field"><span>Assigned at</span><strong>{formatWorkspaceDateTime(assignment?.assigned_at)}</strong></div>
+                    <div className="tm-field"><span>Last activity</span><strong>{formatWorkspaceDateTime(assignment?.submitted_at)}</strong></div>
                     <div className="tm-field"><span>Versions submitted</span><strong>{detail.versions.length}</strong></div>
                     <div className="tm-field"><span>Revision cycles</span><strong>{assignment?.revision_cycle ?? 0}</strong></div>
                   </div>
@@ -389,10 +389,10 @@ function SubmissionViewer({ taskId, studentId, onClose, onChanged }) {
                 {(assignment?.status === "revision_required" || assignment?.status === "resubmission_expired") && (
                   <div className={`tm-deadline ${assignment?.status === "resubmission_expired" ? "tm-deadline-closed" : ""}`}>
                     {assignment?.status === "resubmission_expired"
-                      ? <span><strong>Resubmission window expired.</strong> The 24-hour window closed on {formatISTDateTime(assignment.revision_deadline)}. A new revision request will open a fresh 24-hour cycle.</span>
+                      ? <span><strong>Resubmission window expired.</strong> The 24-hour window closed on {formatWorkspaceDateTime(assignment.revision_deadline)}. A new revision request will open a fresh 24-hour cycle.</span>
                       : (
                         <>
-                          <span><strong>Resubmission window open.</strong> Deadline {formatISTDateTime(assignment.revision_deadline)}</span>
+                          <span><strong>Resubmission window open.</strong> Deadline {formatWorkspaceDateTime(assignment.revision_deadline)}</span>
                           {remainingTime(assignment.revision_deadline) && (
                             <span className="tm-countdown">{remainingTime(assignment.revision_deadline).label}</span>
                           )}
@@ -412,9 +412,9 @@ function SubmissionViewer({ taskId, studentId, onClose, onChanged }) {
                             {/* The stored field is camelCase (requestedAt); the
                                 snake_case alias is accepted so rows written by
                                 any future writer still render. */}
-                            Requested {formatISTDateTime(h.requestedAt || h.requested_at)} · deadline {formatISTDateTime(h.deadline)}
-                            {h.resubmitted_at ? ` · resubmitted ${formatISTDateTime(h.resubmitted_at)}` : ""}
-                            {h.expired_at ? ` · expired ${formatISTDateTime(h.expired_at)}` : ""}
+                            Requested {formatWorkspaceDateTime(h.requestedAt || h.requested_at)} · deadline {formatWorkspaceDateTime(h.deadline)}
+                            {h.resubmitted_at ? ` · resubmitted ${formatWorkspaceDateTime(h.resubmitted_at)}` : ""}
+                            {h.expired_at ? ` · expired ${formatWorkspaceDateTime(h.expired_at)}` : ""}
                           </small>
                           {h.feedback && <p className="tm-comment tm-feedback" style={{ marginTop: 8 }}>{h.feedback}</p>}
                         </li>
@@ -561,9 +561,9 @@ function AssignmentDetail({ taskId, studentId, onClose, onRemind, reminding }) {
               <h4>Assignment</h4>
               <div className="tm-grid">
                 <div className="tm-field"><span>Status</span><strong>{STATUS_LABEL[a?.status] || "—"}</strong></div>
-                <div className="tm-field"><span>Assigned at</span><strong>{formatISTDateTime(a?.assigned_at)}</strong></div>
+                <div className="tm-field"><span>Assigned at</span><strong>{formatWorkspaceDateTime(a?.assigned_at)}</strong></div>
                 <div className="tm-field"><span>Versions submitted</span><strong>{a?.submission_version ?? 0}</strong></div>
-                <div className="tm-field"><span>Last activity</span><strong>{formatISTDateTime(a?.submitted_at)}</strong></div>
+                <div className="tm-field"><span>Last activity</span><strong>{formatWorkspaceDateTime(a?.submitted_at)}</strong></div>
               </div>
               {a?.submission_comment && (
                 <div style={{ marginTop: 12 }}>
@@ -750,7 +750,7 @@ export default function TaskReview() {
               {task?.program && <span className="tm-chip">Program <strong>{titleCase(task.program)}</strong></span>}
               {task?.target_type === "batch" && task?.batch_name && <span className="tm-chip">Batch <strong>{task.batch_name}</strong></span>}
               {task?.priority && <span className="tm-chip">Priority <strong>{titleCase(task.priority)}</strong></span>}
-              <span className="tm-chip">Deadline <strong>{formatISTDateTime(task?.due_at || task?.due_date)}</strong></span>
+              <span className="tm-chip">Deadline <strong>{formatWorkspaceDateTime(task?.due_at || task?.due_date)}</strong></span>
               {remainingTime(task?.due_at || task?.due_date) && (
                 <span className={`tm-chip ${remainingTime(task.due_at || task.due_date).overdue ? "tm-chip-overdue" : ""}`}>
                   {remainingTime(task.due_at || task.due_date).label}
@@ -949,21 +949,19 @@ function TaskDetails({ task, review, loading }) {
   return (
     <>
       <h3>Task Details</h3>
-      <p className="tm-panel-sub">Every value below is read from the database for this task.</p>
 
       <div className="tm-section">
         <h4>Overview</h4>
         <div className="tm-grid">
           <div className="tm-field"><span>Task ID</span><strong>{task.task_code || "—"}</strong></div>
-          <div className="tm-field"><span>Database ID</span><strong>{task.id}</strong></div>
           <div className="tm-field"><span>Domain</span><strong>{titleCase(task.domain) || "—"}</strong></div>
           <div className="tm-field"><span>Program</span><strong>{titleCase(task.program) || "—"}</strong></div>
           <div className="tm-field"><span>Priority</span><strong>{titleCase(task.priority) || "—"}</strong></div>
           <div className="tm-field"><span>Assigned to</span><strong>{task.target_type === "batch" ? (task.batch_name || "Batch") : "Individual student"}</strong></div>
           <div className="tm-field"><span>Total assignees</span><strong>{task.total_assignees ?? 0}</strong></div>
           <div className="tm-field"><span>Start date</span><strong>{formatISTDateShort(task.start_date)}{task.start_time ? ` ${task.start_time}` : ""}</strong></div>
-          <div className="tm-field"><span>Deadline</span><strong>{formatISTDateTime(task.due_at || task.due_date)}</strong></div>
-          <div className="tm-field"><span>Current status</span><strong>{titleCase(task.workflow_status) || "—"}</strong></div>
+          <div className="tm-field"><span>Deadline</span><strong>{formatWorkspaceDateTime(task.due_at || task.due_date)}</strong></div>
+          <div className="tm-field"><span>Current status</span><strong>{(task.total_assignees ?? 0) === 0 ? "No assignees" : (titleCase(task.workflow_status) || "—")}</strong></div>
         </div>
       </div>
 
@@ -1097,13 +1095,13 @@ function StudentTable({ tab, rows, selected, onToggle, onToggleAll, onView, onRe
               <td><span className="tm-cell-sub">{taskTitle(r.task_title)}</span></td>
                 {showReviewStatus ? (
                   <>
-                    <td>{formatISTDateTime(r.submitted_at)}</td>
+                    <td>{formatWorkspaceDateTime(r.submitted_at)}</td>
                     <td>v{r.submission_version ?? 1}</td>
                     <td>
                       <StatusChip status={r.status} />
                       {r.overdue && <span className="tm-chip tm-chip-overdue" style={{ marginLeft: 6 }}>Overdue</span>}
                       {r.revision_deadline && r.status === "revision_required" && (
-                        <span className="tm-cell-sub">Resubmit by {formatISTDateTime(r.revision_deadline)}</span>
+                        <span className="tm-cell-sub">Resubmit by {formatWorkspaceDateTime(r.revision_deadline)}</span>
                       )}
                     </td>
                     <td>
@@ -1119,7 +1117,7 @@ function StudentTable({ tab, rows, selected, onToggle, onToggleAll, onView, onRe
                   </>
                 ) : tab === "pending" ? (
                   <>
-                    <td>{formatISTDateTime(r.assigned_at)}</td>
+                    <td>{formatWorkspaceDateTime(r.assigned_at)}</td>
                     <td>{formatISTDateShort(r.task_due_at) || "—"}</td>
                     <td><DeadlineCell deadline={r.task_due_at} fallback="No deadline" /></td>
                     <td><StatusChip status={r.status} /></td>
@@ -1127,7 +1125,7 @@ function StudentTable({ tab, rows, selected, onToggle, onToggleAll, onView, onRe
                 ) : (
                   <>
                     <td><StatusChip status={r.status} /></td>
-                    <td>{r.last_activity_at ? formatISTDateTime(r.last_activity_at) : <span className="tm-cell-sub">No activity recorded</span>}</td>
+                    <td>{r.last_activity_at ? formatWorkspaceDateTime(r.last_activity_at) : <span className="tm-cell-sub">No activity recorded</span>}</td>
                     <td>{formatISTDateShort(r.task_due_at) || "—"}</td>
                     <td><DeadlineCell deadline={r.task_due_at} fallback="No deadline" /></td>
                   </>

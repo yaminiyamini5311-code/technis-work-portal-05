@@ -130,6 +130,87 @@ async function notify(db, userId, type, title, message, taskId = null) {
   });
 }
 
+/* ─── TASK EDIT DIFF (used by the "Task Updated" notification) ─────────────
+ * The notification copy is generated field by field from the real before/after
+ * values, so it can never drift from what was saved and never contains
+ * hardcoded text. Long prose fields are summarised as "<label> updated";
+ * short, comparable fields (dates, title, priority, domain, program) name the
+ * old and the new value.
+ */
+
+const NOTIFY_DATE_FMT = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
+});
+
+/** Human label for an editable task field. */
+const TASK_FIELD_LABELS = {
+  title: "Title",
+  description: "Description",
+  expected_output: "Expected output",
+  submission_requirements: "Submission requirements",
+  how_to_do: "Instructions",
+  priority: "Priority",
+  domain: "Domain",
+  program: "Program",
+  day_number: "Day",
+  start_date: "Start date",
+  start_time: "Start time",
+  due_date: "Deadline",
+  due_time: "Deadline time",
+};
+
+/** Fields whose value is prose: never echoed into the message, only "updated". */
+const TASK_TEXT_FIELDS = new Set(["description", "expected_output", "submission_requirements", "how_to_do"]);
+
+function labelForField(key) {
+  return TASK_FIELD_LABELS[key] || key.replace(/_/g, " ");
+}
+
+/** Render one field value for the message (dates as "18 Oct 2026"). */
+function describeFieldValue(key, value) {
+  if (value === null || value === undefined || value === "") return "cleared";
+  if (key === "due_date" || key === "start_date") {
+    const d = new Date(value);
+    if (!Number.isNaN(d.getTime())) return NOTIFY_DATE_FMT.format(d);
+  }
+  const text = String(value).replace(/\s+/g, " ").trim();
+  return text.length > 60 ? `${text.slice(0, 57)}…` : text;
+}
+
+/**
+ * Build the message fragments for the fields that actually changed.
+ * Returns an array such as
+ *   ["Deadline changed from 18 Oct 2026 to 20 Oct 2026", "Instructions updated"]
+ */
+function describeTaskChanges(changedKeys, before, after) {
+  const parts = [];
+  for (const key of changedKeys) {
+    if (key === "start_at" || key === "due_at") continue; // derived from the date/time fields
+    const b = before[key] ?? null;
+    const a = after[key] ?? null;
+    const label = labelForField(key);
+    if (TASK_TEXT_FIELDS.has(key)) {
+      parts.push(a === null || a === "" ? `${label} cleared` : `${label} updated`);
+      continue;
+    }
+    if ((b === null || b === "") && a !== null && a !== "") parts.push(`${label} set to ${describeFieldValue(key, a)}`);
+    else if ((a === null || a === "") && b !== null && b !== "") parts.push(`${label} cleared`);
+    else parts.push(`${label} changed from ${describeFieldValue(key, b)} to ${describeFieldValue(key, a)}`);
+  }
+  return parts;
+}
+
+/** Stable hash of the real change set, used to de-duplicate notifications. */
+function taskChangeHash(changedKeys, before, after) {
+  const crypto = require("crypto");
+  const payload = changedKeys
+    .slice()
+    .sort()
+    .map(k => `${k}=${String(before[k] ?? "")}->${String(after[k] ?? "")}`)
+    .join("|");
+  return crypto.createHash("sha1").update(payload).digest("hex").slice(0, 16);
+}
+
 /**
  * Task-level mirror of the per-student state.
  *
@@ -246,7 +327,22 @@ router.get("/my", authenticateToken, checkStudentRegistrationStatus, authorizeRo
       ]
     }).sort({ created_at: -1 }).toArray();
     const result = await buildTaskResponse(db, tasks);
-    res.json({ success: true, tasks: result });
+
+    // Attach the RUNNING session (if any) to each task in one query, plus the
+    // server clock, so the student portal can render a live timer that is
+    // correct even under client clock skew without a per-task request.
+    const { sessionView } = require("../utils/taskSession");
+    const activeSessions = await db.collection("task_sessions")
+      .find({ student_id: req.user.id, status: "active" })
+      .toArray();
+    const sessionByTask = new Map(activeSessions.map(s => [String(s.task_id), s]));
+    const now = new Date();
+
+    res.json({
+      success: true,
+      server_now: now.toISOString(),
+      tasks: result.map(t => ({ ...t, session: sessionView(sessionByTask.get(String(t.id)) || null, now) })),
+    });
   } catch (e) { console.error("GET MY TASKS:", e); res.status(500).json({ success: false, message: "Unable to load tasks" }); }
 });
 
@@ -316,6 +412,11 @@ router.get("/submissions", authenticateToken, authorizeRoles("admin", "manager",
         comment: s.comment || null,
         status: s.status,
         submitted_at: s.submitted_at,
+        // Server-recorded timing. Null on pre-existing submissions, which the
+        // CEO table renders as "Not recorded".
+        task_started_at: s.task_started_at || null,
+        task_submitted_at: s.task_submitted_at || s.submitted_at || null,
+        duration_seconds: s.duration_seconds ?? null,
         reviewed_at: s.reviewed_at || null,
         reviewer_name: reviewer?.name || null,
         review_comments: s.review_comments || null,
@@ -581,22 +682,83 @@ router.get("/submissions/:submissionId", authenticateToken, authorizeRoles("admi
         { projection: { progress: 1, status: 1, revision_cycle: 1, revision_requested_at: 1, revision_deadline: 1, revision_status: 1, revision_history: 1, assigned_at: 1, created_at: 1 } }
       ),
     ]);
-    if (!task) {
-      return fail(res, 404, "TASK_NOT_FOUND", "The task for this submission no longer exists.");
-    }
+
+    const taskMissing = !task;
+    const studentMissing = !student;
 
     let batch = null;
     if (student?.batch_id) {
       batch = await db.collection("batches").findOne({ _id: toId(student.batch_id) }, { projection: { name: 1, start_date: 1, end_date: 1 } });
     }
 
-    const versions = await versionsForStudent(db, task._id, submission.student_id);
+    const taskIdForVersions = task ? String(task._id) : String(submission.task_id || "");
+    const versions = taskIdForVersions && submission.student_id
+      ? await versionsForStudent(db, taskIdForVersions, submission.student_id)
+      : [];
     const reviewerIds = versions.map(v => v.reviewer_id).filter(Boolean);
     const reviewers = reviewerIds.length
       ? await db.collection("users").find({ _id: { $in: reviewerIds.map(toId) } }, { projection: { name: 1, email: 1 } }).toArray()
       : [];
     const reviewerById = new Map(reviewers.map(r => [String(r._id), r]));
     const code = studentCode(student);
+
+    const responseTask = task ? {
+      id: String(task._id),
+      code: task.task_code || null,
+      title: task.title || null,
+      description: task.description || null,
+      instructions: task.instructions || null,
+      domain: task.domain || null,
+      program: task.program || null,
+      priority: task.priority || null,
+      status: task.status || null,
+      workflow_status: task.workflow_status || null,
+      assigned_at: assignment?.assigned_at || task.assigned_at || task.created_at || null,
+      start_date: task.start_date || null,
+      due_date: task.due_date || null,
+      feedback: task.feedback || null,
+      taskMissing: false,
+    } : {
+      id: submission.task_id ? String(submission.task_id) : null,
+      code: submission.task_code || null,
+      title: "Deleted task",
+      description: null,
+      instructions: null,
+      domain: null,
+      program: null,
+      priority: null,
+      status: null,
+      workflow_status: null,
+      assigned_at: null,
+      start_date: null,
+      due_date: null,
+      feedback: null,
+      taskMissing: true,
+    };
+
+    const responseStudent = student ? {
+      id: submission.student_id ? String(submission.student_id) : null,
+      code,
+      name: student?.name || null,
+      email: student?.email || null,
+      phone: student?.phone || null,
+      department: student?.department || null,
+      program: student?.program || null,
+      batch: batch?.name || null,
+      joined_at: student?.created_at || null,
+      studentMissing: false,
+    } : {
+      id: submission.student_id ? String(submission.student_id) : null,
+      code: null,
+      name: "Deleted student",
+      email: null,
+      phone: null,
+      department: null,
+      program: null,
+      batch: null,
+      joined_at: null,
+      studentMissing: true,
+    };
 
     ok(res, {
       submission: {
@@ -608,6 +770,9 @@ router.get("/submissions/:submissionId", authenticateToken, authorizeRoles("admi
         review_status: normalizeSubmissionStatus(submission.status),
         review_status_label: STATUS_LABELS[normalizeSubmissionStatus(submission.status)],
         submitted_at: submission.submitted_at || null,
+        task_started_at: submission.task_started_at || null,
+        task_submitted_at: submission.task_submitted_at || submission.submitted_at || null,
+        duration_seconds: submission.duration_seconds ?? null,
         reviewer_id: submission.reviewer_id || null,
         reviewer_name: submission.reviewer_id ? (reviewerById.get(String(submission.reviewer_id))?.name || null) : null,
         reviewed_at: submission.reviewed_at || null,
@@ -616,33 +781,8 @@ router.get("/submissions/:submissionId", authenticateToken, authorizeRoles("admi
         score: submission.score ?? null,
         max_marks: submission.max_marks ?? null,
       },
-      student: {
-        id: submission.student_id ? String(submission.student_id) : null,
-        code,
-        name: student?.name || null,
-        email: student?.email || null,
-        phone: student?.phone || null,
-        department: student?.department || null,
-        program: student?.program || null,
-        batch: batch?.name || null,
-        joined_at: student?.created_at || null,
-      },
-      task: {
-        id: String(task._id),
-        code: task.task_code || null,
-        title: task.title || null,
-        description: task.description || null,
-        instructions: task.instructions || null,
-        domain: task.domain || null,
-        program: task.program || null,
-        priority: task.priority || null,
-        status: task.status || null,
-        workflow_status: task.workflow_status || null,
-        assigned_at: assignment?.assigned_at || task.assigned_at || task.created_at || null,
-        start_date: task.start_date || null,
-        due_date: task.due_date || null,
-        feedback: task.feedback || null,
-      },
+      student: responseStudent,
+      task: responseTask,
       assignment: assignment ? {
         progress: assignment.progress ?? null,
         status: assignment.status ?? null,
@@ -659,7 +799,9 @@ router.get("/submissions/:submissionId", authenticateToken, authorizeRoles("admi
       })),
       can_approve: ["submitted", "revision_required"].includes(normalizeSubmissionStatus(submission.status)),
       can_request_revision: ["submitted", "revision_required", "approved"].includes(normalizeSubmissionStatus(submission.status)),
-      message: "Submission loaded",
+      taskMissing,
+      studentMissing,
+      message: taskMissing || studentMissing ? "Submission loaded with missing related records." : "Submission loaded",
     });
   } catch (e) {
     console.error("GET SUBMISSION DETAIL:", e);
@@ -1226,15 +1368,34 @@ router.put("/:id", authenticateToken, authorizeRoles("admin", "ceo", "manager"),
       return res.status(400).json({ success: false, message: "No editable fields supplied" });
     }
 
-    update.updated_at = new Date().toISOString();
-    await db.collection("tasks").updateOne({ _id: taskId }, { $set: update });
-
-    const previousValue = {};
-    const newValue = {};
-    for (const key of editableKeys) {
-      previousValue[key] = task[key] ?? null;
-      newValue[key] = update[key];
+    // Only fields whose value actually changed count as a real edit. Re-saving a
+    // form without touching anything must NOT send a notification, must NOT bump
+    // updated_at and must not touch a single student record.
+    const changedKeys = editableKeys.filter(k => String(task[k] ?? "") !== String(update[k] ?? ""));
+    if (changedKeys.length === 0) {
+      return res.json({
+        success: true,
+        message: "No changes to save",
+        taskId: taskKey,
+        taskCode: task.task_code || null,
+        updated: [],
+        changed: false,
+      });
     }
+
+    // Capture the real "before" values BEFORE anything is mutated, so the audit
+    // log and the notification diff always describe the true old -> new change.
+    const previousValue = {};
+    for (const key of changedKeys) previousValue[key] = task[key] ?? null;
+
+    const nowIso = new Date().toISOString();
+    await db.collection("tasks").updateOne({ _id: taskId }, { $set: { ...update, updated_at: nowIso } });
+
+    const newValue = {};
+    for (const key of changedKeys) newValue[key] = update[key] ?? null;
+
+    // Keep the in-memory task fresh for anything below that reads it.
+    for (const key of changedKeys) task[key] = update[key];
 
     await writeAudit(db, {
       actorId: req.user.id,
@@ -1243,22 +1404,46 @@ router.put("/:id", authenticateToken, authorizeRoles("admin", "ceo", "manager"),
       entityId: taskKey,
       previousValue,
       newValue,
-      metadata: { changed: editableKeys },
+      metadata: { changed: changedKeys },
     });
 
-    // Tell the assigned students what moved. Notification failures never fail
-    // the edit itself (same fail-soft approach as the assignment email).
+    // Notify ONLY the students assigned to THIS task — the batch/individual
+    // assignment snapshot plus any legacy direct assignment. The message is a
+    // real field-by-field diff; an identical repeat save is de-duplicated by the
+    // change hash. Notification failures never fail the edit itself.
     try {
+      const { notifyOnce } = require("../utils/notifications");
       const assignments = await db.collection("task_assignments")
         .find({ task_id: taskKey }, { projection: { student_id: 1 } })
         .toArray();
-      const summary = editableKeys
-        .filter(k => !["start_at", "due_at"].includes(k))
-        .map(k => `${k.replace(/_/g, " ")}: ${update[k] === null || update[k] === "" ? "cleared" : update[k]}`)
-        .join(" · ");
-      const message = `${update.title || task.title} (${task.task_code || taskKey}) was updated by ${req.user.role === "ceo" ? "the CEO" : "an administrator"}. ${summary}`;
-      for (const studentId of new Set(assignments.map(a => String(a.student_id)).filter(Boolean))) {
-        await notify(db, studentId, "task_updated", "Task updated", message.substring(0, 400), taskKey);
+      const recipients = new Set(assignments.map(a => String(a.student_id)).filter(Boolean));
+      if (task.assigned_to) recipients.add(String(task.assigned_to));
+
+      const before = {};
+      const after = {};
+      for (const key of changedKeys) {
+        before[key] = previousValue[key];
+        after[key] = newValue[key];
+      }
+
+      const parts = describeTaskChanges(changedKeys, before, after);
+      const title = String(update.title || task.title || "Task");
+      const actor = req.user.role === "ceo" ? "the CEO" : req.user.role === "manager" ? "a manager" : "an administrator";
+      const message = `"${title}" was updated by ${actor}. ${parts.join("; ")}`.slice(0, 400);
+      const changeHash = taskChangeHash(changedKeys, before, after);
+
+      for (const studentId of recipients) {
+        await notifyOnce(db, {
+          userId: studentId,
+          type: "task_updated",
+          title: "Task Updated",
+          message,
+          taskId: taskKey,
+          recipientRole: "student",
+          changeHash,
+          actionUrl: `/student/tasks/${taskKey}`,
+          meta: { changed: changedKeys, updated_at: nowIso },
+        });
       }
     } catch (e) {
       console.error("Task update notification failed:", e.message);
@@ -1269,7 +1454,9 @@ router.put("/:id", authenticateToken, authorizeRoles("admin", "ceo", "manager"),
       message: "Task updated successfully",
       taskId: taskKey,
       taskCode: task.task_code || null,
-      updated: editableKeys,
+      updated: changedKeys,
+      changed: true,
+      updated_at: nowIso,
     });
   } catch (e) {
     console.error("UPDATE TASK:", e);
@@ -1361,6 +1548,9 @@ async function versionsForStudent(db, taskId, studentId) {
     status_label: s.status || STATUS_LABELS[normalizeSubmissionStatus(s.status)],
     submitted_at: s.submitted_at || null,
     comment: s.comment || null,
+    // Per-version timing snapshot (null on older records).
+    task_started_at: s.task_started_at || null,
+    duration_seconds: s.duration_seconds ?? null,
     reviewed_at: s.reviewed_at || null,
     review_comments: s.review_comments || null,
     reviewer_id: s.reviewer_id || null,
@@ -2358,6 +2548,23 @@ async function storeSubmissionVersion(db, task, studentId, { files, comment, ver
     throw err;
   }
 
+  // Stop the running timer and snapshot the timing onto THIS submission row.
+  // This is deliberately placed after every file upload has succeeded and the
+  // submission row exists: a failed submission must never stop the timer.
+  const { timingSnapshot } = require("../utils/taskSession");
+  const timing = await timingSnapshot(db, { studentId: String(studentId), taskId: String(task._id), submittedAt });
+  await db.collection("submissions").updateOne(
+    { _id: subResult.insertedId },
+    {
+      $set: {
+        session_id: timing.session_id,
+        task_started_at: timing.task_started_at,
+        task_submitted_at: submittedAt,
+        duration_seconds: timing.duration_seconds,
+      },
+    }
+  );
+
   const { updateAssignment } = require("../models/TaskAssignment");
   await updateAssignment(db, String(task._id), studentId, {
     status: "submitted",
@@ -2374,7 +2581,15 @@ async function storeSubmissionVersion(db, task, studentId, { files, comment, ver
     newValue: { submission_code: submissionCode, task_id: String(task._id), version, submitted_at: submittedAt, revision_cycle: revisionCycle },
   });
 
-  return { submissionId: sid, submissionCode, version, submittedAt, parentFolderId };
+  return {
+    submissionId: sid,
+    submissionCode,
+    version,
+    submittedAt,
+    parentFolderId,
+    task_started_at: timing.task_started_at,
+    duration_seconds: timing.duration_seconds,
+  };
 }
 
 /** Load a task a student is allowed to act on, or write the error response. */
@@ -2401,6 +2616,80 @@ async function loadStudentTask(db, req, res) {
   }
   return { task, assignment };
 }
+
+/* ─── START / CURRENT TASK SESSION (student) ───────────────────────────────
+ * The server is the source of truth for the timer. Start is idempotent: a
+ * double click, two tabs, a refresh or a re-login all return the SAME session
+ * with the original `started_at`. Students can never send a timestamp or a
+ * duration — neither is read from the request body anywhere.
+ */
+router.post("/:id/start", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), async (req, res) => {
+  try {
+    const db = req.db;
+    const loaded = await loadStudentTask(db, req, res);
+    if (!loaded) return;
+    const { task, assignment } = loaded;
+    if (["Approved", "Cancelled", "Archived"].includes(task.workflow_status)) {
+      return fail(res, 409, "TASK_CLOSED", "This task can no longer be started.");
+    }
+
+    const { startSession, sessionView } = require("../utils/taskSession");
+    const session = await startSession(db, {
+      studentId: req.user.id,
+      taskId: String(task._id),
+      revisionCycle: assignment?.revision_cycle || 0,
+    });
+
+    // Mirror the historical "Start" behaviour: the first Start marks the
+    // student's assignment in progress. This never touches submissions,
+    // deadlines or review state.
+    if (assignment && normalizeStatus(assignment.status) === "pending") {
+      const { updateAssignment } = require("../models/TaskAssignment");
+      await updateAssignment(db, String(task._id), req.user.id, { status: "in_progress" });
+      await syncTaskWorkflowFromStudents(db, task);
+    }
+
+    const now = new Date();
+    ok(res, {
+      ...sessionView(session, now),
+      server_now: now.toISOString(),
+      task_id: String(task._id),
+      task_code: task.task_code || null,
+      task_title: task.title || "",
+    });
+  } catch (e) {
+    console.error("START TASK SESSION:", e);
+    fail(res, 500, "START_FAILED", "Unable to start the task timer. Please retry.");
+  }
+});
+
+/* ─── CURRENT SESSION (student) ────────────────────────────────────────────
+ * Returns the active session (or the last completed one), the elapsed seconds
+ * and the SERVER clock. The client renders the live display from
+ * started_at + server_now offset, so a skewed client clock cannot change it.
+ */
+router.get("/:id/session", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), async (req, res) => {
+  try {
+    const db = req.db;
+    const loaded = await loadStudentTask(db, req, res);
+    if (!loaded) return;
+    const { task } = loaded;
+
+    const { currentSession, getActiveSession, sessionView } = require("../utils/taskSession");
+    // Prefer the running session so a refresh always restores the LIVE timer.
+    const active = await getActiveSession(db, req.user.id, String(task._id));
+    const session = active || await currentSession(db, req.user.id, String(task._id));
+    const now = new Date();
+    ok(res, {
+      ...sessionView(session, now),
+      server_now: now.toISOString(),
+      task_id: String(task._id),
+    });
+  } catch (e) {
+    console.error("GET TASK SESSION:", e);
+    fail(res, 500, "SESSION_FAILED", "Unable to load the task timer.");
+  }
+});
 
 /* ─── SUBMIT TASK (first version only) ─────────────────────────────────────
  * A student may create exactly ONE first submission through this route.
@@ -2480,6 +2769,13 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
     });
   } catch (e) {
     console.error("Submission error:", e);
+    // The unique partial index on { student_id, task_id, version: 1 } makes a
+    // duplicate FIRST submission impossible even under a race. Translate the
+    // database error into the same clear 409 the pre-check returns.
+    if (e && e.code === 11000) {
+      return fail(res, 409, "ALREADY_SUBMITTED",
+        "You have already submitted this task. Use the resubmission option if a revision was requested.");
+    }
     fail(res, e.status || 500, e.code || "SUBMIT_FAILED", e.message || "Unable to store submission");
   }
 });

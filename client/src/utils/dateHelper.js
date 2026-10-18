@@ -138,4 +138,137 @@ export function isDeadlinePassedIST(deadlineISO, refDate) {
   return deadline < istRef;
 }
 
-export default { formatISTDateTime, formatISTDate, formatISTDateShort, formatDeadlineIST, isDeadlinePassedIST };
+/* ═══════════════════════════════════════════════════════════════════════════
+ * WORKSPACE DATE FORMAT
+ *
+ * One formatter for every table, card and badge in the CEO workspace. Before
+ * this existed the same page showed three different shapes:
+ *
+ *   "2026-10-16 00:30"            raw ISO, no timezone conversion
+ *   "18 October 2026"             no time at all
+ *   "Thursday, 15 October 202"    weekday + long month, then truncated
+ *
+ * Everything now renders as "15 Oct 2026, 12:33 PM" in Asia/Kolkata, and is
+ * never truncated — a table cell wraps the string instead of cutting it.
+ *
+ * `null` / `undefined` / unparseable input returns an em dash so a missing date
+ * is visibly missing rather than showing "Invalid Date".
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * "18 Oct 2026, 10:00:00 AM" in IST — the ONE date+time format used across the
+ * CEO workspace, the student portal and every dialog. Seconds are included so
+ * two events in the same minute (a task start and its submission) are never
+ * ambiguous. An already-malformed legacy shape such as "15:43 3 PM" can no
+ * longer be produced: the whole string comes from a single Intl formatter.
+ * @param {string|Date|null|undefined} value
+ * @returns {string}
+ */
+export function formatWorkspaceDateTime(value) {
+  if (value == null || value === "") return "—";
+  const date = value instanceof Date ? value : new Date(value);
+  if (isNaN(date)) return "—";
+  return upperPeriod(workspaceDateTimeFormatter.format(date));
+}
+
+/**
+ * Date only, same month format: "15 Oct 2026".
+ * Used where a time is meaningless (a task's deadline date, a batch label).
+ */
+export function formatWorkspaceDate(value) {
+  if (value == null || value === "") return "—";
+  const date = value instanceof Date ? value : new Date(value);
+  if (isNaN(date)) return "—";
+  return workspaceDateFormatter.format(date);
+}
+
+/**
+ * Combine a date and a separate time value ("18:30") into one display string.
+ * Task start/end are stored as two fields; this keeps them on one format.
+ * Returns null when neither part is present, so the caller can decide between
+ * an em dash and "Not available".
+ */
+export function formatWorkspaceDateTimeParts(dateValue, timeValue) {
+  if (dateValue == null || dateValue === "") return null;
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (isNaN(date)) return null;
+  if (timeValue == null || timeValue === "") return formatWorkspaceDate(date);
+
+  const match = String(timeValue).match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return formatWorkspaceDate(date);
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const dateWithTime = new Date(date.getTime());
+  dateWithTime.setHours(hour, minute, 0, 0);
+  return upperPeriod(workspaceDateTimeFormatter.format(dateWithTime));
+}
+
+/** "am" → "AM" so the workspace shows one consistent meridiem casing. */
+function upperPeriod(text) {
+  return text.replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase());
+}
+
+const workspaceDateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: true,
+  timeZone: "Asia/Kolkata",
+});
+
+const workspaceDateFormatter = new Intl.DateTimeFormat("en-IN", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: "Asia/Kolkata",
+});
+
+/**
+ * Correctly pluralised count, e.g. pluralise(1, "file") -> "1 file",
+ * pluralise(2, "file") -> "2 files", pluralise(1, "hour") -> "1 hour".
+ */
+export function pluralise(count, word, pluralWord) {
+  const n = Number(count) || 0;
+  const plural = pluralWord || `${word}s`;
+  return `${n} ${n === 1 ? word : plural}`;
+}
+
+/**
+ * Human duration: 5100 -> "1 hour, 25 minutes, 30 seconds" with correct
+ * singular/plural. Returns null for a missing value so callers can show
+ * "Not recorded" instead of a fabricated "0 seconds".
+ *
+ * @param {number|null|undefined} totalSeconds
+ * @returns {string|null}
+ */
+export function formatDuration(totalSeconds) {
+  if (totalSeconds === null || totalSeconds === undefined || totalSeconds === "") return null;
+  const seconds = Math.max(0, Math.floor(Number(totalSeconds)));
+  if (!Number.isFinite(seconds)) return null;
+  if (seconds === 0) return "0 seconds";
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  const parts = [];
+  if (hours) parts.push(pluralise(hours, "hour"));
+  if (minutes) parts.push(pluralise(minutes, "minute"));
+  if (secs) parts.push(pluralise(secs, "second"));
+  return parts.join(", ");
+}
+
+export default {
+  formatISTDateTime,
+  formatISTDate,
+  formatISTDateShort,
+  formatDeadlineIST,
+  isDeadlinePassedIST,
+  formatWorkspaceDateTime,
+  formatWorkspaceDate,
+  formatWorkspaceDateTimeParts,
+  pluralise,
+  formatDuration,
+};

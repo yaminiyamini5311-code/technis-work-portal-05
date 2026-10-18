@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import StatusBadge from "../../components/StatusBadge";
+import { formatWorkspaceDateTime, pluralise } from "../../utils/dateHelper";
 import "../../styles/admin.css";
+import "../../styles/ceo-ui.css";
 import "./performance.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -14,9 +17,48 @@ const STATE_LABELS = {
   not_started: "Not Started",
 };
 
-function fmtDate(value) {
-  if (!value) return "—";
-  try { return new Date(value).toLocaleString(); } catch { return String(value); }
+/** A Mongo ObjectId rendered as a bare 24-character hex string. */
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+
+/**
+ * The student's display code, or null when the endpoint only gave us a raw
+ * database id.
+ *
+ * GET /api/performance returns `student.id` and `student.student_id`, but
+ * server/utils/studentReport.js:199 reads `student.student_id` from the users
+ * collection while TECHINS stores that code in `learner_id`. The field is
+ * therefore always undefined server-side and the expression falls back to the
+ * ObjectId, which is why the card used to show "ID: 6acf831d7f1e…".
+ *
+ * The frontend does not invent a code it was not given. It shows the value when
+ * it is a real code and otherwise says so, keeping the raw id in the tooltip so
+ * nothing is hidden. The backend mapping is reported rather than worked around.
+ */
+function displayStudentCode(student) {
+  const candidate = student.student_id || student.student_code || "";
+  if (!candidate || OBJECT_ID.test(candidate)) return null;
+  return candidate;
+}
+
+/**
+ * Program and batch, de-duplicated.
+ * These collections hold the same string for most students, which rendered as
+ * "Techins 60 · Techins 60". When they are equal the batch is dropped and the
+ * value is labelled; when they differ both are labelled so neither is ambiguous.
+ */
+function programAndBatch(student) {
+  const program = (student.program || "").trim();
+  const batch = (student.batch_name || student.batch || "").trim();
+  const parts = [];
+  if (program) parts.push(`Program: ${program}`);
+  if (batch && batch.toLowerCase() !== program.toLowerCase()) parts.push(`Batch: ${batch}`);
+  return parts.join(" · ");
+}
+
+/* Task states come from the server (utils/studentReport.js) so the CEO view
+   and the stored per-student/per-task records can never disagree. */
+function stateLabel(state) {
+  return STATE_LABELS[state] || state || "Unknown";
 }
 
 export default function Performance() {
@@ -101,77 +143,111 @@ export default function Performance() {
         <p>Task-wise results come from each student's own submissions and reviews. Scores appear only after evaluation.</p>
       </div>
 
-      <div className="perf-search-bar">
+      <div className="perf-search-bar ui-toolbar">
         <input
+          className="ui-input"
           type="search"
           aria-label="Search students"
           placeholder="Search by student name, email, ID, program or batch…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        {search && <button type="button" onClick={() => setSearch("")}>Clear</button>}
+        {search && (
+          <button type="button" className="ui-btn ui-btn--neutral" onClick={() => setSearch("")}>Clear</button>
+        )}
       </div>
 
+      {/* align-items:start lives in performance.css. Grid items default to
+          stretch, so one expanded card used to stretch its whole row and leave
+          its neighbours with a tall empty gap. */}
       <div className="performance-admin-grid">
         {filtered.map((x) => {
           const c = x.counts || {};
           const s = x.scoring || {};
           const open = !!expanded[x.student.id];
+          const code = displayStudentCode(x.student);
+          const cohort = programAndBatch(x.student);
           return (
             <div className="panel perf-card" key={x.student.id}>
-              <div className="panel-head">
-                <div>
+              {/* Fixed three-cell grid: identity | progress | spacer. The
+                  progress percentage stays in the same place on every card
+                  regardless of how long the name or email is. */}
+              <div className="panel-head perf-card-head">
+                <div className="perf-identity">
                   <h3>{x.student.name}</h3>
                   <small>{x.student.email}</small>
-                  <small style={{ display: "block", marginTop: "0.25rem", opacity: 0.75 }}>
-                    ID: {x.student.student_id || x.student.id}
-                    {x.student.program ? ` · ${x.student.program}` : ""}
-                    {x.student.department ? ` · ${x.student.department}` : ""}
-                    {x.student.batch_name ? ` · ${x.student.batch_name}` : ""}
+                  <small className="perf-identity-meta">
+                    {code
+                      ? <>ID: <b>{code}</b></>
+                      : (
+                        <>
+                          ID: <span className="ui-na" title={`Only a database id is available: ${x.student.id}`}>Not available</span>
+                        </>
+                      )}
+                    {cohort ? <> · {cohort}</> : null}
                   </small>
                 </div>
-                <strong title="Approval-based completion across tasks and missions">{x.progress}%</strong>
+                <strong
+                  className="perf-progress-value"
+                  title="Approval-based completion across tasks and missions"
+                >
+                  {x.progress}%
+                </strong>
               </div>
 
+              {/* Two fixed columns. A card with no Latest review leaves that
+                  cell empty instead of shifting "Overall score" left. */}
               <div className="perf-score-block">
-                <div>
+                <div className="perf-score-cell-main">
                   <small>Overall score</small>
                   {s.overall_percentage == null
                     ? <strong className="muted">Not evaluated</strong>
                     : <strong>{s.overall_percentage}%</strong>}
                   {s.has_scores && (
                     <small className="perf-score-basis">
-                      {s.scored_tasks} scored task{s.scored_tasks === 1 ? "" : "s"} · {s.total_earned}/{s.total_max} marks
+                      {pluralise(s.scored_tasks || 0, "scored task")} · {s.total_earned}/{s.total_max} marks
                     </small>
                   )}
                   {!s.has_scores && (
                     <small className="perf-score-basis">
-                      {c.total || 0} task{(c.total || 0) === 1 ? "" : "s"} assigned · no scores recorded yet
+                      {pluralise(c.total || 0, "task")} assigned · no scores recorded yet
                     </small>
                   )}
                 </div>
-                {x.score != null && (
-                  <div className="perf-eval-score">
-                    <small>Latest review</small>
-                    <strong>{x.score}%</strong>
-                    <small>{x.lastReviewed ? fmtDate(x.lastReviewed) : ""}</small>
-                  </div>
+                <div className="perf-eval-score">
+                  <small>Latest review</small>
+                  {x.score != null ? (
+                    <>
+                      <strong>{x.score}%</strong>
+                      <small>{x.lastReviewed ? formatWorkspaceDateTime(x.lastReviewed) : ""}</small>
+                    </>
+                  ) : (
+                    <strong className="muted">—</strong>
+                  )}
+                </div>
+              </div>
+
+              {/* Count chips from the shared status palette. */}
+              <div className="perf-counts ui-chip-group">
+                <span className="ui-chip ui-chip--submitted">Total <b>{c.total || 0}</b></span>
+                <StatusBadge status="approved" count={c.approved || 0} label="Approved" />
+                <StatusBadge status="submitted" count={c.submitted || 0} label="Submitted" />
+                <StatusBadge status="pending" count={c.pending || 0} label="Pending" />
+                {c.revision_required > 0 && (
+                  <StatusBadge status="revision_required" count={c.revision_required} label="Revision" />
                 )}
+                {c.overdue > 0 && <StatusBadge status="overdue" count={c.overdue} label="Overdue" />}
               </div>
 
-              <div className="perf-counts">
-                <span className="perf-chip total">Total <b>{c.total || 0}</b></span>
-                <span className="perf-chip approved">Approved <b>{c.approved || 0}</b></span>
-                <span className="perf-chip submitted">Submitted <b>{c.submitted || 0}</b></span>
-                <span className="perf-chip pending">Pending <b>{c.pending || 0}</b></span>
-                {c.revision_required > 0 && <span className="perf-chip revision">Revision <b>{c.revision_required}</b></span>}
-                {c.overdue > 0 && <span className="perf-chip overdue">Overdue <b>{c.overdue}</b></span>}
+              {/* Label, count and bar on one aligned row. */}
+              <div className="perf-line">
+                <span>Missions</span>
+                <b>{x.completedMissions}/{x.totalMissions}</b>
               </div>
-
-              <div className="perf-line"><span>Missions</span><b>{x.completedMissions}/{x.totalMissions}</b></div>
               <div className="admin-progress"><i style={{ width: `${x.progress}%` }} /></div>
 
-              <button className="perf-expand" type="button" onClick={() => toggle(x.student.id)} aria-expanded={open}>
+              {/* Same position in every card, neutral grey. */}
+              <button className="ui-btn ui-btn--neutral perf-expand" type="button" onClick={() => toggle(x.student.id)} aria-expanded={open}>
                 {open ? "Hide task-wise results" : `View task-wise results (${(x.tasks || []).length})`}
               </button>
 
@@ -179,8 +255,16 @@ export default function Performance() {
                 (x.tasks || []).length === 0 ? (
                   <div className="perf-empty">No tasks assigned to this student yet.</div>
                 ) : (
-                  <div className="perf-table-wrap">
-                    <table className="perf-table">
+                  /* The wrapper scrolls; the card itself never overflows. */
+                  <div className="perf-table-wrap ui-table-wrap">
+                    <table className="perf-table ui-table">
+                      <colgroup>
+                        <col style={{ width: "38%" }} />
+                        <col style={{ width: "20%" }} />
+                        <col style={{ width: "12%" }} />
+                        <col style={{ width: "15%" }} />
+                        <col style={{ width: "15%" }} />
+                      </colgroup>
                       <thead>
                         <tr>
                           <th>Task</th><th>Status</th><th>Score</th><th>Submitted</th><th>Reviewed</th>
@@ -194,10 +278,10 @@ export default function Performance() {
                               <small>{t.task_code || t.task_id}{t.day != null ? ` · Day ${String(t.day).padStart(2, "0")}` : ""}</small>
                             </td>
                             <td>
-                              <span className={`perf-state ${t.state}`}>
-                                {STATE_LABELS[t.state] || t.state}
-                              </span>
-                              {t.overdue && <span className="perf-state overdue">Overdue</span>}
+                              <div className="ui-chip-group">
+                                <StatusBadge status={t.state} label={stateLabel(t.state)} />
+                                {t.overdue && <StatusBadge status="overdue" label="Overdue" />}
+                              </div>
                             </td>
                             <td>
                               {t.has_score
@@ -206,11 +290,12 @@ export default function Performance() {
                                     {t.awaiting_evaluation ? "Awaiting evaluation" : "—"}
                                   </span>}
                             </td>
-                            <td>{fmtDate(t.submission?.submitted_at)}</td>
-                            <td>
+                            {/* Shared formatter; never truncated. */}
+                            <td className="perf-date">{formatWorkspaceDateTime(t.submission?.submitted_at)}</td>
+                            <td className="perf-date">
                               {t.submission?.reviewed_at ? (
                                 <span title={t.submission?.review_comments || ""}>
-                                  {fmtDate(t.submission.reviewed_at)}
+                                  {formatWorkspaceDateTime(t.submission.reviewed_at)}
                                   {t.submission?.reviewer_name ? ` · ${t.submission.reviewer_name}` : ""}
                                 </span>
                               ) : <span className="muted">—</span>}

@@ -232,6 +232,7 @@
 
 .sdd-message-error { background: rgba(255, 77, 109, 0.11); border: 1px solid rgba(255, 77, 109, 0.38); color: #ffd9e2; }
 .sdd-message-ok { background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.35); color: #b9f4dc; }
+.sdd-message-warning { background: rgba(244, 180, 75, 0.12); border: 1px solid rgba(244, 180, 75, 0.35); color: #f7d89a; }
 
 .sdd-loading { color: #b9c4dd; font-size: 13px; padding: 10px 2px; }
 

@@ -25,7 +25,7 @@ function toId(id) {
   try { return new ObjectId(String(id)); } catch { return id; }
 }
 
-function buildDedupeKey({ userId, type, taskId = null, submissionId = null, missionId = null, cycle = null }) {
+function buildDedupeKey({ userId, type, taskId = null, submissionId = null, missionId = null, cycle = null, changeHash = null }) {
   return [
     String(userId),
     String(type),
@@ -33,6 +33,7 @@ function buildDedupeKey({ userId, type, taskId = null, submissionId = null, miss
     submissionId ? String(submissionId) : "",
     missionId ? String(missionId) : "",
     cycle != null ? String(cycle) : "",
+    changeHash ? String(changeHash) : "",
   ].join("|");
 }
 
@@ -50,9 +51,10 @@ function buildDeepLink({ recipientRole, type, taskId, submissionId, studentId })
     const base = recipientRole === "ceo" ? "admin" : recipientRole;
     return taskId ? `/${base}/tasks` : null;
   }
-  // Students deep link to their own task list; the Revision Required section
-  // on that page is where the resubmit action lives.
-  return taskId ? "/student/tasks" : "/student/feedback";
+  // Students deep link to the task's own page (the route registered in
+  // client/src/App.jsx: /student/tasks/:taskId), where the live timer, the
+  // resubmit section and the revision countdown live.
+  return taskId ? `/student/tasks/${taskId}` : "/student/feedback";
 }
 
 /**
@@ -69,6 +71,7 @@ async function notifyOnce(db, {
   submissionId = null,
   missionId = null,
   cycle = null,
+  changeHash = null,
   recipientRole = null,
   revisionRequestedAt = null,
   revisionDeadline = null,
@@ -77,7 +80,7 @@ async function notifyOnce(db, {
 }) {
   if (!db || !userId || !type || !title || !message) return { created: false, notification: null };
 
-  const dedupe_key = buildDedupeKey({ userId, type, taskId, submissionId, missionId, cycle });
+  const dedupe_key = buildDedupeKey({ userId, type, taskId, submissionId, missionId, cycle, changeHash });
   const now = new Date().toISOString();
   const doc = {
     user_id: String(userId),
@@ -95,6 +98,7 @@ async function notifyOnce(db, {
     revision_requested_at: revisionRequestedAt || null,
     revision_deadline: revisionDeadline || null,
     action_url: actionUrl || buildDeepLink({ recipientRole, type, taskId, submissionId, studentId }),
+    change_hash: changeHash ? String(changeHash) : null,
     meta: meta || null,
     dedupe_key,
     read_at: null,

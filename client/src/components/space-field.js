@@ -78,6 +78,14 @@ export function mountSpace({ force = false } = {}) {
   const stars = Array.from({ length: N }, () => spawn({}, 0.04 + Math.random() * 0.96));
 
   // Scroll input: capture phase so it works for window AND inner scroll containers; wheel/touch fallback for short pages
+  //
+  // Speed tuning: every input is multiplied by SCROLL_GAIN before it becomes
+  // velocity. 0.6 travels ~40% slower than the raw scroll delta, which removes
+  // the whip-and-snap that a fast flick produced (the field reached its clamped
+  // top speed in a couple of frames and then had to decelerate visibly). The
+  // streak length and nebula parallax scale with the SAME velocity, so slowing
+  // the input slows the whole scene coherently — nothing was removed.
+  const SCROLL_GAIN = 0.6;
   const lastY = new WeakMap();
   let scrollPending = 0,
     wheelPending = 0,
@@ -92,18 +100,18 @@ export function mountSpace({ force = false } = {}) {
     const y = el.scrollTop,
       prev = lastY.has(el) ? lastY.get(el) : y;
     lastY.set(el, y);
-    scrollPending += y - prev;
+    scrollPending += (y - prev) * SCROLL_GAIN;
     events++;
     const max = el.scrollHeight - el.clientHeight;
     if (max > 0) progress = clamp(y / max, 0, 1);
   };
 
   const onWheel = (e) => {
-    wheelPending += e.deltaY * 0.6;
+    wheelPending += e.deltaY * 0.6 * SCROLL_GAIN;
   };
   const onTouch = (e) => {
     const y = e.touches[0].clientY;
-    if (touchY !== null) wheelPending += (touchY - y) * 0.9;
+    if (touchY !== null) wheelPending += (touchY - y) * 0.9 * SCROLL_GAIN;
     touchY = y;
   };
   const onTouchEnd = () => {
@@ -236,7 +244,9 @@ export function mountSpace({ force = false } = {}) {
     scrollPending = 0;
     wheelPending = 0;
     const target = clamp(input, -100, 100);
-    v += (target - v) * (target !== 0 ? 0.25 : 0.06); // smooth glide in/out
+    // Softer ramp in and out: less overshoot on a fast flick, and a longer,
+    // smoother glide to rest instead of an abrupt stop.
+    v += (target - v) * (target !== 0 ? 0.2 : 0.05); // smooth glide in/out
     if (Math.abs(v) < 0.02) v = 0;
 
     // Nothing in the scene is animating when the field is at rest and the

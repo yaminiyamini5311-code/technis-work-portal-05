@@ -3,8 +3,10 @@ import TechinsIcon from "./TechinsIcon";
 import FixedOverlay from "./FixedOverlay";
 import FilePreview, { isPreviewable } from "./FilePreview";
 import SubmissionDetailDialog from "./SubmissionDetailDialog";
-import { formatISTDateTime } from "../utils/dateHelper";
-import { STATUS_LABEL, API_URL, apiFetch, downloadFile, statusClass, taskTitle } from "../utils/api";
+import { formatWorkspaceDateTime, formatDuration, pluralise } from "../utils/dateHelper";
+import { STATUS_LABEL, API_URL, apiFetch, downloadFile, taskTitle } from "../utils/api";
+import StatusBadge from "./StatusBadge";
+import "../styles/ceo-ui.css";
 import "./SubmissionsView.css";
 
 /**
@@ -41,8 +43,20 @@ export function getStudentRouteId(submission) {
 /** Stable key for one student's work on one task. */
 const groupKey = (item) => `${item.student_db_id || item.student_id || "unknown"}::${item.task_id || "unknown"}`;
 
-/** One em dash for every absent value, never a placeholder string. */
+/**
+ * One em dash for every absent value, never a placeholder string.
+ *
+ * `Not available` is reserved for a field the API does not carry for this
+ * record at all. GET /api/tasks/submissions does return student_id,
+ * student_code, student_name, student_email, student_department,
+ * student_program and batch_name — but every one of them is null when the
+ * submission points at a student record that has since been deleted. That is
+ * genuinely missing data, so it is stated plainly rather than shown as a bare
+ * dash the reader has to interpret.
+ */
 const dash = (value) => (value === null || value === undefined || value === "" ? "—" : value);
+const NA = <span className="ui-na">Not available</span>;
+const meta = (value) => (value === null || value === undefined || value === "" ? NA : value);
 
 export default function SubmissionsView({ eyebrow, title, subtitle }) {
   const [items, setItems] = useState([]);
@@ -64,6 +78,18 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
   const [submittingRequirement, setSubmittingRequirement] = useState(false);
   const [previewFile, setPreviewFile] = useState(null);
   const [collapsed, setCollapsed] = useState(() => new Set());
+  /**
+   * Which response cells are expanded past the clamp. Keyed by submission id so
+   * two rows never share a toggle. Starts closed: every response renders at the
+   * same 3-line height, which is what made the column line up row to row.
+   */
+  const [expanded, setExpanded] = useState(() => new Set());
+
+  const toggleExpanded = (id) => setExpanded(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -253,10 +279,17 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
     }
   };
 
+  /**
+   * Status chip from the shared vocabulary. `review_status` wins over `status`
+   * when present because it is the reviewer's verdict; `status` is the
+   * submission's own. The underlying value is never rewritten — only the tone
+   * and the label are chosen.
+   */
   const statusPill = (item) => (
-    <span className={`pill ${statusClass(item.review_status || String(item.status || "").toLowerCase().replace(/\s+/g, "_"))}`}>
-      {item.status || STATUS_LABEL[item.review_status] || "Submitted"}
-    </span>
+    <StatusBadge
+      status={item.review_status || item.status}
+      label={item.status || STATUS_LABEL[item.review_status] || "Submitted"}
+    />
   );
 
   return (
@@ -277,44 +310,47 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
       {notice && <div className="info-msg" role="status">{notice}</div>}
 
       <section className="panel">
-        <div className="panel-head chart-head">
+        {/* Search, filters and Refresh share one wrapping row at one control
+            height. */}
+        <div className="panel-head ui-toolbar">
           <div>
             <span className="section-kicker">SUBMISSION RECORDS</span>
             <h3>
-              {filteredSubmissions.length} submission{filteredSubmissions.length === 1 ? "" : "s"}
+              {pluralise(filteredSubmissions.length, "submission")}
               {" · "}
-              {groups.length} student/task group{groups.length === 1 ? "" : "s"}
+              {pluralise(groups.length, "student/task group")}
             </h3>
           </div>
-          <div className="chart-tabs">
+          <div className="chart-tabs ui-toolbar-controls">
             <input
+              className="ui-input"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search student, task, email…"
               aria-label="Search submissions"
-              style={{ minWidth: "200px" }}
             />
-            <select value={filterStudent} onChange={e => setFilterStudent(e.target.value)} aria-label="Filter by student">
+            <select className="ui-select" value={filterStudent} onChange={e => setFilterStudent(e.target.value)} aria-label="Filter by student">
               <option value="all">All students</option>
               {students.map(s => <option key={s.key} value={s.key}>{s.code ? `${s.name} (${s.code})` : s.name}</option>)}
             </select>
-            <select value={filterBatch} onChange={e => setFilterBatch(e.target.value)} aria-label="Filter by batch">
+            <select className="ui-select" value={filterBatch} onChange={e => setFilterBatch(e.target.value)} aria-label="Filter by batch">
               <option value="all">All batches</option>
               {batches.filter(b => b !== "all").map(b => <option key={b} value={b}>{b}</option>)}
             </select>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} aria-label="Filter by status">
+            <select className="ui-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} aria-label="Filter by status">
               {statuses.map(s => <option key={s} value={s}>{s === "all" ? "All statuses" : s}</option>)}
             </select>
-            <select value={sortBy} onChange={e => setSortBy(e.target.value)} aria-label="Sort by">
+            <select className="ui-select" value={sortBy} onChange={e => setSortBy(e.target.value)} aria-label="Sort by">
               <option value="newest">Newest first</option>
               <option value="oldest">Oldest first</option>
               <option value="student">Student A–Z</option>
               <option value="task">Task A–Z</option>
               <option value="status">Status A–Z</option>
             </select>
-            <button type="button" onClick={load} disabled={loading}>{loading ? "Loading…" : "Refresh"}</button>
-            <button type="button" className="export-excel-btn" onClick={exportToExcel} disabled={exporting || loading}>
-              {exporting ? "Exporting…" : (<><TechinsIcon name="chart" size={18} ariaHidden /><span>Export to Excel</span></>)}
+            <button type="button" className="ui-btn ui-btn--neutral" onClick={load} disabled={loading}>{loading ? "Loading…" : "Refresh"}</button>
+            <button type="button" className="ui-btn ui-btn--info" onClick={exportToExcel} disabled={exporting || loading}>
+              <TechinsIcon name="chart" size={15} variant="light" ariaHidden />
+              <span>{exporting ? "Exporting…" : "Export to Excel"}</span>
             </button>
           </div>
         </div>
@@ -326,24 +362,31 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
         )}
 
         {!loading && filteredSubmissions.length > 0 && (
-          <div className="submissions-table-wrapper">
-            <table className="submissions-table">
+          <div className="submissions-table-wrapper ui-table-wrap">
+            <table className="submissions-table ui-table">
+              {/* Explicit widths. With `table-layout: auto` the browser gave the
+                  Response and Files columns whatever width was left over, so
+                  the Actions column ran past the right edge of the viewport
+                  and "Delete" was clipped. Fixed layout + min-width means the
+                  wrapper scrolls instead. */}
               <colgroup>
                 <col className="col-student-name" />
                 <col className="col-task" />
                 <col className="col-response" />
                 <col className="col-files" />
                 <col className="col-submitted" />
+                <col className="col-timing" />
                 <col className="col-status" />
                 <col className="col-actions" />
               </colgroup>
               <thead>
                 <tr>
-                  <th>Student</th>
+                  <th>Version / ID</th>
                   <th>Task</th>
                   <th>Response</th>
                   <th>Files</th>
                   <th>Submitted</th>
+                  <th>Task Submission Timing</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -358,26 +401,33 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
                     <Fragment key={group.key}>
                       {/* Identity row: name + code + department/program/batch + version count */}
                       <tr className="sv-group-head">
-                        <td colSpan={7}>
+                        <td colSpan={8}>
                           <div className="sv-group-lead">
                             <div className="student-avatar">{((head.student_name || "S").charAt(0) || "S").toUpperCase()}</div>
                             <div className="sv-group-identity">
                               <strong>{head.student_name || "Unknown student"}</strong>
+                              {/* Wrapping label:value pairs. The values were
+                                  #6b7691 on a #0d1220 surface — about 3.4:1,
+                                  below AA for body text. */}
                               <span className="sv-group-meta">
-                                <span>ID: <b>{dash(head.student_id)}</b></span>
-                                <span>Email: <b>{dash(head.student_email)}</b></span>
-                                <span>Department: <b>{dash(head.student_department)}</b></span>
-                                <span>Program: <b>{dash(head.student_program)}</b></span>
-                                <span>Batch: <b>{dash(head.batch_name)}</b></span>
+                                <span>ID: <b>{meta(head.student_id)}</b></span>
+                                <span>Email: <b>{meta(head.student_email)}</b></span>
+                                <span>Department: <b>{meta(head.student_department)}</b></span>
+                                <span>Program: <b>{meta(head.student_program)}</b></span>
+                                <span>Batch: <b>{meta(head.batch_name)}</b></span>
                               </span>
                             </div>
+                            {/* `flex: 0 0 auto` on .sv-group-right plus the
+                                head cell's own right padding is what keeps the
+                                version badge fully inside the header; it used
+                                to be cut off by the table's right edge. */}
                             <div className="sv-group-right">
                               <span className="sv-version-badge">
-                                {group.versions.length} version{group.versions.length === 1 ? "" : "s"}
+                                {pluralise(group.versions.length, "version")}
                                 {" · latest v"}{group.latest}
                               </span>
                               {group.versions.length > 1 && (
-                                <button type="button" className="sv-toggle" onClick={() => toggleGroup(group.key)} aria-expanded={!isCollapsed}>
+                                <button type="button" className="ui-btn ui-btn--neutral" onClick={() => toggleGroup(group.key)} aria-expanded={!isCollapsed}>
                                   {isCollapsed ? "Show versions" : "Hide versions"}
                                 </button>
                               )}
@@ -395,7 +445,7 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
                           <td className="student-name">
                             <div className="student-name-text">
                               <strong>v{item.version || 1}</strong>
-                              <small title={item.submission_code || ""}>{item.submission_code || "—"}</small>
+                              <small className="sv-wrap" title={item.submission_code || ""}>{item.submission_code || "—"}</small>
                             </div>
                           </td>
                           <td className="task-info">
@@ -406,28 +456,54 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
                             </div>
                           </td>
                           <td className="response-column">
-                            {item.comment
-                              ? <p className="response-text sv-wrap">{taskTitle(item.comment)}</p>
-                              : <span className="no-response">No written response</span>}
+                            {/* A uniform 3-line clamp with an explicit toggle.
+                                This was a per-row <textarea> with a fixed
+                                height and `overflow:auto`, so every row had its
+                                own internal scrollbar at a different height
+                                and short responses still reserved full box
+                                space. A clamp needs no nested scrolling. */}
+                            {item.comment ? (
+                              <>
+                                <p className={`response-text ui-clamp${expanded.has(item.id) ? " is-open" : ""}`} style={{ "--ui-clamp-lines": 3 }}>
+                                  {taskTitle(item.comment)}
+                                </p>
+                                <button
+                                  type="button"
+                                  className="ui-toggle"
+                                  onClick={() => toggleExpanded(item.id)}
+                                  aria-expanded={expanded.has(item.id)}
+                                >
+                                  {expanded.has(item.id) ? "Show less" : "Show more"}
+                                </button>
+                              </>
+                            ) : (
+                              <span className="no-response">No written response</span>
+                            )}
                             {item.assignment_status && (
                               <div className="submission-meta">Assignment: {item.assignment_status}</div>
                             )}
                             {item.revision_deadline && (
-                              <div className="submission-meta">Resubmit by {formatISTDateTime(item.revision_deadline)}</div>
+                              <div className="submission-meta">Resubmit by {formatWorkspaceDateTime(item.revision_deadline)}</div>
                             )}
                           </td>
                           <td className="files-column">
                             {item.file_count > 0 ? (
                               <div className="files-cell">
+                                {/* A muted label, not a button. This was a
+                                    full-width purple pill that read as a
+                                    primary action and competed with the real
+                                    action buttons in the last column. */}
                                 <div className="file-count">
-                                  <TechinsIcon name="folder" size={13} variant="light" ariaHidden />
-                                  <span>{item.file_count} file{item.file_count === 1 ? "" : "s"}</span>
+                                  <TechinsIcon name="folder" size={12} variant="light" ariaHidden />
+                                  <span>{pluralise(item.file_count, "file")}</span>
                                 </div>
                                 <div className="file-list">
                                   {(item.files || []).slice(0, 3).map(f => (
                                     <div key={f.id} className="file-item">
-                                      {/* Full file name in the tooltip; wraps below. */}
-                                      <span className="file-name sv-wrap" title={f.name}>{f.name}</span>
+                                      {/* Ellipsis in CSS with the full name in
+                                          the tooltip; the name itself is never
+                                          truncated in the data. */}
+                                      <span className="file-name" title={f.name}>{f.name}</span>
                                       <div className="file-actions">
                                         <button
                                           type="button"
@@ -436,18 +512,18 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
                                           title={isPreviewable(f.mime) ? `Preview ${f.name}` : `${f.name} cannot be previewed — download instead`}
                                         >
                                           <TechinsIcon name="eye" size={12} variant="light" ariaHidden />
-                                          <span className="sr-only">Preview</span>
+                                          <span className="sr-only">Preview {f.name}</span>
                                         </button>
                                         <button type="button" className="file-action-btn" onClick={() => handleDownload(f)} title={`Download ${f.name}`}>
                                           <TechinsIcon name="download" size={12} variant="light" ariaHidden />
-                                          <span className="sr-only">Download</span>
+                                          <span className="sr-only">Download {f.name}</span>
                                         </button>
                                       </div>
                                     </div>
                                   ))}
                                   {item.file_count > 3 && (
-                                    <button type="button" className="more-files" onClick={() => setPreviewFile((item.files || [])[0])}>
-                                      +{item.file_count - 3} more
+                                    <button type="button" className="ui-toggle" onClick={() => setPreviewFile((item.files || [])[0])}>
+                                      Show all {item.file_count} files
                                     </button>
                                   )}
                                 </div>
@@ -456,13 +532,42 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
                               <span className="no-files">No attachments</span>
                             )}
                           </td>
-                          <td className="timestamp-column">{formatISTDateTime(item.submitted_at)}</td>
+                          {/* One shared formatter, never truncated. The previous
+                              `formatISTDateTime` emitted
+                              "Thursday, 15 October 2026, 12:33 pm" inside a
+                              nowrap cell and was cut mid-word. */}
+                          <td className="timestamp-column">{formatWorkspaceDateTime(item.submitted_at)}</td>
+                          {/* Server-stored timing only. A pre-existing submission
+                              with no session shows "Not recorded" — never a
+                              fabricated duration. */}
+                          <td className="timing-column">
+                            {(item.task_started_at || item.duration_seconds !== null && item.duration_seconds !== undefined) ? (
+                              <div className="sv-timing">
+                                <span className="sv-timing-row"><span>Started</span><b>{formatWorkspaceDateTime(item.task_started_at)}</b></span>
+                                <span className="sv-timing-row"><span>Submitted</span><b>{formatWorkspaceDateTime(item.task_submitted_at || item.submitted_at)}</b></span>
+                                <span className="sv-timing-row"><span>Total</span><b>{formatDuration(item.duration_seconds) || "Not recorded"}</b></span>
+                              </div>
+                            ) : (
+                              <span className="no-timing">Not recorded</span>
+                            )}
+                          </td>
                           <td className="status-column">{statusPill(item)}</td>
                           <td className="actions-column">
-                            <div className="actions-buttons">
-                              <button type="button" className="view-details-btn" onClick={() => setDetailId(item.id)}>View Details</button>
-                              <button type="button" className="delete-btn" onClick={() => setDeleteTarget(item)}>Delete</button>
-                              <button type="button" className="requirement-btn" onClick={() => setRequirementTarget(item)}>Requirement</button>
+                            {/* Equal-height group, fixed order, even wrap.
+                                Requirement used to drop onto a line of its own
+                                because the column was too narrow for three
+                                word-length labels. */}
+                            <div className="ui-actions">
+                              <button type="button" className="ui-btn ui-btn--primary" onClick={() => setDetailId(item.id)}>
+                                View Details
+                              </button>
+                              <button type="button" className="ui-btn ui-btn--info" onClick={() => setRequirementTarget(item)}>
+                                Requirement
+                              </button>
+                              <button type="button" className="ui-btn ui-btn--danger" onClick={() => setDeleteTarget(item)}>
+                                <TechinsIcon name="trash" size={13} variant="light" ariaHidden />
+                                Delete
+                              </button>
                             </div>
                           </td>
                         </tr>

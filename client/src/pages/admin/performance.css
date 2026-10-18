@@ -422,3 +422,168 @@
   .perf-eval-score { text-align: left; }
   .perf-search-bar { flex-direction: column; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * CEO WORKSPACE — performance cards
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Grid items default to align-items:stretch, so opening one card's task-wise
+   table stretched every card in that row to the same height and left the
+   neighbours with a large empty gap. align-items:start sizes each card to its
+   own content; the row still lines up at the top. */
+.role-layout .performance-admin-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .role-layout .performance-admin-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Search field and Clear share one row and one control height. */
+.role-layout .perf-search-bar { align-items: center; gap: var(--ui-gap-2); }
+.role-layout .perf-search-bar .ui-input { flex: 1 1 320px; min-width: 0; height: var(--ui-control-h); }
+
+/* ── Card header: identity left, progress pinned right ─────────────────── */
+.role-layout .perf-card { min-width: 0; }
+
+.role-layout .perf-card-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--ui-gap-3);
+  min-width: 0;
+}
+
+.role-layout .perf-identity { min-width: 0; }
+.role-layout .perf-identity h3 {
+  color: var(--ceo-text);
+  font-size: 14.5px;
+  overflow-wrap: anywhere;
+}
+.role-layout .perf-identity > small {
+  display: block;
+  color: var(--ceo-text-mute);
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+/* The ID / Program / Batch line was opacity:0.75 on an already-muted colour,
+   which is what made it hard to read. */
+.role-layout .perf-identity-meta {
+  margin-top: 5px;
+  color: #93a3c2;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.role-layout .perf-identity-meta b { color: var(--ceo-text); }
+
+.role-layout .perf-progress-value {
+  color: var(--ceo-text);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Overall score / Latest review: two fixed columns ─────────────────────
+ * Previously the Latest review block was conditionally rendered, so a student
+ * with no review pulled "Overall score" across the full width and every
+ * element below it shifted. Both cells now always exist. */
+.role-layout .perf-score-block {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  align-items: start;
+  gap: var(--ui-gap-3);
+  padding: 12px 0;
+  border-top: 1px solid var(--ceo-border);
+  border-bottom: 1px solid var(--ceo-border);
+}
+.role-layout .perf-score-cell-main { min-width: 0; }
+.role-layout .perf-eval-score {
+  text-align: right;
+  min-width: 0;
+}
+.role-layout .perf-score-block small { color: #93a3c2; font-size: 11.5px; }
+.role-layout .perf-score-block strong { color: var(--ceo-text); }
+.role-layout .perf-score-block strong.muted { font-size: 13px; color: var(--ceo-text-mute); }
+.role-layout .perf-eval-score strong { color: var(--ceo-violet); }
+
+@media (max-width: 480px) {
+  .role-layout .perf-score-block { grid-template-columns: minmax(0, 1fr); }
+  .role-layout .perf-eval-score { text-align: left; }
+}
+
+/* ── Missions row: label, count and bar aligned ─────────────────────────── */
+.role-layout .perf-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-gap-2);
+  padding: 10px 0 6px;
+  color: #93a3c2;
+  font-size: 12px;
+  font-weight: 600;
+}
+.role-layout .perf-line b {
+  color: var(--ceo-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── View / Hide task-wise results: same place in every card, neutral ────── */
+.role-layout .perf-expand {
+  align-self: stretch;
+  justify-content: center;
+  margin-top: 12px;
+  width: 100%;
+}
+
+/* ── Task-wise table ────────────────────────────────────────────────────── */
+.role-layout .perf-table-wrap {
+  margin-top: 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--ceo-border);
+  border-radius: var(--ui-radius);
+}
+
+.role-layout .perf-table {
+  width: 100%;
+  min-width: 620px;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+/* Long task titles wrap inside their cell instead of pushing the columns. */
+.role-layout .perf-table td strong {
+  display: block;
+  color: var(--ceo-text);
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.role-layout .perf-table td small {
+  display: block;
+  margin-top: 3px;
+  color: var(--ceo-text-mute);
+  font-size: 10.5px;
+}
+
+.role-layout .perf-table .perf-date {
+  color: var(--ceo-text-dim);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.role-layout .perf-table .muted { color: var(--ceo-text-mute); }
+.role-layout .perf-empty {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px dashed var(--ceo-border);
+  border-radius: var(--ui-radius);
+  color: var(--ceo-text-mute);
+  font-size: 12.5px;
+  text-align: center;
+}

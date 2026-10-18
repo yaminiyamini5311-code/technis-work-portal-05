@@ -1,13 +1,32 @@
 import { useEffect, useRef, useState, Fragment } from "react";
 import axios from "axios";
+import { Link } from "react-router-dom";
 import TechinsIcon from "../../components/TechinsIcon";
 import { useScrollReveal } from "../../components/useScrollReveal";
-import { formatISTDateTime, formatISTDate } from "../../utils/dateHelper";
+import { formatISTDateTime, formatISTDate, formatDuration, formatWorkspaceDateTime } from "../../utils/dateHelper";
 import { remainingTime } from "../../utils/api";
+import useLiveElapsed from "../../hooks/useLiveElapsed";
 import "./MyTasks.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
+
+/**
+ * Live timer for one in-progress task. The value comes from the server-owned
+ * `started_at` plus the server clock offset; setInterval only repaints it.
+ */
+function LiveTimer({ session, serverNow }) {
+  const running = session?.running === true;
+  const elapsed = useLiveElapsed(session?.started_at || null, serverNow, running);
+  if (!session?.started_at) return null;
+  const seconds = running ? elapsed : (session.duration_seconds ?? elapsed);
+  return (
+    <span className="inline-timer" title={`Started ${formatWorkspaceDateTime(session.started_at)}`}>
+      <TechinsIcon name="clock" size={13} variant="light" ariaHidden />
+      {formatDuration(seconds) || "0 seconds"}
+    </span>
+  );
+}
 
 function formatDateTime(value) {
   if (!value) return "—";
@@ -63,6 +82,10 @@ export default function MyTasks() {
   const [selectedFiles, setSelectedFiles] = useState({});
   const [comments, setComments] = useState({});
   const [domainFilter, setDomainFilter] = useState("");
+  // Server clock captured with each /my response. The live timer derives its
+  // elapsed value from `started_at` + (this - client clock), so a wrong client
+  // clock can never change the displayed duration.
+  const [serverNow, setServerNow] = useState(null);
   // Submission history per task (fetched on demand, never in the list call)
   const [history, setHistory] = useState({});
   // Success popup state
@@ -94,7 +117,8 @@ export default function MyTasks() {
       setLoading(true);
       const { data } = await axios.get(`${API_URL}/api/tasks/my`, { headers: auth() });
       const next = data.tasks || [];
-      
+      if (data.server_now) setServerNow(data.server_now);
+
       // Fetch per-student submission status for each task
       const tasksWithSubmissionStatus = await Promise.all(
         next.map(async (task) => {
@@ -154,14 +178,28 @@ export default function MyTasks() {
     return () => clearInterval(id);
   }, []);
 
+  /**
+   * Start the task timer. The SERVER creates (or reuses) the session and owns
+   * `started_at`; the client only renders the value it returns. Re-clicking
+   * Start, refreshing or opening a second tab keeps the ORIGINAL start time —
+   * the endpoint is idempotent.
+   */
   const startTask = async (id) => {
+    if (busy) return;
     try {
       setBusy(id);
-      await axios.patch(`${API_URL}/api/tasks/${id}/status`, { workflow_status: "In Progress" }, { headers: auth() });
-      setMessage("Task started.");
+      setMessage("");
+      const { data } = await axios.post(`${API_URL}/api/tasks/${id}/start`, {}, { headers: auth() });
+      const session = data?.data || data || null;
+      if (session?.server_now) setServerNow(session.server_now);
+      // Show the running timer immediately, before the refetch lands.
+      if (session?.started_at) {
+        setTasks((prev) => prev.map((t) => (String(t.id) === String(id) ? { ...t, session, student_status: t.student_status || "in_progress" } : t)));
+      }
+      setMessage("Task started — the timer is running.");
       await load();
     } catch (err) {
-      setError(err.response?.data?.message || "Unable to start task.");
+      setError(err.response?.data?.error?.message || err.response?.data?.message || "Unable to start task.");
     } finally {
       setBusy(null);
     }
@@ -378,7 +416,7 @@ export default function MyTasks() {
                 <div className="task-card-top">
                   <div>
                     <span className="task-label">{task.task_code || "TASK"}</span>
-                    <h2>{task.title}</h2>
+                    <h2><Link className="task-title-link" to={`/student/tasks/${task.id}`}>{task.title}</Link></h2>
                     {task.description && <div className="task-section"><strong>Description:</strong><p style={{ whiteSpace: 'pre-wrap' }}>{task.description}</p></div>}
                     {task.expected_output && <div className="task-section"><strong>Expected Output:</strong><p style={{ whiteSpace: 'pre-wrap' }}>{task.expected_output}</p></div>}
                     {task.how_to_do && <div className="task-section"><strong>How to Do:</strong><p style={{ whiteSpace: 'pre-wrap' }}>{task.how_to_do}</p></div>}
@@ -393,10 +431,18 @@ export default function MyTasks() {
                   <div><span>End</span><strong>{task.due_date ? `${formatDate(task.due_date)}${task.due_time ? ` ${task.due_time}` : ""}` : "No deadline"}</strong></div>
                   <div><span>Assigned by</span><strong>{task.assigned_by_name || "Management"}</strong></div>
                   <div><span>Versions</span><strong>{task.latest_version || 0}</strong></div>
+                  {task.session?.started_at && (
+                    <div><span>Time on task</span><strong><LiveTimer session={task.session} serverNow={serverNow} /></strong></div>
+                  )}
                 </div>
                 <div className="task-actions">
-                  {(!hasStudentSubmission && (studentStatus === "Assigned" || task.status === "pending" || studentStatus === null)) && (beforeStart ? <div className="completed-label">Starts on {startAt ? new Date(startAt).toLocaleString() : "scheduled time"}</div> : <button className="action-progress" disabled={busy === task.id || expired} onClick={() => startTask(task.id)}>{busy === task.id ? "Updating…" : "Start Task"}</button>)}
-                  {showAwaitingReview ? <div className="completed-label">Submission received · awaiting review</div> : null}
+                  {(!hasStudentSubmission && (studentStatus === "Assigned" || task.status === "pending" || studentStatus === null)) && (beforeStart ? <div className="completed-label">Starts on {startAt ? formatWorkspaceDateTime(startAt) : "scheduled time"}</div> : <button className="action-progress" disabled={busy === task.id || expired} onClick={() => startTask(task.id)}>{busy === task.id ? "Starting…" : "Start Task"}</button>)}
+                  {showAwaitingReview ? (
+                    <div className="completed-label">
+                      <TechinsIcon name="check" size={16} variant="light" ariaHidden /> Task Submitted
+                      {task.latest_submission?.submitted_at ? ` · ${formatWorkspaceDateTime(task.latest_submission.submitted_at)}` : ""}
+                    </div>
+                  ) : null}
                   {hasStudentSubmission && (
                     <button className="action-progress" onClick={() => toggleHistory(task)} aria-expanded={!!history[task.id]}>
                       <TechinsIcon name="history" size={14} variant="light" ariaHidden />
@@ -405,6 +451,7 @@ export default function MyTasks() {
                     </button>
                   )}
                   {studentStatus === "Approved" && <div className="completed-label"><TechinsIcon name="check" size={16} variant="light" /> Task approved and recorded</div>}
+                  <Link className="action-progress" to={`/student/tasks/${task.id}`}>Open task</Link>
                 </div>
                 {hasStudentSubmission && history[task.id] && (
                   <div className="submission-history">
