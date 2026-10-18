@@ -581,22 +581,83 @@ router.get("/submissions/:submissionId", authenticateToken, authorizeRoles("admi
         { projection: { progress: 1, status: 1, revision_cycle: 1, revision_requested_at: 1, revision_deadline: 1, revision_status: 1, revision_history: 1, assigned_at: 1, created_at: 1 } }
       ),
     ]);
-    if (!task) {
-      return fail(res, 404, "TASK_NOT_FOUND", "The task for this submission no longer exists.");
-    }
+
+    const taskMissing = !task;
+    const studentMissing = !student;
 
     let batch = null;
     if (student?.batch_id) {
       batch = await db.collection("batches").findOne({ _id: toId(student.batch_id) }, { projection: { name: 1, start_date: 1, end_date: 1 } });
     }
 
-    const versions = await versionsForStudent(db, task._id, submission.student_id);
+    const taskIdForVersions = task ? String(task._id) : String(submission.task_id || "");
+    const versions = taskIdForVersions && submission.student_id
+      ? await versionsForStudent(db, taskIdForVersions, submission.student_id)
+      : [];
     const reviewerIds = versions.map(v => v.reviewer_id).filter(Boolean);
     const reviewers = reviewerIds.length
       ? await db.collection("users").find({ _id: { $in: reviewerIds.map(toId) } }, { projection: { name: 1, email: 1 } }).toArray()
       : [];
     const reviewerById = new Map(reviewers.map(r => [String(r._id), r]));
     const code = studentCode(student);
+
+    const responseTask = task ? {
+      id: String(task._id),
+      code: task.task_code || null,
+      title: task.title || null,
+      description: task.description || null,
+      instructions: task.instructions || null,
+      domain: task.domain || null,
+      program: task.program || null,
+      priority: task.priority || null,
+      status: task.status || null,
+      workflow_status: task.workflow_status || null,
+      assigned_at: assignment?.assigned_at || task.assigned_at || task.created_at || null,
+      start_date: task.start_date || null,
+      due_date: task.due_date || null,
+      feedback: task.feedback || null,
+      taskMissing: false,
+    } : {
+      id: submission.task_id ? String(submission.task_id) : null,
+      code: submission.task_code || null,
+      title: "Deleted task",
+      description: null,
+      instructions: null,
+      domain: null,
+      program: null,
+      priority: null,
+      status: null,
+      workflow_status: null,
+      assigned_at: null,
+      start_date: null,
+      due_date: null,
+      feedback: null,
+      taskMissing: true,
+    };
+
+    const responseStudent = student ? {
+      id: submission.student_id ? String(submission.student_id) : null,
+      code,
+      name: student?.name || null,
+      email: student?.email || null,
+      phone: student?.phone || null,
+      department: student?.department || null,
+      program: student?.program || null,
+      batch: batch?.name || null,
+      joined_at: student?.created_at || null,
+      studentMissing: false,
+    } : {
+      id: submission.student_id ? String(submission.student_id) : null,
+      code: null,
+      name: "Deleted student",
+      email: null,
+      phone: null,
+      department: null,
+      program: null,
+      batch: null,
+      joined_at: null,
+      studentMissing: true,
+    };
 
     ok(res, {
       submission: {
@@ -616,33 +677,8 @@ router.get("/submissions/:submissionId", authenticateToken, authorizeRoles("admi
         score: submission.score ?? null,
         max_marks: submission.max_marks ?? null,
       },
-      student: {
-        id: submission.student_id ? String(submission.student_id) : null,
-        code,
-        name: student?.name || null,
-        email: student?.email || null,
-        phone: student?.phone || null,
-        department: student?.department || null,
-        program: student?.program || null,
-        batch: batch?.name || null,
-        joined_at: student?.created_at || null,
-      },
-      task: {
-        id: String(task._id),
-        code: task.task_code || null,
-        title: task.title || null,
-        description: task.description || null,
-        instructions: task.instructions || null,
-        domain: task.domain || null,
-        program: task.program || null,
-        priority: task.priority || null,
-        status: task.status || null,
-        workflow_status: task.workflow_status || null,
-        assigned_at: assignment?.assigned_at || task.assigned_at || task.created_at || null,
-        start_date: task.start_date || null,
-        due_date: task.due_date || null,
-        feedback: task.feedback || null,
-      },
+      student: responseStudent,
+      task: responseTask,
       assignment: assignment ? {
         progress: assignment.progress ?? null,
         status: assignment.status ?? null,
@@ -659,7 +695,9 @@ router.get("/submissions/:submissionId", authenticateToken, authorizeRoles("admi
       })),
       can_approve: ["submitted", "revision_required"].includes(normalizeSubmissionStatus(submission.status)),
       can_request_revision: ["submitted", "revision_required", "approved"].includes(normalizeSubmissionStatus(submission.status)),
-      message: "Submission loaded",
+      taskMissing,
+      studentMissing,
+      message: taskMissing || studentMissing ? "Submission loaded with missing related records." : "Submission loaded",
     });
   } catch (e) {
     console.error("GET SUBMISSION DETAIL:", e);

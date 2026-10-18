@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import FixedOverlay from "./FixedOverlay";
 import FilePreview, { isPreviewable } from "./FilePreview";
 import TechinsIcon from "./TechinsIcon";
-import { formatISTDateTime } from "../utils/dateHelper";
+import { formatWorkspaceDateTime } from "../utils/dateHelper";
 import { STATUS_LABEL, apiFetch, downloadFile, formatBytes, statusClass, taskTitle } from "../utils/api";
 import "./SubmissionDetailDialog.css";
 
@@ -53,6 +53,7 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [errorMeta, setErrorMeta] = useState(null);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(null);
   const [previewFile, setPreviewFile] = useState(null);
@@ -63,17 +64,24 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
+    setErrorMeta(null);
     try {
       const res = await apiFetch(`/api/tasks/submissions/${encodeURIComponent(submissionId)}`);
       setDetail(res?.data ?? null);
     } catch (e) {
+      const permanent = [403, 404].includes(e?.status) || ["FORBIDDEN", "NOT_FOUND", "SUBMISSION_NOT_FOUND", "TASK_NOT_FOUND", "ASSIGNMENT_NOT_FOUND", "INVALID_STUDENT_ID"].includes(e?.code);
       setError(e.message || "Unable to load this submission.");
+      setErrorMeta({ status: e?.status, code: e?.code, permanent });
     } finally {
       setLoading(false);
     }
   }, [submissionId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!submissionId) return;
+    const run = async () => { await load(); };
+    run();
+  }, [load, submissionId]);
 
   function openDecision(mode) {
     setDialogMode(mode);
@@ -109,7 +117,7 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
       setNotice(
         dialogMode === "approve"
           ? (payload?.message || "Submission approved.")
-          : `${payload?.message || "Revision requested."}${deadline ? ` Resubmit by ${formatISTDateTime(deadline)}.` : ""}`,
+          : `${payload?.message || "Revision requested."}${deadline ? ` Resubmit by ${formatWorkspaceDateTime(deadline)}.` : ""}`,
       );
       closeDecision();
       // Refresh in place: the dialog and the list behind it both re-read.
@@ -138,6 +146,10 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
   const files = detail?.files || [];
   const versions = detail?.versions || [];
   const currentStatus = submission?.review_status;
+  const hasMissingRelatedRecord = Boolean(detail?.taskMissing || detail?.studentMissing);
+  const effectiveStudentName = student?.name || (detail?.studentMissing ? "Deleted student" : "Student");
+  const effectiveTaskTitle = taskTitle(task?.title) || (detail?.taskMissing ? "Deleted task" : "Task");
+  const canRetry = !(errorMeta && errorMeta.permanent);
 
   return (
     <>
@@ -154,9 +166,9 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
             {/* taskTitle() returns the stored string verbatim and the CSS sets
                 white-space: pre-wrap, so a title containing "|", "—" or "’"
                 can never be re-encoded or collapsed. */}
-            <h3 className="sdd-task-title">{taskTitle(task?.title) || "Submission"}</h3>
+            <h3 className="sdd-task-title">{effectiveTaskTitle}</h3>
             <p className="sdd-sub">
-              {student?.name || "Student"}
+              {effectiveStudentName}
               {student?.code ? ` · ${student.code}` : ""}
               {submission?.version ? ` · Version ${submission.version}` : ""}
             </p>
@@ -177,11 +189,21 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
           {!loading && error && (
             <div className="sdd-message sdd-message-error" role="alert">
               <span>{error}</span>
-              <button type="button" className="sdd-btn" onClick={load}>Retry</button>
+              {canRetry && <button type="button" className="sdd-btn" onClick={load}>Retry</button>}
             </div>
           )}
 
           {!loading && notice && <div className="sdd-message sdd-message-ok" role="status">{notice}</div>}
+
+          {!loading && detail && hasMissingRelatedRecord && (
+            <div className="sdd-message sdd-message-warning" role="status">
+              {detail.taskMissing && detail.studentMissing
+                ? "This submission still exists, but the linked task and student records were deleted. Review data is limited to the submission record itself."
+                : detail.taskMissing
+                  ? "This submission still exists, but the linked task was deleted. Review data is limited to the submission record itself."
+                  : "This submission still exists, but the linked student record was deleted. Review data is limited to the submission record itself."}
+            </div>
+          )}
 
           {!loading && !error && detail && (
             <>
@@ -194,7 +216,7 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
                   <Row label="Department">{student?.department}</Row>
                   <Row label="Program">{student?.program}</Row>
                   <Row label="Batch">{student?.batch}</Row>
-                  <Row label="Joined">{student?.joined_at ? formatISTDateTime(student.joined_at) : null}</Row>
+                  <Row label="Joined">{student?.joined_at ? formatWorkspaceDateTime(student.joined_at) : null}</Row>
                 </div>
               </Section>
 
@@ -202,10 +224,10 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
                 <div className="sdd-grid">
                   <Row label="Task ID">{task?.code}</Row>
                   <Row label="Version">v{submission?.version || 1}</Row>
-                  <Row label="Assigned">{task?.assigned_at ? formatISTDateTime(task.assigned_at) : null}</Row>
-                  <Row label="Deadline">{task?.due_date ? formatISTDateTime(task.due_date) : null}</Row>
-                  <Row label="Submitted">{submission?.submitted_at ? formatISTDateTime(submission.submitted_at) : null}</Row>
-                  <Row label="Reviewed">{submission?.reviewed_at ? formatISTDateTime(submission.reviewed_at) : null}</Row>
+                  <Row label="Assigned">{task?.assigned_at ? formatWorkspaceDateTime(task.assigned_at) : null}</Row>
+                  <Row label="Deadline">{task?.due_date ? formatWorkspaceDateTime(task.due_date) : null}</Row>
+                  <Row label="Submitted">{submission?.submitted_at ? formatWorkspaceDateTime(submission.submitted_at) : null}</Row>
+                  <Row label="Reviewed">{submission?.reviewed_at ? formatWorkspaceDateTime(submission.reviewed_at) : null}</Row>
                 </div>
                 {task?.description && <p className="sdd-prose">{taskTitle(task.description)}</p>}
                 {task?.instructions && (
@@ -230,7 +252,7 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
                 </div>
                 {detail.assignment?.revision_deadline && (
                   <p className="sdd-deadline">
-                    Resubmission window: closes {formatISTDateTime(detail.assignment.revision_deadline)}
+                    Resubmission window: closes {formatWorkspaceDateTime(detail.assignment.revision_deadline)}
                     {detail.assignment.revision_status === "open" ? " (open)" : ` (${detail.assignment.revision_status || "closed"})`}
                   </p>
                 )}
@@ -273,9 +295,9 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
                         <span className={`pill ${statusClass(v.status)}`}>{v.status_label || STATUS_LABEL[v.status] || v.status}</span>
                       </div>
                       <div className="sdd-version-meta">
-                        <span>{v.submitted_at ? formatISTDateTime(v.submitted_at) : "—"}</span>
+                        <span>{v.submitted_at ? formatWorkspaceDateTime(v.submitted_at) : "—"}</span>
                         <span>Reviewer: {v.reviewer_name || "Not reviewed yet"}</span>
-                        {v.reviewed_at && <span>Reviewed {formatISTDateTime(v.reviewed_at)}</span>}
+                        {v.reviewed_at && <span>Reviewed {formatWorkspaceDateTime(v.reviewed_at)}</span>}
                       </div>
                       {v.comment && <p className="sdd-comment">{taskTitle(v.comment)}</p>}
                       {v.review_comments && <p className="sdd-comment sdd-comment-review">{taskTitle(v.review_comments)}</p>}

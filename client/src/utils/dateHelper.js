@@ -164,13 +164,7 @@ export function formatWorkspaceDateTime(value) {
   if (value == null || value === "") return "—";
   const date = value instanceof Date ? value : new Date(value);
   if (isNaN(date)) return "—";
-
-  // en-GB gives "15 Oct 2026, 12:33"; en-US gives 12-hour AM/PM. Combine the
-  // numeric parts from en-GB with the meridiem from en-US so the output is
-  // exactly "15 Oct 2026, 12:33 PM".
-  const numeric = workspaceDateTimeFormatter.format(date);
-  const meridiem = workspaceMeridiemFormatter.format(date);
-  return `${numeric} ${meridiem}`;
+  return workspaceDateTimeFormatter.format(date);
 }
 
 /**
@@ -195,33 +189,28 @@ export function formatWorkspaceDateTimeParts(dateValue, timeValue) {
   const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
   if (isNaN(date)) return null;
   if (timeValue == null || timeValue === "") return formatWorkspaceDate(date);
-  // "HH:MM" (possibly 24-hour) → 12-hour with meridiem, same date part.
+
   const match = String(timeValue).match(/^(\d{1,2}):(\d{2})/);
   if (!match) return formatWorkspaceDate(date);
-  let hour = Number(match[1]);
-  const minute = match[2];
-  const suffix = hour >= 12 ? "PM" : "AM";
-  hour = hour % 12 || 12;
-  return `${workspaceDateFormatter.format(date)}, ${hour}:${minute} ${suffix}`;
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const dateWithTime = new Date(date.getTime());
+  dateWithTime.setHours(hour, minute, 0, 0);
+  return workspaceDateTimeFormatter.format(dateWithTime);
 }
 
-const workspaceDateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+const workspaceDateTimeFormatter = new Intl.DateTimeFormat("en-IN", {
   day: "numeric",
   month: "short",
   year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-  timeZone: "Asia/Kolkata",
-});
-
-const workspaceMeridiemFormatter = new Intl.DateTimeFormat("en-US", {
   hour: "numeric",
-  hour12: true,
+  minute: "2-digit",
+  hourCycle: "h12",
   timeZone: "Asia/Kolkata",
 });
 
-const workspaceDateFormatter = new Intl.DateTimeFormat("en-GB", {
+const workspaceDateFormatter = new Intl.DateTimeFormat("en-IN", {
   day: "numeric",
   month: "short",
   year: "numeric",

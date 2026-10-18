@@ -97,6 +97,14 @@
   /* Focus ring — the app purple, in the app's purple. */
   --ui-focus: #a78bfa;
   --ui-focus-ring: 0 0 0 3px rgba(167, 139, 250, 0.35);
+
+  /* Raised inside the workspace only.
+     CeoDark.css sets --ceo-text-mute to #6b7691, which measures 4.06:1
+     against this canvas - below the 4.5:1 WCAG AA threshold for body text.
+     It was used for secondary lines like the submission code and the
+     "1 file" label, so it is lifted here. Scoped to .role-layout, so the
+     student portal (which renders on a lighter surface) is unaffected. */
+  --ceo-text-mute: #8b9cbd;
 }
 
 .role-layout .admin-simple,
@@ -472,18 +480,18 @@
      into a full-width bar inside every card. */
   align-self: flex-start;
   margin-top: 6px;
-  padding: 2px 0;
-  border: none;
-  background: none;
-  color: var(--ui-focus);
+  padding: 3px 10px;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: 6px;
+  background: rgba(251, 191, 36, 0.08);
+  color: #fbbf24;
   font-size: 11.5px;
   font-weight: 700;
   line-height: 1.4;
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  text-decoration: none;
 }
-.role-layout .ui-toggle:hover { color: #c4b5fd; }
+.role-layout .ui-toggle:hover { color: #fcd34d; border-color: rgba(251, 191, 36, 0.65); background: rgba(251, 191, 36, 0.14); }
 .role-layout .ui-toggle:focus-visible {
   outline: 2px solid var(--ui-focus) !important;
   outline-offset: 2px !important;

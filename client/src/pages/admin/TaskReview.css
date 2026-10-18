@@ -10,7 +10,7 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-  max-width: 1200px;
+  max-width: var(--ui-page-max, 1500px);
   margin: 0 auto;
 }
 
@@ -158,14 +158,14 @@
   font-size: 11px;
   letter-spacing: 1.4px;
   text-transform: uppercase;
-  color: var(--ceo-violet, #7c6cff);
+  color: #cbd5e1;
   font-weight: 800;
 }
 
 .tm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 18px; }
 .tm-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.tm-field > span { font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--ceo-text-mute, #6b7691); font-weight: 700; }
-.tm-field > strong { font-size: 13.5px; color: var(--ceo-text, #eef2fb); font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tm-field > span { font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; color: #94a3c4; font-weight: 700; }
+.tm-field > strong { font-size: 13.5px; color: #f1f5f9; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
 .tm-field > p { margin: 0; font-size: 13.5px; color: var(--ceo-text, #eef2fb); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .tm-prose { margin: 0; font-size: 13.5px; line-height: 1.7; color: var(--ceo-text, #eef2fb); white-space: pre-wrap; overflow-wrap: anywhere; }
 
