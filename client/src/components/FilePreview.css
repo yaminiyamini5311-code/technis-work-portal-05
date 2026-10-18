@@ -5,6 +5,21 @@
   --overlay-border: rgba(124, 92, 255, 0.32);
   width: min(1600px, 95vw);
   height: 95vh;
+  /* Header, then a body that takes the rest. `min-height: 0` on the flex child
+     is what lets the body actually shrink and the stage scroll, instead of
+     the panel growing past 95vh. */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.fp-head {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
 }
 
 .fp-title {
@@ -36,29 +51,46 @@
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
+}
+
+/* Portal safety.
+ *
+ * FixedOverlay renders this panel into <body>, OUTSIDE .role-layout. That is
+ * deliberate (it is why `position: fixed` resolves against the viewport), but
+ * it also means the app's dark overrides — `.role-layout.ceo-dark
+ * .panel-head button { background: ... !important }` in admin.css — never match
+ * these buttons. They fell through to admin.css's light rule
+ * `.panel-head button { background: #FFFFFF }` and rendered as white chips on
+ * a dark panel. These styles are therefore scoped to .fp-panel itself and do
+ * not rely on any ancestor. */
+.fp-panel .panel-head button,
+.fp-panel button.fp-btn {
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  background: rgba(124, 108, 255, 0.16);
+  color: #eef2fb;
 }
 
 .fp-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 8px 14px;
-  border-radius: 9px;
-  border: 1px solid rgba(124, 92, 255, 0.45);
-  background: rgba(124, 92, 255, 0.14);
-  color: #eef2fb;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 8px;
   font-size: 12.5px;
   font-weight: 700;
   letter-spacing: 0.2px;
   cursor: pointer;
+  white-space: nowrap;
   transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
 }
 
 .fp-btn:hover:not(:disabled) {
-  background: rgba(124, 92, 255, 0.26);
-  border-color: rgba(124, 92, 255, 0.7);
+  background: rgba(124, 108, 255, 0.28);
+  border-color: rgba(167, 139, 250, 0.7);
 }
 
 .fp-btn:active:not(:disabled) { transform: translateY(1px); }
@@ -66,22 +98,37 @@
 .fp-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .fp-btn:focus-visible {
-  outline: 2px solid #8b5cf6;
+  outline: 2px solid #a78bfa;
   outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.35);
 }
 
-.fp-btn-primary {
-  background: linear-gradient(135deg, #7c5cff, #6d28d9);
-  border-color: transparent;
-  align-self: flex-start;
+.fp-btn-close,
+.fp-panel .fp-btn-close {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #cbd5e1;
+}
+.fp-panel .fp-btn-close:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.32);
+  color: #eef2fb;
 }
 
-.fp-btn-close { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.18); }
-
-.fp-body { padding: 14px 16px 16px; }
+/* Body fills the panel below the header and scrolls internally only. */
+.fp-body {
+  padding: 14px 16px 16px;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 
 .fp-stage {
   width: 100%;
+  /* Takes whatever height is left after the header and the zoom bar. */
+  flex: 1 1 auto;
   min-height: 0;
   display: flex;
   justify-content: center;
@@ -92,8 +139,10 @@
 
 .fp-pdf {
   width: 100%;
+  /* The stage already bounds the height; a min-height here would push the
+     iframe taller than the panel on a short viewport. */
   height: 100%;
-  min-height: 60vh;
+  min-height: 0;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
   background: #1a1a1a;
@@ -159,41 +208,52 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Loading, error and empty states are centred in the preview area and fill it,
+   so none of them can read as an empty panel with a stuck spinner. */
 .fp-message {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 18px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+  margin: auto;
+  padding: 28px 24px;
+  max-width: 520px;
   border-radius: 12px;
-  background: rgba(124, 92, 255, 0.08);
-  border: 1px solid rgba(124, 92, 255, 0.28);
+  background: rgba(124, 108, 255, 0.08);
+  border: 1px solid rgba(124, 108, 255, 0.28);
   color: #d6ddf0;
   font-size: 13.5px;
   line-height: 1.6;
 }
 
 .fp-message-error {
-  background: rgba(255, 77, 109, 0.1);
-  border-color: rgba(255, 77, 109, 0.35);
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.4);
   color: #ffd9e2;
 }
 
 .fp-loading {
+  /* `margin: auto` centres it in the flex body; `flex: 1` gives it real
+     height so the spinner is never a sliver against the panel edge. */
+  flex: 1 1 auto;
+  margin: auto;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
+  gap: 14px;
   color: #b9c4dd;
   font-size: 13px;
-  padding: 12px 2px;
 }
 
 .fp-spinner {
-  width: 16px;
-  height: 16px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  border: 2px solid rgba(124, 92, 255, 0.3);
-  border-top-color: #8b5cf6;
+  border: 2px solid rgba(124, 108, 255, 0.3);
+  border-top-color: #a78bfa;
   animation: fp-spin 0.8s linear infinite;
   flex-shrink: 0;
 }
@@ -203,8 +263,10 @@
 @media (max-width: 600px) {
   .fp-panel { width: 100vw; height: 96vh; }
   .fp-title h3 { max-width: 100%; font-size: 14px; }
+  /* Stack the header: name + meta on one row, actions full-width below. */
+  .fp-head { flex-wrap: wrap; align-items: flex-start; }
   .fp-actions { width: 100%; justify-content: stretch; }
   .fp-actions .fp-btn { flex: 1; justify-content: center; }
-  .fp-pdf { min-height: 52vh; }
-  .fp-image, .fp-text { max-height: 62vh; }
+  .fp-pdf { min-height: 0; }
+  .fp-image, .fp-text { max-height: none; }
 }

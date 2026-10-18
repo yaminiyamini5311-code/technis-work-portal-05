@@ -28,6 +28,17 @@ const TEXT_MIME = /^text\/plain$/i;
 /** Open parameters for the browser's native PDF viewer. */
 const PDF_PARAMS = "#toolbar=1&navpanes=0&view=FitH";
 
+/**
+ * Hard ceiling on the byte fetch.
+ *
+ * The panel used to be able to sit on "Loading preview…" indefinitely: nothing
+ * raced the request, so a hung socket left `loading` true forever with no way
+ * out except closing the dialog. This bounds the wait and reports it as the
+ * error it is. It is generous enough that a slow Drive or GridFS read on a
+ * large PDF is not cut off.
+ */
+const LOAD_TIMEOUT_MS = 25000;
+
 function isPreviewable(mime = "") {
   const m = String(mime).toLowerCase();
   return IMAGE_MIME.test(m) || m === "application/pdf" || TEXT_MIME.test(m);
@@ -72,23 +83,35 @@ export default function FilePreview({ file, onClose }) {
   useEffect(() => {
     if (!file) return undefined;
     let cancelled = false;
+    let timer = null;
     setUrl(null);
     setError("");
     setLoading(true);
     setZoom(1);
     (async () => {
       try {
-        const objectUrl = await fetchFileObjectUrl(file.preview_url || file.download_url);
+        // Race the fetch against a timer so a hung socket cannot pin the panel
+        // on "Loading preview…" with no way to recover.
+        const objectUrl = await Promise.race([
+          fetchFileObjectUrl(file.preview_url || file.download_url),
+          new Promise((_, reject) => {
+            timer = setTimeout(
+              () => reject(new Error("Timed out while loading this file. Download it instead.")),
+              LOAD_TIMEOUT_MS,
+            );
+          }),
+        ]);
         if (cancelled) { URL.revokeObjectURL(objectUrl); return; }
         objectUrlRef.current = objectUrl;
         setUrl(objectUrl);
       } catch (e) {
         if (!cancelled) setError(e.message || "Unable to preview this file.");
       } finally {
+        if (timer) clearTimeout(timer);
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current); };
+    return () => { cancelled = true; if (timer) clearTimeout(timer); if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current); };
   }, [file]);
 
   async function handleDownload() {
@@ -112,7 +135,9 @@ export default function FilePreview({ file, onClose }) {
       panelClassName="fixed-overlay-panel fp-panel"
       zIndex={2000}
     >
-      <div className="panel-head">
+      {/* One row on desktop: filename + "type · size" on the left, Download
+          and Close on the right. Stacks below 600px. */}
+      <div className="panel-head fp-head">
         <div className="fp-title">
           <span className="section-kicker">FILE PREVIEW</span>
           <h3 title={name}>{name}</h3>
@@ -122,7 +147,7 @@ export default function FilePreview({ file, onClose }) {
           </small>
         </div>
         <div className="fp-actions">
-          <button type="button" className="fp-btn" onClick={handleDownload} disabled={downloading}>
+          <button type="button" className="fp-btn fp-btn-download" onClick={handleDownload} disabled={downloading}>
             <TechinsIcon name="download" size={14} variant="light" ariaHidden />
             {downloading ? "Downloading…" : "Download"}
           </button>
@@ -131,14 +156,25 @@ export default function FilePreview({ file, onClose }) {
       </div>
 
       <div className="panel-body fp-body">
+        {/* Centred in the preview area. Previously this was a 12px-tall
+            left-aligned strip with no min-height, so in a ~700px-tall body it
+            read as an empty panel with a spinner stuck to the left edge. */}
         {loading && (
           <div className="fp-loading" role="status">
             <span className="fp-spinner" aria-hidden="true" />
-            Loading preview…
+            <span>Loading preview…</span>
           </div>
         )}
 
-        {!loading && error && <div className="fp-message fp-message-error" role="alert"><span>{error}</span></div>}
+        {!loading && error && (
+          <div className="fp-message fp-message-error" role="alert">
+            <span>{error}</span>
+            <button type="button" className="fp-btn fp-btn-download" onClick={handleDownload} disabled={downloading}>
+              <TechinsIcon name="download" size={14} variant="light" ariaHidden />
+              {downloading ? "Downloading…" : "Download instead"}
+            </button>
+          </div>
+        )}
 
         {!loading && !error && !supported && (
           <div className="fp-message">
@@ -147,7 +183,7 @@ export default function FilePreview({ file, onClose }) {
               {file?.mime || "This file"} cannot be shown safely in the browser.
               Download it to open it in its own application.
             </span>
-            <button type="button" className="fp-btn fp-btn-primary" onClick={handleDownload} disabled={downloading}>
+            <button type="button" className="fp-btn fp-btn-download" onClick={handleDownload} disabled={downloading}>
               <TechinsIcon name="download" size={14} variant="light" ariaHidden />
               {downloading ? "Downloading…" : "Download file"}
             </button>
