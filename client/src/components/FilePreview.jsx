@@ -73,8 +73,9 @@ export default function FilePreview({ file, onClose }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(100); // Store as percentage for clearer UI
   const objectUrlRef = useRef(null);
+  const iframeRef = useRef(null);
 
   const name = file?.name || "File";
   const kind = previewKind(file?.mime);
@@ -87,7 +88,7 @@ export default function FilePreview({ file, onClose }) {
     setUrl(null);
     setError("");
     setLoading(true);
-    setZoom(1);
+    setZoom(100); // Reset zoom on file change
     (async () => {
       try {
         // Race the fetch against a timer so a hung socket cannot pin the panel
@@ -126,6 +127,10 @@ export default function FilePreview({ file, onClose }) {
       setDownloading(false);
     }
   }
+
+  const handleZoomIn = () => setZoom(z => Math.min(300, z + 25));
+  const handleZoomOut = () => setZoom(z => Math.max(50, z - 25));
+  const handleZoomReset = () => setZoom(100);
 
   return (
     <FixedOverlay
@@ -196,10 +201,10 @@ export default function FilePreview({ file, onClose }) {
                 native PDF toolbar usable at every step. */}
             {kind === "pdf" && (
               <div className="fp-zoom" role="group" aria-label="Zoom">
-                <button type="button" onClick={() => setZoom(z => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))} aria-label="Zoom out">−</button>
-                <span aria-live="polite">{Math.round(zoom * 100)}%</span>
-                <button type="button" onClick={() => setZoom(z => Math.min(3, Math.round((z + 0.25) * 100) / 100))} aria-label="Zoom in">+</button>
-                <button type="button" onClick={() => setZoom(1)} disabled={zoom === 1}>Reset</button>
+                <button type="button" onClick={handleZoomOut} aria-label="Zoom out" disabled={zoom <= 50}>−</button>
+                <span aria-live="polite">{zoom}%</span>
+                <button type="button" onClick={handleZoomIn} aria-label="Zoom in" disabled={zoom >= 300}>+</button>
+                <button type="button" onClick={handleZoomReset} disabled={zoom === 100}>Reset</button>
               </div>
             )}
             <div className="fp-stage">
@@ -208,15 +213,21 @@ export default function FilePreview({ file, onClose }) {
                   className="fp-image"
                   src={url}
                   alt={name}
-                  style={zoom !== 1 ? { width: `${zoom * 100}%`, maxWidth: "none" } : undefined}
+                  style={zoom !== 100 ? { width: `${zoom}%`, maxWidth: "none" } : undefined}
                 />
               )}
               {kind === "pdf" && (
                 <iframe
+                  ref={iframeRef}
                   className="fp-pdf"
                   src={`${url}${PDF_PARAMS}`}
                   title={`Preview of ${name}`}
-                  style={zoom !== 1 ? { width: `${100 / zoom}%`, height: `${100 / zoom}%`, transform: `scale(${zoom})`, transformOrigin: 'top left' } : undefined}
+                  style={zoom !== 100 ? { 
+                    width: `${10000 / zoom}%`, 
+                    height: `${10000 / zoom}%`, 
+                    transform: `scale(${zoom / 100})`, 
+                    transformOrigin: 'top left' 
+                  } : undefined}
                 />
               )}
               {kind === "text" && <TextPreview url={url} />}

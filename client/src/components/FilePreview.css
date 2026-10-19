@@ -1,16 +1,24 @@
-/* File preview panel — near full-screen, internal scroll, no sideways overflow. */
+/* File preview panel — true full-screen with minimal margin, internal scroll, no sideways overflow. */
 
 .fp-panel {
   --overlay-surface: #0b1220;
   --overlay-border: rgba(124, 92, 255, 0.32);
-  width: min(1600px, 95vw);
-  max-height: min(95vh, calc(100dvh - 2rem));
+  /* Near full viewport with only 0.5rem margin on each side for breathing room */
+  width: calc(100vw - 1rem);
+  max-width: 1920px;
+  height: calc(100dvh - 1rem);
+  max-height: calc(100vh - 1rem); /* Fallback for older browsers */
   /* Header, then a body that takes the rest. `min-height: 0` on the flex child
      is what lets the body actually shrink and the stage scroll, instead of
      the panel growing past the viewport. */
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* Mobile safe area support */
+  padding-left: max(0px, env(safe-area-inset-left));
+  padding-right: max(0px, env(safe-area-inset-right));
+  padding-top: max(0px, env(safe-area-inset-top));
+  padding-bottom: max(0px, env(safe-area-inset-bottom));
 }
 
 .fp-head {
@@ -125,7 +133,8 @@
 /* Body fills the panel below the header and scrolls internally only. */
 .fp-body {
   padding: 14px 16px 16px;
-  flex: 1 1 auto;
+  /* flex: 1 ensures it takes all remaining height after header */
+  flex: 1 1 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -134,8 +143,8 @@
 
 .fp-stage {
   width: 100%;
-  /* Takes whatever height is left after the header and the zoom bar. */
-  flex: 1 1 auto;
+  /* Takes ALL available height - flex: 1 with min-height: 0 is crucial */
+  flex: 1 1 0;
   min-height: 0;
   display: flex;
   justify-content: center;
@@ -146,10 +155,9 @@
 
 .fp-pdf {
   width: 100%;
-  /* The stage already bounds the height; a min-height here would push the
-     iframe taller than the panel on a short viewport. */
+  /* Fill all available height in the stage */
   height: 100%;
-  min-height: 0;
+  min-height: 500px; /* Ensure minimum readable height */
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
   background: #1a1a1a;
@@ -269,12 +277,17 @@
 @keyframes fp-spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 600px) {
-  .fp-panel { width: 100vw; height: 96vh; }
+  .fp-panel { 
+    width: 100vw; 
+    height: 100dvh;
+    height: 100vh; /* Fallback */
+    border-radius: 0; /* Full screen on mobile */
+  }
   .fp-title h3 { max-width: 100%; font-size: 14px; }
   /* Stack the header: name + meta on one row, actions full-width below. */
   .fp-head { flex-wrap: wrap; align-items: flex-start; }
   .fp-actions { width: 100%; justify-content: stretch; }
   .fp-actions .fp-btn { flex: 1; justify-content: center; }
-  .fp-pdf { min-height: 0; }
+  .fp-pdf { min-height: 400px; }
   .fp-image, .fp-text { max-height: none; }
 }
