@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import TechinsIcon from "../../components/TechinsIcon";
+import FixedOverlay from "../../components/FixedOverlay";
 import useModalBehavior from "../../components/useModalBehavior";
 import FilePreview from "../../components/FilePreview";
 import { formatISTDateShort, formatWorkspaceDateTime } from "../../utils/dateHelper";
@@ -196,7 +197,6 @@ function SubmissionViewer({ taskId, studentId, onClose, onChanged }) {
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [previewFile, setPreviewFile] = useState(null);
   const [fileError, setFileError] = useState("");
-  const dialogRef = useModalBehavior(true, onClose);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -246,12 +246,18 @@ function SubmissionViewer({ taskId, studentId, onClose, onChanged }) {
   };
 
   return (
-    <div className="tm-dialog-backdrop" ref={dialogRef} onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="tm-dialog" style={{ width: "min(1120px, 100%)" }} role="dialog" aria-modal="true" aria-labelledby="tm-viewer-title">
+    <>
+      <FixedOverlay
+        open={true}
+        onClose={onClose}
+        label="Submission review"
+        panelClassName="fixed-overlay-panel tm-viewer-panel"
+        zIndex={1000}
+      >
         <div className="panel-head" style={{ marginBottom: 14 }}>
           <div style={{ minWidth: 0 }}>
             <span className="section-kicker">SUBMISSION REVIEW</span>
-            <h3 id="tm-viewer-title" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+            <h3 style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
               {student?.student_name || "Student"}
             </h3>
             <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "#9aa6c2" }}>
@@ -268,203 +274,205 @@ function SubmissionViewer({ taskId, studentId, onClose, onChanged }) {
           </div>
         </div>
 
-        {notice && <div className="tm-notice" role="status" style={{ marginBottom: 12 }}>{notice}</div>}
-        {fileError && <div style={{ marginBottom: 12 }}><ErrorState message={fileError} onRetry={() => setFileError("")} /></div>}
-        {loading && <SkeletonRows count={4} />}
-        {!loading && error && <ErrorState message={error} onRetry={load} busy={loading} />}
+        <div className="panel-body" style={{ padding: "18px 20px" }}>
+          {notice && <div className="tm-notice" role="status" style={{ marginBottom: 12 }}>{notice}</div>}
+          {fileError && <div style={{ marginBottom: 12 }}><ErrorState message={fileError} onRetry={() => setFileError("")} /></div>}
+          {loading && <SkeletonRows count={4} />}
+          {!loading && error && <ErrorState message={error} onRetry={load} busy={loading} />}
 
-        {!loading && !error && detail && (
-          <div className="tm-viewer">
-            <div className="tm-viewer-grid">
-              {/* LEFT: what the student handed in */}
-              <div>
-                <div className="tm-section">
-                  <h4>Latest submission</h4>
-                  {!latest ? (
-                    <div className="tm-empty">
-                      <strong>Nothing submitted yet</strong>
-                      <p>This student has not handed in any work for this task.</p>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="tm-grid" style={{ marginBottom: 12 }}>
-                        <div className="tm-field"><span>Version</span><strong>v{latest.version}</strong></div>
-                        <div className="tm-field"><span>Submission code</span><strong>{latest.submission_code || "—"}</strong></div>
-                        <div className="tm-field"><span>Submitted at</span><strong>{formatWorkspaceDateTime(latest.submitted_at)}</strong></div>
-                        <div className="tm-field"><span>Review status</span><strong>{latest.status_label || STATUS_LABEL[latest.status]}</strong></div>
-                      </div>
-
-                      <span className="tm-comment-label">Submission comment</span>
-                      <p className="tm-comment">{latest.comment || "No submission comment was provided."}</p>
-
-                      <div style={{ marginTop: 14 }}>
-                        <span className="tm-comment-label">Files ({latest.files.length})</span>
-                        {latest.files.length === 0 && <p className="tm-hint">No files were attached to this version.</p>}
-                        {latest.files.map((f) => (
-                          <div className="tm-file" key={f.id}>
-                            <TechinsIcon name="folder" size={14} variant="light" ariaHidden />
-                            <span className="tm-file-name">{f.name}</span>
-                            {f.size ? <span className="tm-file-size">{formatBytes(f.size)}</span> : null}
-                            <span style={{ display: "flex", gap: 6 }}>
-                              {PREVIEWABLE(f.mime) && (
-                                <button type="button" className="tm-icon-btn" onClick={() => setPreviewFile(f)}>
-                                  <TechinsIcon name="eye" size={13} variant="light" ariaHidden /> Preview
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                className="tm-icon-btn"
-                                onClick={() => downloadFile(f).catch((e) => setFileError(e.message))}
-                              >
-                                <TechinsIcon name="download" size={13} variant="light" ariaHidden /> Download
-                              </button>
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-
-                      {latest.review_comments && (
-                        <div style={{ marginTop: 14 }}>
-                          <span className="tm-comment-label">Reviewer feedback on this version</span>
-                          <p className="tm-comment tm-feedback">{latest.review_comments}</p>
-                          <p className="tm-hint">
-                            {latest.reviewer_name || "Reviewer"} · {formatWorkspaceDateTime(latest.reviewed_at)}
-                          </p>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                {/* Version history: every version is kept, newest first. */}
-                {detail.versions.length > 1 && (
+          {!loading && !error && detail && (
+            <div className="tm-viewer">
+              <div className="tm-viewer-grid">
+                {/* LEFT: what the student handed in */}
+                <div>
                   <div className="tm-section">
-                    <h4>Version history ({detail.versions.length})</h4>
-                    <ul className="tm-timeline">
-                      {detail.versions.map((v) => (
-                        <li key={v.id}>
-                          <strong>v{v.version} · {v.status_label || STATUS_LABEL[v.status]}</strong>
-                          <small>
-                            {formatWorkspaceDateTime(v.submitted_at)}
-                            {v.submission_code ? ` · ${v.submission_code}` : ""}
-                            {(v.files || []).length ? ` · ${v.files.length} file${v.files.length === 1 ? "" : "s"}` : " · no files"}
-                          </small>
-                          {v.comment && <p className="tm-comment" style={{ marginTop: 8 }}>{v.comment}</p>}
-                          {(v.files || []).length > 0 && (
-                            <div style={{ marginTop: 8 }}>
-                              {v.files.map((f) => (
-                                <div className="tm-file" key={f.id} style={{ marginBottom: 6 }}>
-                                  <span className="tm-file-name">{f.name}</span>
-                                  {PREVIEWABLE(f.mime) && (
-                                    <button type="button" className="tm-icon-btn" onClick={() => setPreviewFile(f)}>Preview</button>
-                                  )}
-                                  <button
-                                    type="button"
-                                    className="tm-icon-btn"
-                                    onClick={() => downloadFile(f).catch((e) => setFileError(e.message))}
-                                  >Download</button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
+                    <h4>Latest submission</h4>
+                    {!latest ? (
+                      <div className="tm-empty">
+                        <strong>Nothing submitted yet</strong>
+                        <p>This student has not handed in any work for this task.</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="tm-grid" style={{ marginBottom: 12 }}>
+                          <div className="tm-field"><span>Version</span><strong>v{latest.version}</strong></div>
+                          <div className="tm-field"><span>Submission code</span><strong>{latest.submission_code || "—"}</strong></div>
+                          <div className="tm-field"><span>Submitted at</span><strong>{formatWorkspaceDateTime(latest.submitted_at)}</strong></div>
+                          <div className="tm-field"><span>Review status</span><strong>{latest.status_label || STATUS_LABEL[latest.status]}</strong></div>
+                        </div>
 
-              {/* RIGHT: assignment state + revision cycles + actions */}
-              <div>
-                <div className="tm-section">
-                  <h4>Assignment</h4>
-                  <div className="tm-grid">
-                    <div className="tm-field"><span>Assigned at</span><strong>{formatWorkspaceDateTime(assignment?.assigned_at)}</strong></div>
-                    <div className="tm-field"><span>Last activity</span><strong>{formatWorkspaceDateTime(assignment?.submitted_at)}</strong></div>
-                    <div className="tm-field"><span>Versions submitted</span><strong>{detail.versions.length}</strong></div>
-                    <div className="tm-field"><span>Revision cycles</span><strong>{assignment?.revision_cycle ?? 0}</strong></div>
+                        <span className="tm-comment-label">Submission comment</span>
+                        <p className="tm-comment">{latest.comment || "No submission comment was provided."}</p>
+
+                        <div style={{ marginTop: 14 }}>
+                          <span className="tm-comment-label">Files ({latest.files.length})</span>
+                          {latest.files.length === 0 && <p className="tm-hint">No files were attached to this version.</p>}
+                          {latest.files.map((f) => (
+                            <div className="tm-file" key={f.id}>
+                              <TechinsIcon name="folder" size={14} variant="light" ariaHidden />
+                              <span className="tm-file-name">{f.name}</span>
+                              {f.size ? <span className="tm-file-size">{formatBytes(f.size)}</span> : null}
+                              <span style={{ display: "flex", gap: 6 }}>
+                                {PREVIEWABLE(f.mime) && (
+                                  <button type="button" className="tm-icon-btn" onClick={() => setPreviewFile(f)}>
+                                    <TechinsIcon name="eye" size={13} variant="light" ariaHidden /> Preview
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  className="tm-icon-btn"
+                                  onClick={() => downloadFile(f).catch((e) => setFileError(e.message))}
+                                >
+                                  <TechinsIcon name="download" size={13} variant="light" ariaHidden /> Download
+                                </button>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {latest.review_comments && (
+                          <div style={{ marginTop: 14 }}>
+                            <span className="tm-comment-label">Reviewer feedback on this version</span>
+                            <p className="tm-comment tm-feedback">{latest.review_comments}</p>
+                            <p className="tm-hint">
+                              {latest.reviewer_name || "Reviewer"} · {formatWorkspaceDateTime(latest.reviewed_at)}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
+
+                  {/* Version history: every version is kept, newest first. */}
+                  {detail.versions.length > 1 && (
+                    <div className="tm-section">
+                      <h4>Version history ({detail.versions.length})</h4>
+                      <ul className="tm-timeline">
+                        {detail.versions.map((v) => (
+                          <li key={v.id}>
+                            <strong>v{v.version} · {v.status_label || STATUS_LABEL[v.status]}</strong>
+                            <small>
+                              {formatWorkspaceDateTime(v.submitted_at)}
+                              {v.submission_code ? ` · ${v.submission_code}` : ""}
+                              {(v.files || []).length ? ` · ${v.files.length} file${v.files.length === 1 ? "" : "s"}` : " · no files"}
+                            </small>
+                            {v.comment && <p className="tm-comment" style={{ marginTop: 8 }}>{v.comment}</p>}
+                            {(v.files || []).length > 0 && (
+                              <div style={{ marginTop: 8 }}>
+                                {v.files.map((f) => (
+                                  <div className="tm-file" key={f.id} style={{ marginBottom: 6 }}>
+                                    <span className="tm-file-name">{f.name}</span>
+                                    {PREVIEWABLE(f.mime) && (
+                                      <button type="button" className="tm-icon-btn" onClick={() => setPreviewFile(f)}>Preview</button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      className="tm-icon-btn"
+                                      onClick={() => downloadFile(f).catch((e) => setFileError(e.message))}
+                                    >Download</button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
 
-                {(assignment?.status === "revision_required" || assignment?.status === "resubmission_expired") && (
-                  <div className={`tm-deadline ${assignment?.status === "resubmission_expired" ? "tm-deadline-closed" : ""}`}>
-                    {assignment?.status === "resubmission_expired"
-                      ? <span><strong>Resubmission window expired.</strong> The 24-hour window closed on {formatWorkspaceDateTime(assignment.revision_deadline)}. A new revision request will open a fresh 24-hour cycle.</span>
-                      : (
-                        <>
-                          <span><strong>Resubmission window open.</strong> Deadline {formatWorkspaceDateTime(assignment.revision_deadline)}</span>
-                          {remainingTime(assignment.revision_deadline) && (
-                            <span className="tm-countdown">{remainingTime(assignment.revision_deadline).label}</span>
-                          )}
-                        </>
-                      )}
+                {/* RIGHT: assignment state + revision cycles + actions */}
+                <div>
+                  <div className="tm-section">
+                    <h4>Assignment</h4>
+                    <div className="tm-grid">
+                      <div className="tm-field"><span>Assigned at</span><strong>{formatWorkspaceDateTime(assignment?.assigned_at)}</strong></div>
+                      <div className="tm-field"><span>Last activity</span><strong>{formatWorkspaceDateTime(assignment?.submitted_at)}</strong></div>
+                      <div className="tm-field"><span>Versions submitted</span><strong>{detail.versions.length}</strong></div>
+                      <div className="tm-field"><span>Revision cycles</span><strong>{assignment?.revision_cycle ?? 0}</strong></div>
+                    </div>
                   </div>
-                )}
 
-                {assignment?.revision_history?.length > 0 && (
-                  <div className="tm-section" style={{ marginTop: 14 }}>
-                    <h4>Revision history</h4>
-                    <ul className="tm-timeline">
-                      {[...assignment.revision_history].reverse().map((h, i) => (
-                        <li key={`${h.cycle}-${i}`}>
-                          <strong>Cycle {h.cycle} · {h.status}</strong>
-                          <small>
-                            {/* The stored field is camelCase (requestedAt); the
-                                snake_case alias is accepted so rows written by
-                                any future writer still render. */}
-                            Requested {formatWorkspaceDateTime(h.requestedAt || h.requested_at)} · deadline {formatWorkspaceDateTime(h.deadline)}
-                            {h.resubmitted_at ? ` · resubmitted ${formatWorkspaceDateTime(h.resubmitted_at)}` : ""}
-                            {h.expired_at ? ` · expired ${formatWorkspaceDateTime(h.expired_at)}` : ""}
-                          </small>
-                          {h.feedback && <p className="tm-comment tm-feedback" style={{ marginTop: 8 }}>{h.feedback}</p>}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                <div className="tm-section" style={{ marginTop: 14 }}>
-                  <h4>Actions</h4>
-                  {latest ? (
-                    <>
-                      <p className="tm-hint" style={{ marginTop: 0, marginBottom: 12 }}>
-                        These actions affect this student's submission only. They never change another student's state.
-                      </p>
-                      <div className="tm-row-actions" style={{ justifyContent: "flex-start" }}>
-                        <button
-                          type="button"
-                          className="tm-btn tm-btn-approve"
-                          disabled={busy !== null || status === "approved"}
-                          onClick={() => setConfirmApprove(true)}
-                          title={status === "approved" ? "This submission is already approved." : "Approve this student's submission"}
-                        >
-                          {busy === "approve" ? "Approving…" : "Approve"}
-                        </button>
-                        <button
-                          type="button"
-                          className="tm-btn tm-btn-revise"
-                          disabled={busy !== null || status === "approved" || status === "revision_required"}
-                          onClick={() => setRevisionFor(student)}
-                        >
-                          {busy === "revision" ? "Sending…" : "Request revision"}
-                        </button>
-                      </div>
-                      {status === "revision_required" && (
-                        <p className="tm-hint">A revision is already open for this student. Wait for their resubmission or let the window expire.</p>
-                      )}
-                      {status === "resubmission_expired" && (
-                        <p className="tm-hint">The window expired. Requesting a revision again opens a NEW 24-hour cycle.</p>
-                      )}
-                    </>
-                  ) : (
-                    <p className="tm-hint" style={{ marginTop: 0 }}>Nothing to review until this student submits.</p>
+                  {(assignment?.status === "revision_required" || assignment?.status === "resubmission_expired") && (
+                    <div className={`tm-deadline ${assignment?.status === "resubmission_expired" ? "tm-deadline-closed" : ""}`}>
+                      {assignment?.status === "resubmission_expired"
+                        ? <span><strong>Resubmission window expired.</strong> The 24-hour window closed on {formatWorkspaceDateTime(assignment.revision_deadline)}. A new revision request will open a fresh 24-hour cycle.</span>
+                        : (
+                          <>
+                            <span><strong>Resubmission window open.</strong> Deadline {formatWorkspaceDateTime(assignment.revision_deadline)}</span>
+                            {remainingTime(assignment.revision_deadline) && (
+                              <span className="tm-countdown">{remainingTime(assignment.revision_deadline).label}</span>
+                            )}
+                          </>
+                        )}
+                    </div>
                   )}
+
+                  {assignment?.revision_history?.length > 0 && (
+                    <div className="tm-section" style={{ marginTop: 14 }}>
+                      <h4>Revision history</h4>
+                      <ul className="tm-timeline">
+                        {[...assignment.revision_history].reverse().map((h, i) => (
+                          <li key={`${h.cycle}-${i}`}>
+                            <strong>Cycle {h.cycle} · {h.status}</strong>
+                            <small>
+                              {/* The stored field is camelCase (requestedAt); the
+                                  snake_case alias is accepted so rows written by
+                                  any future writer still render. */}
+                              Requested {formatWorkspaceDateTime(h.requestedAt || h.requested_at)} · deadline {formatWorkspaceDateTime(h.deadline)}
+                              {h.resubmitted_at ? ` · resubmitted ${formatWorkspaceDateTime(h.resubmitted_at)}` : ""}
+                              {h.expired_at ? ` · expired ${formatWorkspaceDateTime(h.expired_at)}` : ""}
+                            </small>
+                            {h.feedback && <p className="tm-comment tm-feedback" style={{ marginTop: 8 }}>{h.feedback}</p>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="tm-section" style={{ marginTop: 14 }}>
+                    <h4>Actions</h4>
+                    {latest ? (
+                      <>
+                        <p className="tm-hint" style={{ marginTop: 0, marginBottom: 12 }}>
+                          These actions affect this student's submission only. They never change another student's state.
+                        </p>
+                        <div className="tm-row-actions" style={{ justifyContent: "flex-start" }}>
+                          <button
+                            type="button"
+                            className="tm-btn tm-btn-approve"
+                            disabled={busy !== null || status === "approved"}
+                            onClick={() => setConfirmApprove(true)}
+                            title={status === "approved" ? "This submission is already approved." : "Approve this student's submission"}
+                          >
+                            {busy === "approve" ? "Approving…" : "Approve"}
+                          </button>
+                          <button
+                            type="button"
+                            className="tm-btn tm-btn-revise"
+                            disabled={busy !== null || status === "approved" || status === "revision_required"}
+                            onClick={() => setRevisionFor(student)}
+                          >
+                            {busy === "revision" ? "Sending…" : "Request revision"}
+                          </button>
+                        </div>
+                        {status === "revision_required" && (
+                          <p className="tm-hint">A revision is already open for this student. Wait for their resubmission or let the window expire.</p>
+                        )}
+                        {status === "resubmission_expired" && (
+                          <p className="tm-hint">The window expired. Requesting a revision again opens a NEW 24-hour cycle.</p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="tm-hint" style={{ marginTop: 0 }}>Nothing to review until this student submits.</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </FixedOverlay>
 
       {revisionFor && (
         <RevisionDialog
@@ -483,7 +491,7 @@ function SubmissionViewer({ taskId, studentId, onClose, onChanged }) {
         />
       )}
       {previewFile && <FilePreview file={previewFile} onClose={() => setPreviewFile(null)} />}
-    </div>
+    </>
   );
 }
 
@@ -492,7 +500,6 @@ function AssignmentDetail({ taskId, studentId, onClose, onRemind, reminding }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const dialogRef = useModalBehavior(true, onClose);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -513,19 +520,25 @@ function AssignmentDetail({ taskId, studentId, onClose, onRemind, reminding }) {
   const remaining = a ? remainingTime(detail.task?.due_at) : null;
 
   return (
-    <div className="tm-dialog-backdrop" ref={dialogRef} onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="tm-dialog" style={{ width: "min(760px, 100%)" }} role="dialog" aria-modal="true" aria-labelledby="tm-detail-title">
-        <div className="panel-head" style={{ marginBottom: 14 }}>
-          <div>
-            <span className="section-kicker">STUDENT &amp; ASSIGNMENT</span>
-            <h3 id="tm-detail-title">{s?.student_name || "Student"}</h3>
-          </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {a && <StatusChip status={a.status} />}
-            <button type="button" className="tm-btn" onClick={onClose}>Close</button>
-          </div>
+    <FixedOverlay
+      open={true}
+      onClose={onClose}
+      label="Student and assignment details"
+      panelClassName="fixed-overlay-panel tm-assignment-panel"
+      zIndex={1000}
+    >
+      <div className="panel-head" style={{ marginBottom: 14 }}>
+        <div>
+          <span className="section-kicker">STUDENT &amp; ASSIGNMENT</span>
+          <h3>{s?.student_name || "Student"}</h3>
         </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {a && <StatusChip status={a.status} />}
+          <button type="button" className="tm-btn" onClick={onClose}>Close</button>
+        </div>
+      </div>
 
+      <div className="panel-body" style={{ padding: "18px 20px" }}>
         {loading && <SkeletonRows count={3} />}
         {!loading && error && <ErrorState message={error} onRetry={load} busy={loading} />}
 
@@ -576,7 +589,7 @@ function AssignmentDetail({ taskId, studentId, onClose, onRemind, reminding }) {
               )}
             </div>
 
-            <div className="tm-dialog-actions">
+            <div className="tm-dialog-actions" style={{ marginTop: 18 }}>
               <button type="button" className="tm-btn" onClick={onClose}>Close</button>
               <button
                 type="button"
@@ -590,7 +603,7 @@ function AssignmentDetail({ taskId, studentId, onClose, onRemind, reminding }) {
           </>
         )}
       </div>
-    </div>
+    </FixedOverlay>
   );
 }
 
@@ -837,7 +850,7 @@ export default function TaskReview() {
               <input
                 className="tm-input"
                 type="search"
-                placeholder="Search name, ID, email or batch…"
+                placeholder="Search name, ID, email…"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                 aria-label="Search students"

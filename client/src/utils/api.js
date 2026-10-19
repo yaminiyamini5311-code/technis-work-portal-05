@@ -169,7 +169,7 @@ export function taskTitle(value) {
 
 /** Title-case a program / domain slug for display: "techins 60" → "Techins 60". */
 export function titleCase(value) {
-  if (!value) return "";
+  if (!value || value === "null" || value === "undefined") return "";
   return String(value)
     .split(" ")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))

@@ -515,8 +515,10 @@ export default function Tasks() {
             placeholder="Description"
             value={form.description}
             onChange={e => setForm({ ...form, description: e.target.value })}
+            maxLength={500}
             autoComplete="off"
           />
+          <small className="field-hint">{form.description.length}/500 characters</small>
         </div>
 
         <div className="field">
@@ -527,8 +529,10 @@ export default function Tasks() {
             placeholder="How to Do"
             value={form.how_to_do}
             onChange={e => setForm({ ...form, how_to_do: e.target.value })}
+            maxLength={500}
             autoComplete="off"
           />
+          <small className="field-hint">{form.how_to_do.length}/500 characters</small>
         </div>
 
         <div className="field">
@@ -539,8 +543,10 @@ export default function Tasks() {
             placeholder="Expected output"
             value={form.expected_output}
             onChange={e => setForm({ ...form, expected_output: e.target.value })}
+            maxLength={500}
             autoComplete="off"
           />
+          <small className="field-hint">{form.expected_output.length}/500 characters</small>
         </div>
 
         {/* Full width: the last field of the group, so the grid closes cleanly. */}
@@ -552,8 +558,10 @@ export default function Tasks() {
             placeholder="Submission requirements"
             value={form.submission_requirements}
             onChange={e => setForm({ ...form, submission_requirements: e.target.value })}
+            maxLength={500}
             autoComplete="off"
           />
+          <small className="field-hint">{form.submission_requirements.length}/500 characters</small>
         </div>
 
         {/* Left-aligned with the form's fields and a consistent top margin. */}

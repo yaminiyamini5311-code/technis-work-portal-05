@@ -216,7 +216,7 @@ export default function FilePreview({ file, onClose }) {
                   className="fp-pdf"
                   src={`${url}${PDF_PARAMS}`}
                   title={`Preview of ${name}`}
-                  style={zoom !== 1 ? { width: `${100 / zoom}%`, height: `${100 / zoom}%` } : undefined}
+                  style={zoom !== 1 ? { width: `${100 / zoom}%`, height: `${100 / zoom}%`, transform: `scale(${zoom})`, transformOrigin: 'top left' } : undefined}
                 />
               )}
               {kind === "text" && <TextPreview url={url} />}

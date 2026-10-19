@@ -349,10 +349,20 @@ function uploadAllowed(canonical, hasSubmission) {
 }
 
 function SubmitForm({ title, hint, comment, setComment, files, setFiles, busy, label, onSubmit, revision }) {
+  const MAX_COMMENT_LENGTH = 500;
+  
   return (
     <section className={`upload-box ${revision ? "revision-upload" : ""}`}>
       <div><strong>{title}</strong><small>{hint}</small></div>
-      <textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder={revision ? "Describe what you changed in response to the feedback…" : "Submission comment / outcome (optional if files are selected)"} />
+      <textarea 
+        value={comment} 
+        onChange={(e) => setComment(e.target.value)} 
+        placeholder={revision ? "Describe what you changed in response to the feedback…" : "Submission comment / outcome (optional if files are selected)"}
+        maxLength={MAX_COMMENT_LENGTH}
+      />
+      <div style={{ fontSize: '11px', color: '#9aa6c2', marginTop: '4px', textAlign: 'right' }}>
+        {comment.length}/{MAX_COMMENT_LENGTH} characters
+      </div>
       <label className="upload-button">
         {files.length ? `${files.length} file(s) selected` : (revision ? "Choose corrected file" : "Choose files")}
         <input type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.png,.jpg,.jpeg" onChange={(e) => setFiles(Array.from(e.target.files || []))} />
