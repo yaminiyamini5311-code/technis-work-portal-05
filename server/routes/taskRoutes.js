@@ -719,19 +719,20 @@ router.get("/submissions/:submissionId", authenticateToken, authorizeRoles("admi
       feedback: task.feedback || null,
       taskMissing: false,
     } : {
+      // Task was deleted: use the snapshot stored during submission
       id: submission.task_id ? String(submission.task_id) : null,
       code: submission.task_code || null,
-      title: "Deleted task",
-      description: null,
-      instructions: null,
-      domain: null,
-      program: null,
-      priority: null,
+      title: submission.task_title || "Deleted task",
+      description: submission.task_description || null,
+      instructions: submission.task_how_to_do || submission.task_instructions || null,
+      domain: submission.task_domain || null,
+      program: submission.task_program || null,
+      priority: submission.task_priority || null,
       status: null,
       workflow_status: null,
       assigned_at: null,
-      start_date: null,
-      due_date: null,
+      start_date: submission.task_start_date || null,
+      due_date: submission.task_due_date || null,
       feedback: null,
       taskMissing: true,
     };
@@ -1158,6 +1159,25 @@ router.post("/", authenticateToken, authorizeRoles("admin", "ceo", "manager"), a
       return res.status(400).json({ success: false, message: "Day must be an integer between 1 and 60" });
     }
 
+    // Validate 500-character limits for text fields
+    const description = String(b.description || "").trim();
+    const howToDo = String(b.how_to_do || "").trim();
+    const expectedOutput = String(b.expected_output || "").trim();
+    const submissionRequirements = String(b.submission_requirements || "").trim();
+    
+    if (description.length > 500) {
+      return res.status(400).json({ success: false, message: "Description must be 500 characters or less" });
+    }
+    if (howToDo.length > 500) {
+      return res.status(400).json({ success: false, message: "How to Do must be 500 characters or less" });
+    }
+    if (expectedOutput.length > 500) {
+      return res.status(400).json({ success: false, message: "Expected Output must be 500 characters or less" });
+    }
+    if (submissionRequirements.length > 500) {
+      return res.status(400).json({ success: false, message: "Submission Requirements must be 500 characters or less" });
+    }
+
     const workflow = String(b.workflow_status || "Assigned");
     if (!STATUS.includes(workflow)) return res.status(400).json({ success: false, message: "Invalid task workflow status" });
 
@@ -1192,13 +1212,13 @@ router.post("/", authenticateToken, authorizeRoles("admin", "ceo", "manager"), a
       domain,
       team: String(b.team || "").trim() || null,
       task_type: String(b.task_type || "General"),
-      description: String(b.description || "").trim(),
+      description: description,
       what: String(b.what || "").trim(),
       why: String(b.why || "").trim(),
       how: String(b.how || "").trim(),
-      how_to_do: b.how_to_do ? String(b.how_to_do).trim().substring(0, 5000) : null,
-      expected_output: String(b.expected_output || "").trim(),
-      submission_requirements: String(b.submission_requirements || "").trim(),
+      how_to_do: howToDo,
+      expected_output: expectedOutput,
+      submission_requirements: submissionRequirements,
       resources: String(b.resources || "").trim(),
       notes: String(b.notes || "").trim(),
       target_type: taskTargetType,
@@ -1300,11 +1320,25 @@ router.put("/:id", authenticateToken, authorizeRoles("admin", "ceo", "manager"),
       if (!title) return res.status(400).json({ success: false, message: "Task title is required" });
       update.title = title;
     }
+    
+    // Validate 500-character limits for text fields
     for (const field of ["description", "expected_output", "submission_requirements"]) {
-      if (field in b) update[field] = String(b[field] || "").trim();
+      if (field in b) {
+        const value = String(b[field] || "").trim();
+        if (value.length > 500) {
+          const fieldLabel = field.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+          return res.status(400).json({ success: false, message: `${fieldLabel} must be 500 characters or less` });
+        }
+        update[field] = value;
+      }
     }
+    
     if ("how_to_do" in b) {
-      update.how_to_do = b.how_to_do ? String(b.how_to_do).trim().substring(0, 5000) : null;
+      const value = b.how_to_do ? String(b.how_to_do).trim() : null;
+      if (value && value.length > 500) {
+        return res.status(400).json({ success: false, message: "How To Do must be 500 characters or less" });
+      }
+      update.how_to_do = value;
     }
     if ("priority" in b) {
       const priority = String(b.priority || "").trim().toLowerCase();
@@ -1876,6 +1910,11 @@ async function handleApprove(req, res) {
 
     const now = new Date().toISOString();
     const feedback = String((req.body && req.body.feedback) || "").trim() || "Approved";
+    
+    // Validate 500-character limit for approval feedback
+    if (feedback.length > 500) {
+      return fail(res, 400, "FEEDBACK_TOO_LONG", "Approval feedback must be 500 characters or less.");
+    }
 
     const approvalFields = {
       status: "Approved",
@@ -2435,6 +2474,23 @@ async function storeSubmissionVersion(db, task, studentId, { files, comment, ver
   const submissionCode = await nextSubmissionCode(db);
   const submittedAt = new Date().toISOString();
 
+  // Snapshot critical task fields so submissions remain viewable even if the task is deleted
+  const taskSnapshot = {
+    task_code: task.task_code || null,
+    task_title: task.title || null,
+    task_description: task.description || null,
+    task_expected_output: task.expected_output || null,
+    task_how_to_do: task.how_to_do || null,
+    task_instructions: task.instructions || null,
+    task_domain: task.domain || null,
+    task_program: task.program || null,
+    task_batch_id: task.batch_id || null,
+    task_priority: task.priority || null,
+    task_start_date: task.start_date || null,
+    task_due_date: task.due_date || null,
+    task_day_number: task.day_number || null,
+  };
+
   const subResult = await db.collection("submissions").insertOne({
     submission_code: submissionCode,
     task_id: String(task._id),
@@ -2447,7 +2503,9 @@ async function storeSubmissionVersion(db, task, studentId, { files, comment, ver
     reviewer_id: null,
     reviewed_at: null,
     review_comments: null,
-    created_at: submittedAt
+    created_at: submittedAt,
+    // Task snapshot for historical integrity
+    ...taskSnapshot,
   });
   const sid = String(subResult.insertedId);
 
@@ -2736,6 +2794,11 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
     if (!(req.files || []).length && !commentText) {
       return fail(res, 400, "EMPTY_SUBMISSION", "Add at least one file or a submission comment before submitting.");
     }
+    
+    // Enforce maximum comment length (500 characters)
+    if (commentText.length > 500) {
+      return fail(res, 400, "COMMENT_TOO_LONG", "Comment must be 500 characters or less.");
+    }
 
     const stored = await storeSubmissionVersion(db, task, req.user.id, {
       files: req.files || [],
@@ -2905,6 +2968,11 @@ router.post("/:id/resubmit", authenticateToken, checkStudentRegistrationStatus, 
     const commentText = String(body.comment || "").trim();
     if (!(req.files || []).length && !commentText) {
       return fail(res, 400, "EMPTY_SUBMISSION", "Attach the corrected file or describe what you changed before resubmitting.");
+    }
+    
+    // Enforce maximum comment length (500 characters)
+    if (commentText.length > 500) {
+      return fail(res, 400, "COMMENT_TOO_LONG", "Comment must be 500 characters or less.");
     }
 
     const version = priorCount + 1;

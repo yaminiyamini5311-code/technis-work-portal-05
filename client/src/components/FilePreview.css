@@ -4,10 +4,10 @@
   --overlay-surface: #0b1220;
   --overlay-border: rgba(124, 92, 255, 0.32);
   width: min(1600px, 95vw);
-  height: 95vh;
+  max-height: min(95vh, calc(100dvh - 2rem));
   /* Header, then a body that takes the rest. `min-height: 0` on the flex child
      is what lets the body actually shrink and the stage scroll, instead of
-     the panel growing past 95vh. */
+     the panel growing past the viewport. */
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -187,6 +187,7 @@
   justify-content: flex-end;
   margin-bottom: 8px;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .fp-zoom button {

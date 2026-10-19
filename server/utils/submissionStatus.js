@@ -343,6 +343,13 @@ function validateRevisionFeedback(feedback) {
       message: `Feedback must be at least ${min} characters so the student knows what to correct.`,
     };
   }
+  if (value.length > 500) {
+    return {
+      ok: false,
+      code: "REVISION_FEEDBACK_TOO_LONG",
+      message: "Feedback must be 500 characters or less.",
+    };
+  }
   return { ok: true, value };
 }
 

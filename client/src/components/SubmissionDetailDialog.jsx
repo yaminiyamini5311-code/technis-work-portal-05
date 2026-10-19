@@ -198,10 +198,10 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
           {!loading && detail && hasMissingRelatedRecord && (
             <div className="sdd-message sdd-message-warning" role="status">
               {detail.taskMissing && detail.studentMissing
-                ? "This submission still exists, but the linked task and student records were deleted. Review data is limited to the submission record itself."
+                ? "The task and student records for this submission were deleted. Displaying snapshot data captured at submission time."
                 : detail.taskMissing
-                  ? "This submission still exists, but the linked task was deleted. Review data is limited to the submission record itself."
-                  : "This submission still exists, but the linked student record was deleted. Review data is limited to the submission record itself."}
+                  ? "The task for this submission was deleted. Displaying snapshot data captured at submission time."
+                  : "The student record for this submission was deleted. Review data is limited to the submission record itself."}
             </div>
           )}
 
