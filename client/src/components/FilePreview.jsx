@@ -140,8 +140,7 @@ export default function FilePreview({ file, onClose }) {
       panelClassName="fixed-overlay-panel fp-panel"
       zIndex={2000}
     >
-      {/* One row on desktop: filename + "type · size" on the left, Download
-          and Close on the right. Stacks below 600px. */}
+      {/* Header: filename on left, controls on right */}
       <div className="panel-head fp-head">
         <div className="fp-title">
           <span className="section-kicker">FILE PREVIEW</span>
@@ -156,6 +155,15 @@ export default function FilePreview({ file, onClose }) {
             <TechinsIcon name="download" size={14} variant="light" ariaHidden />
             {downloading ? "Downloading…" : "Download"}
           </button>
+          {/* Zoom controls for PDF - moved to header */}
+          {!loading && !error && supported && url && kind === "pdf" && (
+            <>
+              <button type="button" className="fp-btn fp-btn-zoom" onClick={handleZoomOut} aria-label="Zoom out" disabled={zoom <= 50}>−</button>
+              <span className="fp-zoom-display" aria-live="polite">{zoom}%</span>
+              <button type="button" className="fp-btn fp-btn-zoom" onClick={handleZoomIn} aria-label="Zoom in" disabled={zoom >= 300}>+</button>
+              <button type="button" className="fp-btn fp-btn-zoom" onClick={handleZoomReset} disabled={zoom === 100}>Reset</button>
+            </>
+          )}
           <button type="button" className="fp-btn fp-btn-close" onClick={onClose} data-autofocus>Close</button>
         </div>
       </div>
@@ -197,16 +205,6 @@ export default function FilePreview({ file, onClose }) {
 
         {!loading && !error && supported && url && (
           <>
-            {/* Zoom applies to the whole embedded viewer, which keeps the
-                native PDF toolbar usable at every step. */}
-            {kind === "pdf" && (
-              <div className="fp-zoom" role="group" aria-label="Zoom">
-                <button type="button" onClick={handleZoomOut} aria-label="Zoom out" disabled={zoom <= 50}>−</button>
-                <span aria-live="polite">{zoom}%</span>
-                <button type="button" onClick={handleZoomIn} aria-label="Zoom in" disabled={zoom >= 300}>+</button>
-                <button type="button" onClick={handleZoomReset} disabled={zoom === 100}>Reset</button>
-              </div>
-            )}
             <div className="fp-stage">
               {kind === "image" && (
                 <img
