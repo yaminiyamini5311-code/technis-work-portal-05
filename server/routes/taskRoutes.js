@@ -778,6 +778,8 @@ router.get("/submissions/:submissionId", authenticateToken, authorizeRoles("admi
         reviewer_name: submission.reviewer_id ? (reviewerById.get(String(submission.reviewer_id))?.name || null) : null,
         reviewed_at: submission.reviewed_at || null,
         review_comments: submission.review_comments || null,
+        review_comment_edited_at: submission.review_comment_edited_at || null,
+        review_comment_edited_by: submission.review_comment_edited_by || null,
         revision_cycle: submission.revision_cycle ?? assignment?.revision_cycle ?? null,
         score: submission.score ?? null,
         max_marks: submission.max_marks ?? null,
@@ -807,6 +809,104 @@ router.get("/submissions/:submissionId", authenticateToken, authorizeRoles("admi
   } catch (e) {
     console.error("GET SUBMISSION DETAIL:", e);
     fail(res, 500, "SUBMISSION_DETAIL_FAILED", "Unable to load this submission. Please retry.");
+  }
+});
+
+/* ─── EDIT REVIEW COMMENT ────────────────────────────────────────────────
+ * PATCH /api/tasks/submissions/:submissionId/review-comment
+ *
+ * Allows a reviewer to edit their own review comment on a submission.
+ * Authorization: Only the original reviewer (matched by reviewer_id) can edit.
+ * The comment is stored as review_comments field on the submission document.
+ */
+router.patch("/submissions/:submissionId/review-comment", authenticateToken, authorizeRoles("admin", "manager", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+    const submissionId = req.params.submissionId;
+    
+    // Validate submission ID
+    let sid;
+    try {
+      sid = toId(submissionId);
+    } catch {
+      return fail(res, 400, "INVALID_ID", "Invalid submission ID");
+    }
+
+    // Get the submission
+    const submission = await db.collection("submissions").findOne({ _id: sid });
+    if (!submission) {
+      return fail(res, 404, "SUBMISSION_NOT_FOUND", "Submission not found");
+    }
+
+    // Authorization: Only the reviewer who wrote the comment can edit it
+    const reviewerId = String(submission.reviewer_id || "");
+    const currentUserId = String(req.user.id);
+    if (reviewerId !== currentUserId) {
+      return fail(res, 403, "FORBIDDEN", "You can only edit your own review comments");
+    }
+
+    // Validate the new comment text
+    const newComment = String(req.body.review_comment || "").trim();
+    
+    if (!newComment) {
+      return fail(res, 400, "COMMENT_REQUIRED", "Review comment cannot be empty");
+    }
+
+    // Normalize line endings
+    const normalized = newComment.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    
+    if (normalized.length > 500) {
+      return fail(res, 400, "COMMENT_TOO_LONG", "Review comment must be 500 characters or less");
+    }
+
+    // Check if comment actually changed
+    if (normalized === submission.review_comments) {
+      return ok(res, {
+        message: "No changes to save",
+        submission_id: submissionId,
+        review_comment: normalized,
+      });
+    }
+
+    const now = new Date().toISOString();
+
+    // Update the submission
+    await db.collection("submissions").updateOne(
+      { _id: sid },
+      { 
+        $set: { 
+          review_comments: normalized,
+          review_comment_edited_at: now,
+          review_comment_edited_by: currentUserId,
+          updated_at: now
+        } 
+      }
+    );
+
+    // Audit log
+    await writeAudit(db, {
+      actorId: currentUserId,
+      action: "review_comment_edited",
+      entityType: "submission",
+      entityId: submissionId,
+      previousValue: { review_comments: submission.review_comments },
+      newValue: { review_comments: normalized },
+      metadata: { 
+        task_id: String(submission.task_id),
+        student_id: String(submission.student_id),
+        edited_at: now
+      },
+    });
+
+    ok(res, {
+      message: "Review comment updated successfully",
+      submission_id: submissionId,
+      review_comment: normalized,
+      edited_at: now,
+    });
+  } catch (e) {
+    console.error("EDIT REVIEW COMMENT:", e);
+    fail(res, 500, "EDIT_FAILED", "Unable to update review comment. Please retry.");
   }
 });
 

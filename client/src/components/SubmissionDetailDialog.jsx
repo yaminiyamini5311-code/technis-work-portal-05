@@ -60,6 +60,22 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
   const [dialogMode, setDialogMode] = useState(null); // "approve" | "revision"
   const [comment, setComment] = useState("");
   const [dialogError, setDialogError] = useState("");
+  
+  // Edit comment state
+  const [editingComment, setEditingComment] = useState(false);
+  const [editedCommentText, setEditedCommentText] = useState("");
+  const [editCommentError, setEditCommentError] = useState("");
+  const [savingComment, setSavingComment] = useState(false);
+
+  // Get current user ID from localStorage
+  const currentUserId = (() => {
+    try {
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      return String(user.id || "");
+    } catch {
+      return "";
+    }
+  })();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -137,6 +153,64 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
       await downloadFile(file);
     } catch (e) {
       setError(e.message || "Unable to download this file.");
+    }
+  }
+
+  function startEditingComment() {
+    setEditingComment(true);
+    setEditedCommentText(submission?.review_comments || "");
+    setEditCommentError("");
+    setNotice("");
+  }
+
+  function cancelEditingComment() {
+    setEditingComment(false);
+    setEditedCommentText("");
+    setEditCommentError("");
+  }
+
+  async function saveEditedComment() {
+    if (savingComment) return;
+    
+    const text = editedCommentText.trim();
+    
+    // Validation
+    if (!text) {
+      setEditCommentError("Review comment cannot be empty.");
+      return;
+    }
+    
+    if (text.length > 500) {
+      setEditCommentError("Review comment must be 500 characters or less.");
+      return;
+    }
+    
+    // Check if unchanged
+    if (text === (submission?.review_comments || "").trim()) {
+      cancelEditingComment();
+      return;
+    }
+    
+    setSavingComment(true);
+    setEditCommentError("");
+    
+    try {
+      const res = await apiFetch(`/api/tasks/submissions/${encodeURIComponent(submissionId)}/review-comment`, {
+        method: "PATCH",
+        body: { review_comment: text },
+      });
+      
+      setNotice("Review comment updated successfully.");
+      setEditingComment(false);
+      setEditedCommentText("");
+      
+      // Refresh the submission data to show the updated comment
+      await load();
+      onChanged?.();
+    } catch (e) {
+      setEditCommentError(e.message || "Unable to update review comment. Please try again.");
+    } finally {
+      setSavingComment(false);
     }
   }
 
@@ -247,10 +321,86 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
                       : <p className="sdd-empty">The student did not add a written response to this version.</p>}
                   </div>
                   <div>
-                    <span className="sdd-label">Admin review comments</span>
-                    {submission?.review_comments
-                      ? <p className="sdd-comment sdd-comment-review">{taskTitle(submission.review_comments)}</p>
-                      : <p className="sdd-empty">No admin review comment yet.</p>}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span className="sdd-label">Admin review comments</span>
+                      {submission?.review_comments && submission?.reviewer_id === currentUserId && !editingComment && (
+                        <button 
+                          type="button" 
+                          className="sdd-btn sdd-btn-edit"
+                          onClick={startEditingComment}
+                          title="Edit your review comment"
+                          style={{ 
+                            padding: '4px 10px', 
+                            fontSize: '11px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <TechinsIcon name="edit" size={12} variant="light" ariaHidden />
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                    {!editingComment ? (
+                      <>
+                        {submission?.review_comments ? (
+                          <div>
+                            <p className="sdd-comment sdd-comment-review">{taskTitle(submission.review_comments)}</p>
+                            {submission?.review_comment_edited_at && (
+                              <small style={{ color: '#93a1c2', fontSize: '10.5px', fontStyle: 'italic', marginTop: '4px', display: 'block' }}>
+                                Edited {formatWorkspaceDateTime(submission.review_comment_edited_at)}
+                              </small>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="sdd-empty">No admin review comment yet.</p>
+                        )}
+                      </>
+                    ) : (
+                      <div style={{ marginTop: '8px' }}>
+                        <textarea
+                          className="sdd-textarea"
+                          value={editedCommentText}
+                          onChange={(e) => { setEditedCommentText(e.target.value); setEditCommentError(""); }}
+                          placeholder="Review comment..."
+                          rows={4}
+                          maxLength={500}
+                          autoFocus
+                          style={{ width: '100%', marginBottom: '6px' }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <small style={{ color: editedCommentText.trim().length > 500 ? '#f87171' : '#93a1c2', fontSize: '11px' }}>
+                            {editedCommentText.trim().length}/500 characters
+                          </small>
+                        </div>
+                        {editCommentError && (
+                          <div className="sdd-message sdd-message-error" role="alert" style={{ marginBottom: '8px', padding: '8px 12px', fontSize: '12px' }}>
+                            {editCommentError}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            type="button"
+                            className="sdd-btn"
+                            onClick={cancelEditingComment}
+                            disabled={savingComment}
+                            style={{ flex: 1 }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className="sdd-btn sdd-btn-primary"
+                            onClick={saveEditedComment}
+                            disabled={savingComment || !editedCommentText.trim() || editedCommentText.trim() === submission?.review_comments || editedCommentText.trim().length > 500}
+                            style={{ flex: 1 }}
+                          >
+                            {savingComment ? "Saving..." : "Save Changes"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 {detail.assignment?.revision_deadline && (
