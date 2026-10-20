@@ -2842,7 +2842,6 @@ router.post("/:id/start", authenticateToken, checkStudentRegistrationStatus, aut
       await syncTaskWorkflowFromStudents(db, task);
     }
 
-    const now = new Date();
     ok(res, {
       ...sessionView(session, now),
       server_now: now.toISOString(),
