@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
-import { formatWorkspaceDateTime, formatDuration } from "../../utils/dateHelper";
+import { formatWorkspaceDateTime, formatDuration, formatDurationHHMMSS } from "../../utils/dateHelper";
 import { remainingTime } from "../../utils/api";
 import useLiveElapsed from "../../hooks/useLiveElapsed";
 import "./MyTasks.css";
@@ -60,7 +60,6 @@ export default function TaskDetail() {
   const [error, setError] = useState(null); // { code, message }
   const [blocked, setBlocked] = useState(false);
   const [busy, setBusy] = useState(null);
-  const [notice, setNotice] = useState("");
   const [files, setFiles] = useState([]);
   const [comment, setComment] = useState("");
   const [tick, setTick] = useState(0);
@@ -89,10 +88,27 @@ export default function TaskDetail() {
       setStatus(st?.data || st || null);
 
       // Fresh session snapshot for the live timer.
+      let currentSession = null;
       try {
         const { data: se } = await axios.get(`${API_URL}/api/tasks/${taskId}/session`, { headers: auth() });
-        setSession(se?.data || se || null);
+        currentSession = se?.data || se || null;
+        setSession(currentSession);
       } catch { /* no session yet — timer simply not shown */ }
+
+      // Auto-start the timer if the task is not yet submitted, not closed, and no session exists
+      // This ensures the timer starts when "Open task" is clicked
+      if (!st?.has_submission && !["Approved", "Cancelled", "Archived"].includes(found.workflow_status) && !currentSession) {
+        try {
+          await axios.post(`${API_URL}/api/tasks/${taskId}/start`, {}, { headers: auth() });
+          // Reload to get the fresh session with started_at
+          const { data: se2 } = await axios.get(`${API_URL}/api/tasks/${taskId}/session`, { headers: auth() });
+          setSession(se2?.data || se2 || null);
+        } catch (startErr) {
+          // If start fails (e.g., task already started, deadline passed, etc.), just continue silently
+          // The session fetch above will return the existing session
+          console.log("Auto-start task:", startErr.response?.data?.message || "Task may already be started or not eligible to start");
+        }
+      }
 
       setBlocked(false);
       setError(null);
@@ -191,20 +207,6 @@ export default function TaskDetail() {
     }
   };
 
-  const start = async () => {
-    try {
-      setBusy("start");
-      setError(null);
-      await axios.post(`${API_URL}/api/tasks/${taskId}/start`, {}, { headers: auth() });
-      setNotice("Task started.");
-      await load();
-    } catch (err) {
-      setError({ code: err.response?.data?.error?.code || "START_FAILED", message: err.response?.data?.error?.message || err.response?.data?.message || "Unable to start the task." });
-    } finally {
-      setBusy(null);
-    }
-  };
-
   if (loading && !task && !blocked) {
     return <div className="portal-loading"><div className="loader-dot" /><h2>Loading task</h2><p>Fetching the latest state from the server.</p></div>;
   }
@@ -255,8 +257,8 @@ export default function TaskDetail() {
       {/* Live timer — server-owned start time, repainted once a second. */}
       {session?.started_at && (
         <section className="td-section td-timer">
-          <h3>{running ? "Time on task" : "Time recorded"}</h3>
-          <strong className="td-timer-value">{formatDuration(running ? elapsed : (session.duration_seconds ?? elapsed)) || "0 seconds"}</strong>
+          <h3>{running ? "Time spent" : "Time recorded"}</h3>
+          <strong className="td-timer-value">{formatDurationHHMMSS(running ? elapsed : (session.duration_seconds ?? elapsed)) || "00:00:00"}</strong>
           <small>
             Started {formatWorkspaceDateTime(session.started_at)}
             {session.ended_at ? ` · stopped ${formatWorkspaceDateTime(session.ended_at)}` : " · running"}
@@ -303,11 +305,6 @@ export default function TaskDetail() {
 
       {/* Actions per state. */}
       <div className="td-actions">
-        {!hasSubmission && !closed && !beforeStart && !["in_progress"].includes(canonical) && (
-          <button className="action-progress" disabled={busy === "start"} onClick={start}>
-            {busy === "start" ? "Starting…" : "Start Task"}
-          </button>
-        )}
         {beforeStart && !hasSubmission && <div className="completed-label">Starts on {startAt ? formatWorkspaceDateTime(startAt) : "the scheduled time"}</div>}
         {deadlinePassed && !hasSubmission && <div className="completed-label">The task deadline has passed.</div>}
         {["Cancelled", "Archived"].includes(task?.workflow_status) && <div className="completed-label">This task is {String(task.workflow_status).toLowerCase()}.</div>}
@@ -374,12 +371,6 @@ export default function TaskDetail() {
       )}
     </div>
   );
-}
-
-function uploadAllowed(canonical, hasSubmission) {
-  // Allow submission as long as the student hasn't submitted yet
-  // and the task is not closed (handled by the caller)
-  return !hasSubmission;
 }
 
 function SubmitForm({ title, hint, comment, setComment, files, setFiles, busy, label, onSubmit, revision }) {

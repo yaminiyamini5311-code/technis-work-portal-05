@@ -260,6 +260,24 @@ export function formatDuration(totalSeconds) {
   return parts.join(", ");
 }
 
+/**
+ * Format duration as HH:MM:SS (00:05:09 for 5 minutes 9 seconds).
+ * Returns null for a missing value so callers can show "Not recorded".
+ *
+ * @param {number|null|undefined} totalSeconds
+ * @returns {string|null}
+ */
+export function formatDurationHHMMSS(totalSeconds) {
+  if (totalSeconds === null || totalSeconds === undefined || totalSeconds === "") return null;
+  const seconds = Math.max(0, Math.floor(Number(totalSeconds)));
+  if (!Number.isFinite(seconds)) return null;
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(hours)}:${pad(minutes)}:${pad(secs)}`;
+}
+
 export default {
   formatISTDateTime,
   formatISTDate,
@@ -271,4 +289,5 @@ export default {
   formatWorkspaceDateTimeParts,
   pluralise,
   formatDuration,
+  formatDurationHHMMSS,
 };
