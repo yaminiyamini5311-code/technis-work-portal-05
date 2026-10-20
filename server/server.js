@@ -39,13 +39,16 @@ const app = express();
 
 function buildCorsOriginsList() {
   const origins = new Set();
-  
+
   // Add localhost origins for local development
   origins.add("http://localhost:5173");
   origins.add("http://localhost:5174");
   origins.add("http://localhost:5175");
   origins.add("http://localhost:5176");
-  
+
+  // Add production frontend origin
+  origins.add("https://techins-portal.vercel.app");
+
   // Add from CORS_ORIGINS environment variable (primary config)
   if (process.env.CORS_ORIGINS) {
     process.env.CORS_ORIGINS
@@ -70,7 +73,7 @@ function buildCorsOriginsList() {
       .filter(Boolean)
       .forEach(url => origins.add(url));
   }
-  
+
   return Array.from(origins);
 }
 
