@@ -64,6 +64,7 @@ export default function TaskDetail() {
   const [files, setFiles] = useState([]);
   const [comment, setComment] = useState("");
   const [tick, setTick] = useState(0);
+  const [submitSuccess, setSubmitSuccess] = useState(null);
 
   const submittingRef = useRef(false);
 
@@ -167,10 +168,18 @@ export default function TaskDetail() {
       const form = new FormData();
       files.forEach((file) => form.append("files", file));
       if (comment.trim()) form.append("comment", comment.trim());
-      await axios.post(`${API_URL}/api/tasks/${taskId}/${endpoint}`, form, { headers: auth() });
+      const response = await axios.post(`${API_URL}/api/tasks/${taskId}/${endpoint}`, form, { headers: auth() });
       setFiles([]);
       setComment("");
-      setNotice(endpoint === "resubmit" ? "Corrected version submitted." : "Task submitted.");
+      // Show success popup with submission details
+      const submissionData = response.data?.data || response.data || {};
+      setSubmitSuccess({
+        taskTitle: task?.title || "Task",
+        submissionCode: submissionData.submissionCode,
+        version: submissionData.version,
+        submittedAt: submissionData.submittedAt,
+        status: "Submitted"
+      });
       setError(null);
       await load();
     } catch (err) {
@@ -300,12 +309,13 @@ export default function TaskDetail() {
           </button>
         )}
         {beforeStart && !hasSubmission && <div className="completed-label">Starts on {startAt ? formatWorkspaceDateTime(startAt) : "the scheduled time"}</div>}
-        {deadlinePassed && !hasSubmission && !uploadAllowed(canonical, hasSubmission) && <div className="completed-label">The task deadline has passed.</div>}
+        {deadlinePassed && !hasSubmission && <div className="completed-label">The task deadline has passed.</div>}
         {["Cancelled", "Archived"].includes(task?.workflow_status) && <div className="completed-label">This task is {String(task.workflow_status).toLowerCase()}.</div>}
       </div>
 
-      {/* Upload form: first submission when in progress, resubmission inside the window. */}
-      {!hasSubmission && canonical === "in_progress" && !closed && (
+      {/* Upload form: first submission when not yet submitted, resubmission inside the window.
+          Allow submission from task details page as long as task is not closed. */}
+      {!hasSubmission && !closed && !beforeStart && (
         <SubmitForm
           title="Submit task work"
           hint="PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, ZIP, PNG, JPG · max 4 MB each"
@@ -340,12 +350,36 @@ export default function TaskDetail() {
       <div className="td-foot">
         <Link className="td-back-btn" to="/student/tasks">Back to My Tasks</Link>
       </div>
+
+      {submitSuccess && (
+        <div className="submit-success-overlay" onClick={() => setSubmitSuccess(null)}>
+          <div className="submit-success-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="submit-success-icon">
+              <TechinsIcon name="check" size={40} variant="light" />
+            </div>
+            <h2>You have submitted successfully!</h2>
+            <p>Your task submission has been saved successfully.</p>
+            <div className="submit-success-details">
+              <div><strong>Task:</strong> {submitSuccess.taskTitle}</div>
+              <div><strong>Submission Status:</strong> {submitSuccess.status}</div>
+              <div><strong>Submission Code:</strong> {submitSuccess.submissionCode}</div>
+              <div><strong>Version:</strong> v{submitSuccess.version}</div>
+              <div><strong>Submitted At:</strong> {new Date(submitSuccess.submittedAt).toLocaleString()}</div>
+            </div>
+            <button className="gold-btn" onClick={() => setSubmitSuccess(null)}>
+              Done
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function uploadAllowed(canonical, hasSubmission) {
-  return !hasSubmission && canonical === "in_progress";
+  // Allow submission as long as the student hasn't submitted yet
+  // and the task is not closed (handled by the caller)
+  return !hasSubmission;
 }
 
 function SubmitForm({ title, hint, comment, setComment, files, setFiles, busy, label, onSubmit, revision }) {
