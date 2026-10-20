@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, Fragment } from "react";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
 import { useScrollReveal } from "../../components/useScrollReveal";
