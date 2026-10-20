@@ -1,32 +1,13 @@
 import { useEffect, useRef, useState, Fragment } from "react";
 import axios from "axios";
-import { Link } from "react-router-dom";
 import TechinsIcon from "../../components/TechinsIcon";
 import { useScrollReveal } from "../../components/useScrollReveal";
 import { formatISTDateTime, formatISTDate, formatDuration, formatWorkspaceDateTime } from "../../utils/dateHelper";
 import { remainingTime } from "../../utils/api";
-import useLiveElapsed from "../../hooks/useLiveElapsed";
 import "./MyTasks.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
-
-/**
- * Live timer for one in-progress task. The value comes from the server-owned
- * `started_at` plus the server clock offset; setInterval only repaints it.
- */
-function LiveTimer({ session, serverNow }) {
-  const running = session?.running === true;
-  const elapsed = useLiveElapsed(session?.started_at || null, serverNow, running);
-  if (!session?.started_at) return null;
-  const seconds = running ? elapsed : (session.duration_seconds ?? elapsed);
-  return (
-    <span className="inline-timer" title={`Started ${formatWorkspaceDateTime(session.started_at)}`}>
-      <TechinsIcon name="clock" size={13} variant="light" ariaHidden />
-      {formatDuration(seconds) || "0 seconds"}
-    </span>
-  );
-}
 
 function formatDateTime(value) {
   if (!value) return "—";
@@ -82,10 +63,6 @@ export default function MyTasks() {
   const [selectedFiles, setSelectedFiles] = useState({});
   const [comments, setComments] = useState({});
   const [domainFilter, setDomainFilter] = useState("");
-  // Server clock captured with each /my response. The live timer derives its
-  // elapsed value from `started_at` + (this - client clock), so a wrong client
-  // clock can never change the displayed duration.
-  const [serverNow, setServerNow] = useState(null);
   // Submission history per task (fetched on demand, never in the list call)
   const [history, setHistory] = useState({});
   // Success popup state
@@ -117,7 +94,6 @@ export default function MyTasks() {
       setLoading(true);
       const { data } = await axios.get(`${API_URL}/api/tasks/my`, { headers: auth() });
       const next = data.tasks || [];
-      if (data.server_now) setServerNow(data.server_now);
 
       // Fetch per-student submission status for each task
       const tasksWithSubmissionStatus = await Promise.all(
@@ -179,8 +155,8 @@ export default function MyTasks() {
   }, []);
 
   /**
-   * Start the task timer. The SERVER creates (or reuses) the session and owns
-   * `started_at`; the client only renders the value it returns. Re-clicking
+   * Start the task. The SERVER creates (or reuses) the session and owns
+   * `started_at`; the client only renders the state it returns. Re-clicking
    * Start, refreshing or opening a second tab keeps the ORIGINAL start time —
    * the endpoint is idempotent.
    */
@@ -190,13 +166,9 @@ export default function MyTasks() {
       setBusy(id);
       setMessage("");
       const { data } = await axios.post(`${API_URL}/api/tasks/${id}/start`, {}, { headers: auth() });
-      const session = data?.data || data || null;
-      if (session?.server_now) setServerNow(session.server_now);
-      // Show the running timer immediately, before the refetch lands.
-      if (session?.started_at) {
-        setTasks((prev) => prev.map((t) => (String(t.id) === String(id) ? { ...t, session, student_status: t.student_status || "in_progress" } : t)));
-      }
-      setMessage("Task started — the timer is running.");
+      // Show the started state immediately, before the refetch lands.
+      setTasks((prev) => prev.map((t) => (String(t.id) === String(id) ? { ...t, student_status: t.student_status || "in_progress" } : t)));
+      setMessage("Task started.");
       await load();
     } catch (err) {
       setError(err.response?.data?.error?.message || err.response?.data?.message || "Unable to start task.");
@@ -257,7 +229,7 @@ export default function MyTasks() {
       setSelectedFiles((value) => ({ ...value, [task.id]: [] }));
       setComments((value) => ({ ...value, [task.id]: "" }));
       // Show professional success popup with actual submission details
-      const submissionData = response.data;
+      const submissionData = response.data?.data || response.data || {};
       setSubmitSuccess({
         taskTitle: task.title,
         submissionCode: submissionData.submissionCode,
@@ -265,6 +237,7 @@ export default function MyTasks() {
         submittedAt: submissionData.submittedAt,
         status: "Submitted"
       });
+      setError("");
       await load();
     } catch (err) {
       setError(err.response?.data?.error?.message || err.response?.data?.message || "Unable to submit the task.");
@@ -395,7 +368,9 @@ export default function MyTasks() {
             const beforeStart = !!startAt && nowDate < new Date(startAt);
             const expired = !!endAt && nowDate > new Date(endAt);
             const isClosed = ["Approved", "Cancelled", "Archived"].includes(studentStatus) || ["Cancelled", "Archived"].includes(workflow) || expired;
-            const canSubmit = !isClosed && !hasStudentSubmission;
+            const hasStarted = canonical === "in_progress" || canonical === "submitted" || canonical === "approved" || canonical === "revision_required";
+            // Show submit form only when: task window is open, student has started, no existing submission, task not closed
+            const canSubmitInline = !isClosed && !hasStudentSubmission && hasStarted && !beforeStart && !expired;
             
 
             // Show "awaiting review" only if this student actually submitted
@@ -431,12 +406,22 @@ export default function MyTasks() {
                   <div><span>End</span><strong>{task.due_date ? `${formatDate(task.due_date)}${task.due_time ? ` ${task.due_time}` : ""}` : "No deadline"}</strong></div>
                   <div><span>Assigned by</span><strong>{task.assigned_by_name || "Management"}</strong></div>
                   <div><span>Versions</span><strong>{task.latest_version || 0}</strong></div>
-                  {task.session?.started_at && (
-                    <div><span>Time on task</span><strong><LiveTimer session={task.session} serverNow={serverNow} /></strong></div>
-                  )}
                 </div>
                 <div className="task-actions">
-                  {(!hasStudentSubmission && (studentStatus === "Assigned" || task.status === "pending" || studentStatus === null)) && (beforeStart ? <div className="completed-label">Starts on {startAt ? formatWorkspaceDateTime(startAt) : "scheduled time"}</div> : <button className="action-progress" disabled={busy === task.id || expired} onClick={() => startTask(task.id)}>{busy === task.id ? "Starting…" : "Start Task"}</button>)}
+                  {!hasStarted && !hasStudentSubmission && !isClosed && (
+                    beforeStart ? (
+                      <div className="completed-label">Starts on {startAt ? formatWorkspaceDateTime(startAt) : "scheduled time"}</div>
+                    ) : expired ? (
+                      <div className="completed-label">The task deadline has passed.</div>
+                    ) : (
+                      <button className="action-progress" disabled={busy === task.id} onClick={() => startTask(task.id)}>{busy === task.id ? "Starting…" : "Start"}</button>
+                    )
+                  )}
+                  {hasStarted && !hasStudentSubmission && (
+                    <div className="completed-label">
+                      <TechinsIcon name="check" size={16} variant="light" ariaHidden /> Started
+                    </div>
+                  )}
                   {showAwaitingReview ? (
                     <div className="completed-label">
                       <TechinsIcon name="check" size={16} variant="light" ariaHidden /> Task Submitted
@@ -451,7 +436,6 @@ export default function MyTasks() {
                     </button>
                   )}
                   {studentStatus === "Approved" && <div className="completed-label"><TechinsIcon name="check" size={16} variant="light" /> Task approved and recorded</div>}
-                  <Link className="action-progress" to={`/student/tasks/${task.id}`}>Open task</Link>
                 </div>
                 {hasStudentSubmission && history[task.id] && (
                   <div className="submission-history">
@@ -523,7 +507,7 @@ export default function MyTasks() {
                   </div>
                 )}
 
-                {canSubmit && <div className="upload-box">
+                {canSubmitInline && <div className="upload-box">
                   <div><strong>Submit task work</strong><small>PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, ZIP, PNG, JPG · max 4 MB each</small></div>
                   <textarea value={comments[task.id] || ""} onChange={(e) => setComments((value) => ({ ...value, [task.id]: e.target.value }))} placeholder="Submission comment / outcome (optional if files are selected)" />
                   <label className="upload-button">{selectedFiles[task.id]?.length ? `${selectedFiles[task.id].length} file(s) selected` : "Choose files"}<input type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.png,.jpg,.jpeg" onChange={(e) => setSelectedFiles((value) => ({ ...value, [task.id]: Array.from(e.target.files || []) }))} /></label>
@@ -561,7 +545,7 @@ export default function MyTasks() {
             <div className="submit-success-icon">
               <TechinsIcon name="check" size={40} variant="light" />
             </div>
-            <h2>Task Submitted Successfully!</h2>
+            <h2>You have submitted successfully!</h2>
             <p>Your task submission has been saved successfully.</p>
             <div className="submit-success-details">
               <div><strong>Task:</strong> {submitSuccess.taskTitle}</div>

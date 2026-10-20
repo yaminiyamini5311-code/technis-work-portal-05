@@ -85,7 +85,11 @@ function toId(id) { try { return new ObjectId(id); } catch { return id; } }
 function combineTaskDateTime(date, time, defaultTime) {
   if (!date) return null;
   const t = time || defaultTime;
-  try { return new Date(`${date}T${t}:00`).toISOString(); } catch { return null; }
+  try {
+    // Parse with Asia/Kolkata timezone to match what the portal displays
+    const dt = new Date(`${date}T${t}:00+05:30`);
+    return dt.toISOString();
+  } catch { return null; }
 }
 function taskStartAt(task) {
   return task?.start_at || combineTaskDateTime(task?.start_date, task?.start_time, "00:00");
@@ -1295,6 +1299,13 @@ router.post("/", authenticateToken, authorizeRoles("admin", "ceo", "manager"), a
     const taskCode = await nextTaskCode(db);
     const now = new Date().toISOString();
 
+    // Validate that start datetime is before due datetime
+    const startAt = combineTaskDateTime(b.start_date, startTime, "00:00");
+    const dueAt = combineTaskDateTime(b.due_date, endTime, "23:59");
+    if (startAt && dueAt && new Date(startAt) >= new Date(dueAt)) {
+      return res.status(400).json({ success: false, message: "Task start time must be before the deadline" });
+    }
+
     // Program is stored on the task so the Program column shows a real value
     // instead of "—". An explicit program wins; otherwise it is derived from
     // the students this task is being assigned to.
@@ -1331,10 +1342,10 @@ router.post("/", authenticateToken, authorizeRoles("admin", "ceo", "manager"), a
       day_number: dayNumber,
       start_date: b.start_date || null,
       start_time: startTime,
-      start_at: combineTaskDateTime(b.start_date, startTime, "00:00"),
+      start_at: startAt,
       due_date: b.due_date || null,
       due_time: endTime,
-      due_at: combineTaskDateTime(b.due_date, endTime, "23:59"),
+      due_at: dueAt,
       completed_at: null,
       feedback: null,
       outcome: null,
@@ -1493,8 +1504,14 @@ router.put("/:id", authenticateToken, authorizeRoles("admin", "ceo", "manager"),
           return res.status(400).json({ success: false, message: "Starting time cannot be after ending time" });
         }
       }
-      update.start_at = combineTaskDateTime(startDate, startTime, "00:00");
-      update.due_at = combineTaskDateTime(dueDate, dueTime, "23:59");
+      const startAt = combineTaskDateTime(startDate, startTime, "00:00");
+      const dueAt = combineTaskDateTime(dueDate, dueTime, "23:59");
+      // Validate that start datetime is before due datetime
+      if (startAt && dueAt && new Date(startAt) >= new Date(dueAt)) {
+        return res.status(400).json({ success: false, message: "Task start time must be before the deadline" });
+      }
+      update.start_at = startAt;
+      update.due_at = dueAt;
     }
 
     const editableKeys = Object.keys(update);
@@ -1903,6 +1920,11 @@ router.get("/:id/review/assignments/:studentId", authenticateToken, authorizeRol
     const versions = await versionsForStudent(db, task._id, studentId);
     const { effective_domain, legacy_domain } = resolveDomain(task);
 
+    // Get the student's session for timing information
+    const { currentSession, sessionView } = require("../utils/taskSession");
+    const session = await currentSession(db, studentId, String(task._id));
+    const timing = sessionView(session, new Date());
+
     ok(res, {
       task: {
         id: String(task._id),
@@ -1940,6 +1962,8 @@ router.get("/:id/review/assignments/:studentId", authenticateToken, authorizeRol
         revision_history: Array.isArray(assignment?.revision_history) ? assignment.revision_history : [],
         resubmission_available: row.resubmission_available,
         resubmission_expires_in_ms: row.resubmission_expires_in_ms,
+        started_at: timing.started_at || null,
+        elapsed_seconds: timing.elapsed_seconds || null,
       },
       versions,
       latest: versions[0] || null,
@@ -2789,6 +2813,17 @@ router.post("/:id/start", authenticateToken, checkStudentRegistrationStatus, aut
     const { task, assignment } = loaded;
     if (["Approved", "Cancelled", "Archived"].includes(task.workflow_status)) {
       return fail(res, 409, "TASK_CLOSED", "This task can no longer be started.");
+    }
+
+    // Enforce start/end date-time window server-side.
+    const now = new Date();
+    const startAt = taskStartAt(task);
+    const endAt = taskEndAt(task);
+    if (startAt && now < new Date(startAt)) {
+      return fail(res, 409, "NOT_STARTED", `Task has not started yet. Starts on ${new Date(startAt).toLocaleString()}`);
+    }
+    if (endAt && now > new Date(endAt)) {
+      return fail(res, 409, "DEADLINE_PASSED", "The task deadline has passed.");
     }
 
     const { startSession, sessionView } = require("../utils/taskSession");

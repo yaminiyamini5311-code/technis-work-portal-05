@@ -2,9 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
-import { formatWorkspaceDateTime, formatDuration, formatDurationHHMMSS } from "../../utils/dateHelper";
+import { formatWorkspaceDateTime, formatDuration } from "../../utils/dateHelper";
 import { remainingTime } from "../../utils/api";
-import useLiveElapsed from "../../hooks/useLiveElapsed";
 import "./MyTasks.css";
 import "./TaskDetail.css";
 
@@ -15,11 +14,8 @@ import "./TaskDetail.css";
  * derived on the client that the server has not already decided:
  *   - GET /api/tasks/my                  → the task's own fields
  *   - GET /api/tasks/:id/my-submission-status → the authoritative state
- *   - GET /api/tasks/:id/session         → the server-owned running timer
  *
- * The live timer is rendered from `session.started_at` + the server clock, so
- * refresh, Back/Forward, navigation and a skewed client clock all show the
- * same value. Submit is disabled for this student as soon as the server reports
+ * Submit is disabled for this student as soon as the server reports
  * a submission, and a duplicate direct API call is rejected with 409.
  */
 
@@ -55,14 +51,12 @@ export default function TaskDetail() {
 
   const [task, setTask] = useState(null);
   const [status, setStatus] = useState(null);
-  const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null); // { code, message }
   const [blocked, setBlocked] = useState(false);
   const [busy, setBusy] = useState(null);
   const [files, setFiles] = useState([]);
   const [comment, setComment] = useState("");
-  const [tick, setTick] = useState(0);
   const [submitSuccess, setSubmitSuccess] = useState(null);
 
   const submittingRef = useRef(false);
@@ -81,34 +75,10 @@ export default function TaskDetail() {
         return;
       }
       setTask(found);
-      setSession(found.session || null);
 
       // Authoritative status (also enforces ownership server-side).
       const { data: st } = await axios.get(`${API_URL}/api/tasks/${taskId}/my-submission-status`, { headers: auth() });
       setStatus(st?.data || st || null);
-
-      // Fresh session snapshot for the live timer.
-      let currentSession = null;
-      try {
-        const { data: se } = await axios.get(`${API_URL}/api/tasks/${taskId}/session`, { headers: auth() });
-        currentSession = se?.data || se || null;
-        setSession(currentSession);
-      } catch { /* no session yet — timer simply not shown */ }
-
-      // Auto-start the timer if the task is not yet submitted, not closed, and no session exists
-      // This ensures the timer starts when "Open task" is clicked
-      if (!st?.has_submission && !["Approved", "Cancelled", "Archived"].includes(found.workflow_status) && !currentSession) {
-        try {
-          await axios.post(`${API_URL}/api/tasks/${taskId}/start`, {}, { headers: auth() });
-          // Reload to get the fresh session with started_at
-          const { data: se2 } = await axios.get(`${API_URL}/api/tasks/${taskId}/session`, { headers: auth() });
-          setSession(se2?.data || se2 || null);
-        } catch (startErr) {
-          // If start fails (e.g., task already started, deadline passed, etc.), just continue silently
-          // The session fetch above will return the existing session
-          console.log("Auto-start task:", startErr.response?.data?.message || "Task may already be started or not eligible to start");
-        }
-      }
 
       setBlocked(false);
       setError(null);
@@ -135,12 +105,6 @@ export default function TaskDetail() {
     return () => window.removeEventListener("focus", onFocus);
   }, [load]);
 
-  // Repaint once a second for the revision countdown (the timer has its own).
-  useEffect(() => {
-    const id = setInterval(() => setTick(n => n + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
-
   const canonical = status?.status || null;
   const needsRevision = canonical === "revision_required";
   const windowExpired = canonical === "resubmission_expired";
@@ -154,14 +118,10 @@ export default function TaskDetail() {
   const deadlinePassed = !!endAt && new Date() > new Date(endAt);
   const closed = approved || ["Cancelled", "Archived"].includes(task?.workflow_status) || deadlinePassed;
 
-  const running = session?.running === true && canonical === "in_progress";
-  const elapsed = useLiveElapsed(session?.started_at || null, session?.server_now || null, running);
-
   const countdown = useMemo(() => {
-    void tick;
     if (!status?.revision_deadline) return null;
     return remainingTime(status.revision_deadline, Date.now());
-  }, [status?.revision_deadline, tick]);
+  }, [status?.revision_deadline]);
 
   const validate = () => {
     if (!files.length && !comment.trim()) return "Add at least one file or a submission comment before submitting.";
@@ -238,7 +198,6 @@ export default function TaskDetail() {
       </div>
 
       {error && !blocked && <div className="task-alert" role="alert">{error.message}</div>}
-      {notice && <div className="info-msg" role="status">{notice}</div>}
 
       <div className="td-meta-grid">
         <div><span>Priority</span><strong className={`priority ${task?.priority}`}>{task?.priority || "medium"}</strong></div>
@@ -253,18 +212,6 @@ export default function TaskDetail() {
       {task?.how_to_do && <section className="td-section"><h3>Instructions</h3><p>{task.how_to_do}</p></section>}
       {task?.expected_output && <section className="td-section"><h3>Expected Output</h3><p>{task.expected_output}</p></section>}
       {task?.submission_requirements && <section className="td-section"><h3>Submission Requirements</h3><p>{task.submission_requirements}</p></section>}
-
-      {/* Live timer — server-owned start time, repainted once a second. */}
-      {session?.started_at && (
-        <section className="td-section td-timer">
-          <h3>{running ? "Time spent" : "Time recorded"}</h3>
-          <strong className="td-timer-value">{formatDurationHHMMSS(running ? elapsed : (session.duration_seconds ?? elapsed)) || "00:00:00"}</strong>
-          <small>
-            Started {formatWorkspaceDateTime(session.started_at)}
-            {session.ended_at ? ` · stopped ${formatWorkspaceDateTime(session.ended_at)}` : " · running"}
-          </small>
-        </section>
-      )}
 
       {/* Revision section: feedback + the server's exact deadline + countdown. */}
       {(needsRevision || windowExpired) && (

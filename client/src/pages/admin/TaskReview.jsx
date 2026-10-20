@@ -4,7 +4,7 @@ import TechinsIcon from "../../components/TechinsIcon";
 import FixedOverlay from "../../components/FixedOverlay";
 import useModalBehavior from "../../components/useModalBehavior";
 import FilePreview from "../../components/FilePreview";
-import { formatISTDateShort, formatWorkspaceDateTime } from "../../utils/dateHelper";
+import { formatISTDateShort, formatWorkspaceDateTime, formatDuration } from "../../utils/dateHelper";
 import {
   STATUS_LABEL,
   apiFetch,
@@ -299,6 +299,8 @@ function SubmissionViewer({ taskId, studentId, onClose, onChanged }) {
                           <div className="tm-field"><span>Submission code</span><strong>{latest.submission_code || "—"}</strong></div>
                           <div className="tm-field"><span>Submitted at</span><strong>{formatWorkspaceDateTime(latest.submitted_at)}</strong></div>
                           <div className="tm-field"><span>Review status</span><strong>{latest.status_label || STATUS_LABEL[latest.status]}</strong></div>
+                          {latest.task_started_at && <div className="tm-field"><span>Started at</span><strong>{formatWorkspaceDateTime(latest.task_started_at)}</strong></div>}
+                          {latest.duration_seconds !== null && latest.duration_seconds !== undefined && <div className="tm-field"><span>Time taken</span><strong>{formatDuration(latest.duration_seconds)}</strong></div>}
                         </div>
 
                         <span className="tm-comment-label">Submission comment</span>
@@ -390,6 +392,10 @@ function SubmissionViewer({ taskId, studentId, onClose, onChanged }) {
                       <div className="tm-field"><span>Last activity</span><strong>{formatWorkspaceDateTime(assignment?.submitted_at)}</strong></div>
                       <div className="tm-field"><span>Versions submitted</span><strong>{detail.versions.length}</strong></div>
                       <div className="tm-field"><span>Revision cycles</span><strong>{assignment?.revision_cycle ?? 0}</strong></div>
+                      {assignment?.started_at && <div className="tm-field"><span>Started at</span><strong>{formatWorkspaceDateTime(assignment.started_at)}</strong></div>}
+                      {!latest && assignment?.started_at && (
+                        <div className="tm-field"><span>Elapsed time</span><strong>{formatDuration(Math.floor((new Date() - new Date(assignment.started_at)) / 1000))}</strong></div>
+                      )}
                     </div>
                   </div>
 
