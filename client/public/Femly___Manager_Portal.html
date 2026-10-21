@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Femly – Manager Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg0:#072f1a;--bg1:#0d4a2a;--app:#eef0eb;--card:#fcfcf9;--line:#e3e6df;--ink:#10231a;--mut:#7d8a82;--red:#d63a3a;
+--a:#115130;--a2:#1a7045;--a3:#5abb88;--a4:#e3f1e8;--tm:#041f0f;box-sizing:border-box}
+:root[data-accent=ocean]{--a:#1e4fa8;--a2:#2f6fd6;--a3:#7aa8f0;--a4:#e3ecfb;--tm:#0a1f4a}
+:root[data-accent=plum]{--a:#5b2f8f;--a2:#7a49b5;--a3:#b393de;--a4:#ece3f7;--tm:#1e0d33}
+:root[data-accent=ember]{--a:#a8421a;--a2:#c95a2c;--a3:#eb9a73;--a4:#f9e6dc;--tm:#3a1507}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--ink:#10231a}}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:var(--ink);background:radial-gradient(120% 90% at 30% 20%,var(--bg1),var(--bg0));
+padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0);display:grid;place-items:center;overflow:hidden;font-size:11px}
+.stage{width:min(96vw,1120px);height:min(86vh,680px);position:relative;transition:transform 1.1s cubic-bezier(.65,0,.35,1)}
+.stage.zoom{transform:var(--zt)}
+.app{position:absolute;inset:0;display:flex;gap:10px;padding:10px;background:var(--app);border-radius:18px;box-shadow:0 20px 60px #0007;overflow:hidden}
+.side{width:112px;display:flex;flex-direction:column;padding:6px 4px;flex:none}
+.logo{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;margin-bottom:14px}
+.logo i{width:20px;height:20px;border-radius:7px;background:var(--a);display:grid;place-items:center;color:#fff;font-style:normal;font-size:11px}
+.grp{font-size:8px;letter-spacing:.12em;color:var(--mut);margin:8px 0 5px 6px}
+.nav{display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;color:#55635b;cursor:pointer;position:relative;font-weight:500;transition:.2s}
+.nav:hover{background:#e6e9e2}.nav.on{color:var(--ink);font-weight:600}
+.nav.on:before{content:"";position:absolute;left:-8px;top:6px;bottom:6px;width:3px;border-radius:3px;background:var(--a)}
+.nav b{margin-left:auto;background:var(--a);color:#fff;border-radius:4px;font-size:8px;padding:1px 4px}
+.dl{margin-top:auto;border-radius:12px;padding:10px;color:#fff;background:var(--tm) repeating-linear-gradient(115deg,#fff1 0 1px,transparent 1px 7px);font-size:9px;line-height:1.3}
+.dl button{margin-top:8px;width:100%}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;position:relative}
+.top{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:12px;padding:8px 12px;box-shadow:0 1px 3px #0001}
+.top .s{flex:1;color:var(--mut);display:flex;justify-content:space-between;max-width:230px;background:#f3f4f0;border-radius:8px;padding:6px 8px}
+.top .sp{flex:1}.av{width:24px;height:24px;border-radius:50%;background:#f4b9a8;display:grid;place-items:center;font-weight:700;font-size:9px}
+.page{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;animation:fin .45s ease both}
+@keyframes fin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+h1{font-size:20px;letter-spacing:-.02em}.sub{color:var(--mut);font-size:9px;margin-top:2px}
+.hd,.kpi,.chips{flex:none}.board,.cal,.an,.team,.set{flex:1;min-height:0}.hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.btn{font:inherit;font-weight:600;font-size:10px;border-radius:999px;padding:7px 13px;border:1px solid var(--line);background:var(--card);cursor:pointer;color:var(--ink);transition:.2s}
+.btn.p{background:var(--a);color:#fff;border-color:var(--a)}.btn.p:hover{background:var(--a2)}.btn.o{border-color:var(--a);color:var(--a)}
+.card{background:var(--card);border-radius:14px;padding:9px 12px;overflow:hidden;box-shadow:0 1px 3px #0001;position:relative}
+.card h3{font-size:11px;font-weight:600;margin-bottom:6px}
+.grid{display:grid;gap:10px}
+.kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px}
+.kpi .card b{display:block;font-size:22px;letter-spacing:-.03em;margin:3px 0 1px}.kpi .card small{color:var(--mut);font-size:8px}
+.kpi .card.dk{background:var(--a);color:#fff}.kpi .card.dk small{color:#cfe5d8}
+.arr{position:absolute;right:10px;top:9px;width:18px;height:18px;border:1px solid var(--line);border-radius:50%;display:grid;place-items:center;font-size:9px}
+.dk .arr{background:#fff;color:var(--a)}
+.dash{display:grid;grid-template-columns:1.55fr .85fr .75fr;grid-template-rows:minmax(0,1.1fr) minmax(0,1fr);gap:10px;flex:1;min-height:0}
+.bars{display:flex;gap:8px;align-items:flex-end;height:calc(100% - 30px);padding-top:6px}
+.bar{flex:1;border-radius:999px;position:relative;transform-origin:bottom;animation:grow .8s cubic-bezier(.2,.8,.2,1) both}
+@keyframes grow{from{transform:scaleY(.1);opacity:0}}
+.bar.h{background:repeating-linear-gradient(135deg,#bfc4bd 0 1px,#f4f5f1 1px 4px);border:1px solid #d9dcd5}
+.bars span{position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);font-size:8px;color:var(--mut)}
+.rem{color:var(--a);font-size:15px;font-weight:600;line-height:1.15;margin:8px 0 4px}
+.rem+small{color:var(--mut);font-size:8px}
+.li{display:flex;align-items:center;gap:6px;padding:4px 0}.li i{width:16px;height:16px;border-radius:50%;flex:none;background:var(--a3)}
+.tag{font-size:8px;border:1px solid;border-radius:4px;padding:1px 5px;margin-left:auto}
+.t-c{color:#1a7045;background:#e3f1e8}.t-p{color:#c4801c;background:#fbf0dd}.t-w{color:#b04a4a;background:#fbe6e6}
+.tm{background:var(--tm) repeating-linear-gradient(115deg,#fff1 0 1px,transparent 1px 9px);color:#fff;text-align:center}
+.tm .dig{font-size:26px;font-weight:500;letter-spacing:.01em;margin:4px 0;font-variant-numeric:tabular-nums}
+.tm h3{text-align:left}.ctl{display:flex;justify-content:center;gap:10px}
+.rb{width:26px;height:26px;border-radius:50%;border:0;cursor:pointer;display:grid;place-items:center;font-size:10px;transition:transform .2s}.rb:hover{transform:scale(1.1)}
+.rb.pl{background:#f0f2ee;color:var(--tm)}.rb.st{background:var(--red);color:#fff}
+.overlay{position:absolute;inset:0;background:#10231a66;backdrop-filter:blur(3px);display:grid;place-items:center;opacity:0;pointer-events:none;transition:opacity .3s;z-index:20;border-radius:18px}
+.overlay.on{opacity:1;pointer-events:auto}
+.modal{width:230px;background:var(--card);border-radius:14px;padding:14px;transform:scale(.92) translateY(10px);transition:.3s cubic-bezier(.2,.9,.3,1)}
+.overlay.on .modal{transform:none}
+.modal h3{font-size:12px;margin-bottom:8px}.modal label{font-size:8px;color:var(--mut);display:block;margin:6px 0 3px}
+.modal input{width:100%;font:inherit;font-size:10px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:#fff}
+.modal input:focus{outline:0;border-color:var(--a3);box-shadow:0 0 0 2px var(--a4)}
+.modal .row{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}
+.toast{position:absolute;left:50%;bottom:10px;transform:translate(-50%,20px);background:var(--a);color:#fff;border-radius:999px;padding:6px 12px;font-size:9px;opacity:0;transition:.35s;z-index:30}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.cap{position:fixed;left:50%;bottom:calc(10px + env(safe-area-inset-bottom,0));transform:translateX(-50%);background:var(--tm);color:#fff;padding:7px 14px;border-radius:999px;font-size:11px;font-weight:600;opacity:0;transition:.4s;z-index:50}
+.cap.on{opacity:1}.cap:before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--a3);margin-right:7px}
+.board{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.col{background:#f4f5f1;border-radius:12px;padding:8px;overflow:hidden;transition:.25s}.col.drop{outline:2px solid var(--a3);background:var(--a4)}
+.col h4{font-size:10px;display:flex;gap:6px;align-items:center;margin-bottom:8px}.col h4 u{margin-left:auto;text-decoration:none;color:var(--mut)}
+.col h4 i{width:6px;height:6px;border-radius:50%}
+.tk{background:var(--card);border-radius:10px;padding:8px;margin-bottom:7px;box-shadow:0 1px 2px #0001;cursor:grab;animation:fin .4s both}
+.tk.drag{opacity:.4;transform:rotate(2deg)}.tk em{font-style:normal;font-size:8px;color:var(--a2);background:var(--a4);border-radius:4px;padding:1px 5px}
+.tk p{font-weight:600;margin:6px 0 5px;font-size:10px}.pb{height:3px;border-radius:3px;background:#e6e9e2}.pb u{display:block;height:100%;background:var(--a2);border-radius:3px}
+.chips{display:flex;gap:6px;margin-bottom:10px;align-items:center}.chip{padding:5px 11px;border-radius:999px;background:var(--card);border:1px solid var(--line);cursor:pointer;font-weight:500;font-size:10px;transition:.2s}
+.chip.on{background:var(--a);color:#fff;border-color:var(--a)}.chips small{margin-left:auto;color:var(--mut)}
+.team{align-content:start;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.mc{text-align:center;animation:fin .45s both}.mc .ph{width:34px;height:34px;border-radius:50%;margin:2px auto 6px;display:grid;place-items:center;font-weight:600;font-size:11px;position:relative}
+.mc .ph:after{content:"";position:absolute;right:0;bottom:1px;width:8px;height:8px;border-radius:50%;background:#2fa36a;border:2px solid var(--card)}
+.mc p{font-size:8px;color:var(--mut);margin:1px 0 4px}.st3{display:flex;border-top:1px solid var(--line);margin:8px 0;padding-top:7px}.st3 div{flex:1;font-size:8px;color:var(--mut)}.st3 b{display:block;font-size:11px;color:var(--ink)}
+.mc .row{display:flex;gap:6px;margin-top:8px}.mc .btn{flex:1;padding:5px}
+.panel{position:absolute;right:0;top:0;bottom:0;width:250px;background:var(--card);border-radius:16px;padding:16px;z-index:25;transform:translateX(110%);transition:transform .5s cubic-bezier(.2,.8,.2,1);text-align:center;box-shadow:-10px 0 40px #0003}
+.panel.on{transform:none}.panel .x{position:absolute;right:12px;top:12px;cursor:pointer}
+.panel .st3{border:0;gap:6px}.panel .st3 div{background:#f4f5f1;border-radius:8px;padding:7px}
+.panel .tl{display:flex;gap:6px;align-items:center;background:#f4f5f1;border-radius:7px;padding:6px 8px;margin-bottom:5px;text-align:left;font-size:9px}.panel .tl i{width:6px;height:6px;border-radius:50%;background:var(--a2)}
+.cal{display:grid;grid-template-columns:1fr 190px;gap:10px;}.cal>.card:first-child{display:flex;flex-direction:column}.cal>.card:first-child .cg{flex:1;height:auto}
+.cg{display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:minmax(0,1fr);gap:4px;font-size:9px;height:calc(100% - 22px)}.cg .dw{height:12px}.cg .dw{text-align:center;font-size:8px;color:var(--mut)}
+.cd{background:#f4f5f1;border-radius:7px;min-height:0;overflow:hidden;padding:4px;transition:.3s;animation:fin .4s both}.cd.o{opacity:.5}.cd.td{outline:1.5px solid var(--a2);background:#fff}
+.ev{display:block;font-size:7.5px;border-radius:3px;padding:1px 4px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev.m{background:#dfe4fb;color:#3a4cb0}.ev.r{background:#fbe6d0;color:#b2661c}.ev.d{background:#fbdcdc;color:#b03a3a}.ev.g{background:#dcf0e4;color:#1a7045}
+.an{display:grid;grid-template-columns:1fr 170px;gap:10px;margin-top:10px}
+svg text{font-family:inherit}.rng{display:flex;gap:2px;background:#e6e9e2;border-radius:999px;padding:2px}.rng span{padding:4px 10px;border-radius:999px;cursor:pointer;font-weight:600;font-size:9px}.rng .on{background:var(--a);color:#fff}
+.tip{position:absolute;background:var(--a);color:#fff;border-radius:8px;padding:5px 8px;font-size:9px;pointer-events:none;opacity:0;transition:opacity .2s,left .2s,top .2s}
+.set{display:grid;grid-template-columns:130px 1fr;gap:10px}.sn .nav{border-radius:8px}.sw{display:flex;gap:8px;margin:6px 0 14px}
+.sw div{display:flex;align-items:center;gap:7px;padding:7px 11px 7px 7px;border-radius:10px;background:#f4f5f1;cursor:pointer;border:1.5px solid transparent;font-weight:500;transition:.2s}
+.sw div.on{border-color:var(--a);background:#fff}.sw i{width:20px;height:20px;border-radius:7px}
+.cur{position:fixed;width:16px;height:16px;z-index:99;pointer-events:none;transition:left .8s cubic-bezier(.5,0,.2,1),top .8s cubic-bezier(.5,0,.2,1);left:60%;top:30%;filter:drop-shadow(0 1px 2px #0006)}
+.wm{position:fixed;right:8px;bottom:4px;font-size:9px;color:#fff8}
+@media(max-width:760px){
+body{overflow:hidden;font-size:12px}.stage{width:100vw;height:100dvh}.stage.zoom{transform:none}
+.app{border-radius:0;flex-direction:column-reverse;padding:8px;gap:8px}
+.side{width:auto;flex-direction:row;padding:0;background:var(--card);border-radius:14px;padding:2px 4px}
+.side .logo,.side .grp,.side .dl,.side>.nav:nth-last-child(-n+3):not([data-p]),.side>.nav:not([data-p]){display:none}
+#nav{display:contents}.side .nav{flex:1;flex-direction:column;gap:1px;padding:6px 1px;font-size:8px;justify-content:center;text-align:center;white-space:nowrap}
+.nav.on:before{display:none}.nav.on{background:var(--a4);color:var(--a)}.nav b{position:absolute;top:1px;right:6px;margin:0}
+.main{overflow:hidden}.page{display:block;overflow-y:auto;overflow-x:hidden;padding-bottom:6px;-webkit-overflow-scrolling:touch}
+.hd{flex-wrap:wrap;gap:8px}h1{font-size:18px}.top .s{max-width:none}.top b+br+small,.top .av+div{display:none}
+.kpi{grid-template-columns:repeat(2,1fr)}.dash{display:grid;grid-template-columns:1fr;grid-template-rows:none}
+.dash .card{min-height:150px}.bars{height:120px}
+.board,.set,.cal,.an{display:grid;grid-template-columns:1fr;gap:10px}.team{grid-template-columns:repeat(2,1fr)}
+.chips{overflow-x:auto;white-space:nowrap}.cg{grid-auto-rows:50px;height:auto}.cal>.card:first-child .cg{flex:none}
+.an #ch{height:170px}#chc{min-height:210px}.panel{width:min(100%,320px)}.cap{bottom:80px;font-size:10px}.cur{display:none}
+.wm{display:none}.modal{width:min(86vw,300px)}}
+@media(max-width:380px){.team{grid-template-columns:1fr}}
+
+/* ==========================================================================
+   MANAGER PORTAL MOTION
+   Scoped to [data-portal=manager]. Nothing here can leak into another portal.
+   Vocabulary taken from the reference reel: 3D scatter/reassemble, staged
+   card reveal, camera dolly, draw-on data, side-panel spring, pill morph.
+   ========================================================================== */
+[data-portal=manager]{
+  --mgr-dur-out:200ms;
+  --mgr-dur-page:460ms;
+  --mgr-dur-card:520ms;
+  --mgr-dur-panel:520ms;
+  --mgr-dur-fast:160ms;
+  --mgr-dur-theme:320ms;
+  --mgr-stagger:45ms;
+  --mgr-ease-out:cubic-bezier(.16,1,.3,1);
+  --mgr-ease-card:cubic-bezier(.22,1.06,.36,1);
+  --mgr-ease-in:cubic-bezier(.55,0,1,.45);
+  --mgr-ease-camera:cubic-bezier(.65,0,.35,1);
+  --mgr-ease-panel:cubic-bezier(.22,1,.36,1);
+}
+[data-portal=manager].stage{perspective:1600px;perspective-origin:50% 45%}
+[data-portal=manager].stage.zoom{
+  transform:perspective(1600px) var(--zt) rotateX(1.2deg) rotateY(-1.2deg);
+  transition:transform 1.1s var(--mgr-ease-camera)
+}
+
+/* ---- opening camera settle ------------------------------------------------ */
+[data-portal=manager] .app{
+  overflow:hidden;
+  overflow:clip;
+  transform-origin:50% 55%;
+  will-change:transform,opacity;
+  transition:background-color var(--mgr-dur-theme) ease,box-shadow var(--mgr-dur-theme) ease
+}
+[data-portal=manager] .app.mgr-intro{animation:mgr-app-in 900ms var(--mgr-ease-out) backwards}
+@keyframes mgr-app-in{
+  from{opacity:0;transform:translate3d(0,26px,-80px) rotateX(7deg) rotateY(-2deg) scale(.95)}
+  to{opacity:1;transform:none}
+}
+
+/* ---- page leave / staged reveal ------------------------------------------ */
+[data-portal=manager] .page{animation:none;transform-style:preserve-3d;will-change:opacity,transform}
+[data-portal=manager] .bar,
+[data-portal=manager] .tk,
+[data-portal=manager] .mc,
+[data-portal=manager] .cd{animation:none}
+[data-portal=manager] .page.mgr-page-out{
+  animation:mgr-page-out var(--mgr-dur-out) var(--mgr-ease-in) both;
+  pointer-events:none
+}
+@keyframes mgr-page-out{
+  to{opacity:0;transform:translate3d(0,-5px,-50px) scale(.985);filter:blur(1px)}
+}
+[data-portal=manager] .page.mgr-page-in .mgr-reveal,
+[data-portal=manager] .page.mgr-page-in .hd,
+[data-portal=manager] .page.mgr-page-in .chips{
+  animation:mgr-rise var(--mgr-dur-card) var(--mgr-ease-card) backwards;
+  animation-delay:calc(var(--mgr-i,0) * var(--mgr-stagger))
+}
+@keyframes mgr-rise{
+  from{opacity:0;transform:translate3d(0,12px,-24px) rotateX(2.5deg) scale(.985)}
+  65%{opacity:1}
+  to{opacity:1;transform:none}
+}
+[data-portal=manager] .page.mgr-page-in .bar{
+  animation:mgr-bar .76s var(--mgr-ease-out) backwards;
+  animation-delay:calc(var(--bi,0) * 70ms)
+}
+@keyframes mgr-bar{
+  from{opacity:0;transform:scaleY(.06)}
+  55%{opacity:1}
+  to{opacity:1;transform:scaleY(1)}
+}
+[data-portal=manager] .bars span{animation:mgr-fade .4s ease .35s backwards}
+
+/* ---- rail / nav ---------------------------------------------------------- */
+[data-portal=manager] .nav{
+  transition:background-color .18s ease,color .18s ease,transform .18s var(--mgr-ease-out)
+}
+[data-portal=manager] .mgr-rail{animation:mgr-rail .3s var(--mgr-ease-out) backwards;animation-delay:calc(var(--ni,0) * 55ms)}
+@keyframes mgr-rail{
+  from{opacity:0;transform:translateX(-6px)}
+  to{opacity:1;transform:none}
+}
+@media(hover:hover){
+  [data-portal=manager] .nav:hover{transform:translateX(2px)}
+  [data-portal=manager] .card:not(.tm):hover{
+    transform:translateY(-2px);
+    box-shadow:0 9px 26px #10231a14
+  }
+}
+[data-portal=manager] .nav.on:before{animation:mgr-nav-bar .32s var(--mgr-ease-card) backwards}
+@keyframes mgr-nav-bar{from{transform:scaleY(.25);opacity:0}to{transform:scaleY(1);opacity:1}}
+
+/* ---- buttons / chips / pills -------------------------------------------- */
+[data-portal=manager] .btn{
+  transition:background-color .18s ease,color .18s ease,border-color .18s ease,
+             transform .14s var(--mgr-ease-out),box-shadow .18s ease
+}
+[data-portal=manager] .btn:active{transform:scale(.97)}
+[data-portal=manager] .btn:focus-visible{outline:2px solid var(--a3);outline-offset:2px}
+[data-portal=manager] .chip,
+[data-portal=manager] .rng span,
+[data-portal=manager] .sw div{
+  transition:background-color .2s ease,color .2s ease,border-color .2s ease,
+             transform .16s var(--mgr-ease-card),box-shadow .2s ease
+}
+[data-portal=manager] .chip:active,
+[data-portal=manager] .rng span:active{transform:scale(.96)}
+[data-portal=manager] .chip.on,
+[data-portal=manager] .rng .on{animation:mgr-pill .3s var(--mgr-ease-card) backwards}
+@keyframes mgr-pill{from{transform:scale(.94)}to{transform:scale(1)}}
+[data-portal=manager] .sw div.on{box-shadow:0 4px 14px #10231a12}
+
+/* ---- cards / counters / gauge ------------------------------------------- */
+[data-portal=manager] .card{
+  transition:background-color var(--mgr-dur-theme) ease,color var(--mgr-dur-theme) ease,
+             border-color var(--mgr-dur-theme) ease,box-shadow .18s ease,
+             transform .18s var(--mgr-ease-out)
+}
+[data-portal=manager] .kpi .card b{font-variant-numeric:tabular-nums}
+[data-portal=manager] #arc{
+  transition:stroke-dasharray 1.1s var(--mgr-ease-camera),stroke var(--mgr-dur-theme) ease
+}
+[data-portal=manager] #arcTxt{font-variant-numeric:tabular-nums}
+
+/* ---- analytics chart ----------------------------------------------------- */
+[data-portal=manager] #ch .mgr-grid{animation:mgr-fade .45s ease both;animation-delay:calc(var(--gi,0) * 45ms)}
+[data-portal=manager] #ch .mgr-area{animation:mgr-area .8s var(--mgr-ease-out) .18s backwards}
+@keyframes mgr-area{from{opacity:0}to{opacity:.8}}
+[data-portal=manager] #ch .mgr-dot{
+  transform-box:fill-box;transform-origin:center;
+  animation:mgr-dot .32s var(--mgr-ease-card) backwards;
+  animation-delay:calc(420ms + var(--di,0) * 18ms)
+}
+@keyframes mgr-dot{from{opacity:0;transform:scale(0)}to{opacity:1;transform:scale(1)}}
+[data-portal=manager] .tip{
+  transform:translateY(4px) scale(.95);transform-origin:center bottom;
+  transition:opacity .18s ease,left .18s ease,top .18s ease,transform .18s var(--mgr-ease-out)
+}
+[data-portal=manager] .tip.on{transform:none}
+[data-portal=manager] #dot{transition:r .15s ease,opacity .15s ease}
+
+/* ---- modal --------------------------------------------------------------- */
+[data-portal=manager] .overlay{
+  transition:opacity .24s ease,backdrop-filter .24s ease;
+  backdrop-filter:blur(0)
+}
+[data-portal=manager] .overlay.on{backdrop-filter:blur(3px)}
+[data-portal=manager] .overlay.mgr-closing{opacity:0;pointer-events:none}
+[data-portal=manager] .modal{
+  opacity:0;
+  transform:translate3d(0,16px,-30px) scale(.9) rotateX(4deg);
+  transition:transform .42s var(--mgr-ease-panel),opacity .24s ease
+}
+[data-portal=manager] .overlay.on .modal{opacity:1;transform:none}
+[data-portal=manager] .overlay.mgr-closing .modal{
+  opacity:0;transform:translate3d(0,8px,0) scale(.96);
+  transition:transform .2s ease,opacity .2s ease
+}
+
+/* ---- profile panel + scrim ---------------------------------------------- */
+[data-portal=manager] .mgr-scrim{
+  position:absolute;inset:0;z-index:24;border-radius:18px;
+  background:#10231a33;backdrop-filter:blur(1.5px);
+  opacity:0;pointer-events:none;transition:opacity .26s ease
+}
+[data-portal=manager] .mgr-scrim.on{opacity:1;pointer-events:auto}
+[data-portal=manager] .panel{
+  opacity:.55;
+  transform:translate3d(110%,0,0) scale(.98);
+  transition:transform var(--mgr-dur-panel) var(--mgr-ease-panel),opacity .3s ease
+}
+[data-portal=manager] .panel.on{opacity:1;transform:none}
+[data-portal=manager] .panel .x{z-index:3;padding:6px;line-height:1;border-radius:8px}
+[data-portal=manager] .panel .x:hover{background:#f4f5f1}
+
+/* ---- toast --------------------------------------------------------------- */
+[data-portal=manager] .toast{
+  transform:translate(-50%,24px) scale(.96);
+  transition:opacity .28s ease,transform .35s var(--mgr-ease-card)
+}
+[data-portal=manager] .toast.on{transform:translate(-50%,0) scale(1)}
+
+/* ---- team / calendar / kanban ------------------------------------------- */
+[data-portal=manager] .page.mgr-page-in .team > .mc{
+  animation:mgr-pop var(--mgr-dur-card) var(--mgr-ease-card) backwards
+}
+@keyframes mgr-pop{
+  from{opacity:0;transform:translate3d(0,10px,-18px) scale(.96)}
+  to{opacity:1;transform:none}
+}
+[data-portal=manager] .page.mgr-page-in .cd{
+  animation:mgr-cell .38s var(--mgr-ease-out) backwards
+}
+@keyframes mgr-cell{
+  from{opacity:0;transform:translateY(6px) scale(.96)}
+  to{opacity:1;transform:none}
+}
+[data-portal=manager] .page.mgr-page-in .ev{animation:mgr-fade .3s ease .18s backwards}
+@keyframes mgr-fade{from{opacity:0}to{opacity:1}}
+[data-portal=manager] .page.mgr-page-in .board .tk{
+  animation:mgr-tile .42s var(--mgr-ease-card) backwards;
+  animation-delay:calc(var(--ti,0) * 32ms + 90ms)
+}
+@keyframes mgr-tile{
+  from{opacity:0;transform:translate3d(0,8px,0) scale(.98)}
+  to{opacity:1;transform:none}
+}
+[data-portal=manager] .col{
+  transition:background-color .2s ease,outline-color .2s ease,transform .2s var(--mgr-ease-out)
+}
+[data-portal=manager] .col.drop{transform:scale(1.01)}
+[data-portal=manager] .col.mgr-dropped{animation:mgr-drop .55s var(--mgr-ease-card)}
+@keyframes mgr-drop{
+  0%{transform:scale(1)}
+  35%{transform:scale(1.015);background:var(--a4)}
+  100%{transform:scale(1)}
+}
+[data-portal=manager] .tk.drag{
+  opacity:.32;transform:rotate(2deg) scale(.98);box-shadow:0 12px 28px #10231a22
+}
+[data-portal=manager] .tk{
+  transition:box-shadow .16s ease,transform .16s var(--mgr-ease-out)
+}
+
+/* ---- theme shift --------------------------------------------------------- */
+[data-portal=manager] .top,
+[data-portal=manager] .side,
+[data-portal=manager] .col,
+[data-portal=manager] .cd,
+[data-portal=manager] .tm,
+[data-portal=manager] .dl,
+[data-portal=manager] .panel,
+[data-portal=manager] .modal,
+[data-portal=manager] .rng,
+[data-portal=manager] .hl,
+[data-portal=manager] .tag{
+  transition:background-color var(--mgr-dur-theme) ease,color var(--mgr-dur-theme) ease,
+             border-color var(--mgr-dur-theme) ease
+}
+[data-portal=manager] .tip{background:var(--a)}
+
+/* ---- reduced motion ------------------------------------------------------ */
+@media(prefers-reduced-motion:reduce){
+  [data-portal=manager],
+  [data-portal=manager] *,
+  [data-portal=manager] *::before,
+  [data-portal=manager] *::after{
+    animation-duration:.001ms !important;
+    animation-delay:0ms !important;
+    transition-duration:.001ms !important;
+    scroll-behavior:auto !important
+  }
+  [data-portal=manager] .page,
+  [data-portal=manager] .page > *,
+  [data-portal=manager] .mgr-reveal{
+    opacity:1 !important;transform:none !important;filter:none !important
+  }
+  [data-portal=manager] .stage.zoom{transform:none !important}
+}
+
+@media(max-width:760px){
+  [data-portal=manager].stage{perspective:none}
+  [data-portal=manager].stage.zoom{transform:none}
+  [data-portal=manager] .page.mgr-page-out{animation-duration:120ms}
+  [data-portal=manager] .card:not(.tm):hover{transform:none;box-shadow:0 1px 3px #0001}
+}
+</style></head><body>
+<div class="stage" id="stage" data-portal="manager"><div class="app" id="app">
+<aside class="side"><div class="logo"><i>✦</i>Femly</div><div class="grp">MENU</div><div id="nav"></div>
+<div class="grp">GENERAL</div><div class="nav" data-p="settings">⚙ Settings</div><div class="nav">? Help</div><div class="nav">↪ Logout</div>
+<div class="dl">Femly for iOS &amp; Android<br><small>Manage on the go</small><button class="btn">Download</button></div></aside>
+<div class="main"><div class="top"><div class="s"><span id="ph">Search projects &amp; people</span><span>⌘K</span></div><div class="sp"></div><span>🔔 ⟳</span><div class="av">NC</div><div><b>Noah Castell</b><br><small style="color:var(--mut)">noah@femly.app</small></div></div>
+<div class="page" id="page"></div>
+<div class="overlay" id="ov"><div class="modal"><h3>New project</h3><label>Project name</label><input id="pn" placeholder="e.g. Payment Gateway"><label>Due date</label><input id="pd" value="10/17/2026"><div class="row"><button class="btn" id="cx">Cancel</button><button class="btn p" id="ad">Add project</button></div></div></div>
+<div class="mgr-scrim" id="scrim" aria-hidden="true"></div><div class="panel" id="pnl"></div><div class="toast" id="ts"></div></div></div></div>
+<div class="cap" id="cap"></div><svg class="cur" id="cur" viewBox="0 0 16 16"><path d="M2 1l11 6-5 1.5L6 14z" fill="#fff" stroke="#111" stroke-width="1.2"/></svg><div class="wm">Manager portal · recreation</div>
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const motionOK=()=>!matchMedia('(prefers-reduced-motion: reduce)').matches;
+let mgrGoToken=0,mgrModalTimer=0;
+function markReveal(pg){
+  [...pg.querySelectorAll('.hd,.chips,.kpi>.card,.dash>.card,.board>.col,.cal>.card,.cal>div>.card,.an>.card,.set>.card')]
+    .forEach((el,i)=>{el.classList.add('mgr-reveal');el.style.setProperty('--mgr-i',i)});
+  pg.querySelectorAll('.board .tk').forEach(el=>{
+    el.style.setProperty('--ti',[...el.parentNode.children].indexOf(el))
+  });
+  if(S.dropTo!=null){
+    const to=S.dropTo;S.dropTo=null;
+    const col=pg.querySelector(`.col[data-c="${to}"]`);
+    if(col){col.classList.add('mgr-dropped');setTimeout(()=>col.classList.remove('mgr-dropped'),650)}
+  }
+  pg.classList.remove('mgr-page-out');
+  pg.classList.add('mgr-page-in');
+}
+const NAV=[['dashboard','▦ Dashboard'],['tasks','☑ Tasks'],['calendar','▣ Calendar'],['analytics','▥ Analytics'],['team','♙ Team']];
+const S={page:'dashboard',proj:{t:24,e:10,r:12,p:2,pct:42},timer:{s:5048,run:false},tasks:null,filter:'All',range:'30d',demo:true};
+if(new URLSearchParams(location.search).has('static'))S.demo=false;
+const PJ=[['Payment API v2','Oct 12','#6b7fd6'],['Mobile Onboarding','Oct 12','#1aa08a'],['Design System Audit','Oct 18','#e0689a'],['Search Revamp','Oct 22','#f0a030'],['Q4 Launch Site','Oct 28','#7a49b5']];
+const TEAM=[['Noah Castell','Project Lead','Management',0,48,24,'#f4b9a8'],['Priya Raman','Product Designer','Design',1,39,72,'#f4b9b9'],['Mateo Silva','Backend Engineer','Engineering',2,51,38,'#bfe5cf'],['Hana Kobayashi','Frontend Engineer','Engineering',1,33,50,'#c9d3f5'],['Owen Mercer','Platform Engineer','Engineering',2,42,30,'#f7dcb0'],['Sofia Sato','QA Engineer','Engineering',1,27,44,'#d9c9f0'],['Maya Kovac','Brand Designer','Design',2,24,30,'#bfe3ee'],['Liam Reyes','Growth Marketer','Marketing',1,30,35,'#f5c6d8']];
+const mkT=()=>[['To do','#7d8a82',[['Frontend','Saved filters for projects'],['Backend','Write API endpoint docs'],['Marketing','Onboarding email sequence'],['Frontend','Cut LCP under 2 seconds']]],['In progress','#e0a030',[['Design','Design login & sign-up screens'],['Backend','Passkey sign-in'],['Marketing','Marketing site refresh'],['Marketing','Q4 launch announcement']]],['In review','#4a6fd6',[['QA','Safari & Firefox regression pass'],['Design','Brand illustration set']]],['Done','#2fa36a',[['Backend','Monorepo cleanup'],['Frontend','Dashboard analytics widgets'],['Marketing','Kickoff with Halcyon Labs']]]];
+S.tasks=mkT();
+const fmt=s=>[s/3600|0,s/60%60|0,s%60].map(n=>String(n).padStart(2,'0')).join(':');
+function count(el,to,from=0,suffix=''){const t0=performance.now();(function f(t){const k=Math.min(1,(t-t0)/900);el.textContent=Math.round(from+(to-from)*(1-Math.pow(1-k,3)))+suffix;k<1&&requestAnimationFrame(f)})(t0)}
+function nav(){$('#nav').innerHTML=NAV.map(([k,l],i)=>`<div class="nav mgr-rail ${S.page==k?'on':''}" style="--ni:${i}" data-p="${k}">${l}${k=='tasks'?'<b>13</b>':''}</div>`).join('');$$('.nav[data-p=settings]').forEach(n=>n.classList.toggle('on',S.page=='settings'))}
+function go(p){
+  S.page=p;nav();
+  $('#ph').textContent={tasks:'Search tasks',calendar:'Search tasks',team:'Search people',analytics:'Search tasks'}[p]||'Search projects & people';
+  const pg=$('#page'),token=++mgrGoToken;
+  const paint=()=>{
+    if(token!==mgrGoToken)return;
+    pg.classList.remove('mgr-page-out');
+    pg.innerHTML=V[p]();
+    if(I[p])I[p]();
+    requestAnimationFrame(()=>{if(token===mgrGoToken)markReveal(pg)});
+  };
+  if(!motionOK()||!pg.firstElementChild){paint();return}
+  pg.classList.remove('mgr-page-in');
+  pg.classList.add('mgr-page-out');
+  setTimeout(paint,190);
+}
+const hd=(t,s,b)=>`<div class="hd"><div><h1>${t}</h1><div class="sub">${s}</div></div><div>${b||''}</div></div>`;
+const V={
+dashboard(){const P=S.proj,bars=[['S',55,1],['M',78],['T',62],['W',68],['T',78,1],['F',50,1],['S',72,1]];
+return hd('Dashboard','Everything your team is shipping, in one calm place.','<button class="btn p" id="addb">+ Add Project</button> <button class="btn">⇪ Import Data</button>')+
+`<div class="kpi">${[['Total Projects',P.t,'dk','Increased from last month'],['Ended Projects',P.e,'','Increased from last month'],['Running Projects',P.r,'','Increased from last month'],['Pending Projects',P.p,'','Awaiting review']].map(([a,n,c,s],i)=>`<div class="card ${c}"><h3>${a}</h3><span class="arr">↗</span><b class="cnt" data-n="${n}">0</b><small>${s}</small></div>`).join('')}</div>
+<div class="dash"><div class="card"><h3>Project Analytics</h3><div class="bars">${bars.map(([d,h,x],i)=>`<div class="bar ${x?'h':''}" style="height:${h}%;${x?'':'background:'+['var(--a2)','var(--a3)','var(--a)'][i%3==0?0:i-1]};--bi:${i}"><span>${d}</span></div>`).join('')}</div></div>
+<div class="card"><h3>Reminders</h3><div class="rem">Check-in with Halcyon Labs</div><small>Time: 02:30 pm – 04:00 pm</small><br><br><button class="btn p" style="width:100%">▶ Start Meeting</button></div>
+<div class="card"><h3>Project <button class="btn" style="float:right;padding:3px 8px" id="newb">+ New</button></h3>${PJ.slice(0,5+(S.proj.t>24?1:0)).concat(S.proj.t>24?[]:[]).map(p=>`<div class="li"><i style="background:${p[2]}"></i><div><b>${p[0]}</b><br><small style="color:var(--mut)">Due date: ${p[1]}, 2026</small></div></div>`).join('')}${S.proj.t>24?'<div class="li"><i style="background:#a8e0c0"></i><div><b>'+(S.added||'Payment Gateway')+'</b><br><small style="color:var(--mut)">Due date: Oct 17, 2026</small></div></div>':''}</div>
+<div class="card"><h3>Team Collaboration</h3>${TEAM.slice(1,5).map((m,i)=>`<div class="li"><i style="background:${m[6]}"></i><div><b>${m[0].split(' ')[0]} ${m[0].split(' ')[1]}</b><br><small style="color:var(--mut)">Working on ${['Design System Tokens','Passkey Sign-in','Saved Filters for Projects','Marketing Site Refresh'][i]}</small></div><span class="tag ${['t-c','t-p','t-w','t-p'][i]}">${['Completed','In Progress','Pending','In Progress'][i]}</span></div>`).join('')}</div>
+<div class="card" style="text-align:center"><h3 style="text-align:left">Project Progress</h3><svg viewBox="0 0 120 70" width="100%" style="max-height:110px"><path d="M14 64A46 46 0 0 1 106 64" fill="none" stroke="#e6e9e2" stroke-width="14" stroke-dasharray="3 2"/><path id="arc" d="M14 64A46 46 0 0 1 106 64" fill="none" stroke="var(--a2)" stroke-width="14" pathLength="100" stroke-dasharray="0 100" data-pct="${P.pct}"/><text id="arcTxt" x="60" y="58" text-anchor="middle" font-size="16" font-weight="700" fill="#10231a" data-n="${P.pct}">0%</text></svg></div>
+<div class="card tm" id="tmc"><h3>Time Tracker</h3><div class="dig" id="dig">${fmt(S.timer.s)}</div><div class="ctl"><button class="rb pl" id="tp">${S.timer.run?'❚❚':'▶'}</button><button class="rb st" id="ts2">■</button></div></div></div>`},
+tasks(){return hd('Tasks','Drag a card to another stage, or use its menu to move it.','<button class="btn p">+ New Task</button>')+`<div class="chips"><span class="chip on">All</span><span class="chip">My tasks</span><span class="chip">High priority</span><span class="chip">Due this week</span><small>13 tasks shown</small></div><div class="board">${S.tasks.map((c,ci)=>`<div class="col" data-c="${ci}"><h4><i style="background:${c[1]}"></i>${c[0]}<u>${c[2].length}</u></h4>${c[2].map((t,ti)=>`<div class="tk" draggable="true" data-c="${ci}" data-t="${ti}"><em>${t[0]}</em><p>${t[1]}</p><div class="pb"><u style="width:${[20,45,70,100][ci]}%"></u></div></div>`).join('')}</div>`).join('')}</div>`},
+team(){const L=TEAM.filter(m=>S.filter=='All'||m[2]==S.filter);return hd('Team','Everyone on the workspace, what they’re carrying and who’s around.','<button class="btn p">+ Invite member</button>')+`<div class="chips">${['All','Engineering','Design','Marketing','Management'].map(f=>`<span class="chip ${S.filter==f?'on':''}" data-f="${f}">${f}</span>`).join('')}<small>5 online now</small></div><div class="team">${L.map((m,i)=>`<div class="card mc" style="animation-delay:${i*.06}s"><div class="ph" style="background:${m[6]}">${m[0].split(' ').map(x=>x[0]).join('')}</div><b>${m[0]}</b><p>${m[1]}</p><span class="tag t-c" style="margin:0">${m[2]}</span><div class="st3"><div><b>${m[3]}</b>Open tasks</div><div><b>${m[4]}</b>Completed</div></div><div class="pb"><u style="width:${m[5]}%"></u></div><div class="row"><button class="btn">Message</button><button class="btn p" data-pr="${TEAM.indexOf(m)}">Profile</button></div></div>`).join('')}</div>`},
+calendar(){const ev={0:['m','Design sprint'],3:['g','Halcyon Sync'],4:['m','Planning'],6:['m','Daily stand-up','g','Check-in with Halcyon Labs'],7:['m','Daily stand-up'],8:['m','Sprint planning'],9:['r','Design review'],11:['d','Launch sync'],18:['g','Retro'],25:['d','Regression sign-off']};let c='';for(let i=0;i<35;i++){const d=new Date(2026,8,27+i),o=d.getMonth()!=9,e=ev[i]||[];c+=`<div class="cd ${o?'o':''} ${i==6?'td':''}" style="animation-delay:${i*.012}s">${d.getDate()}${[0,2].filter(k=>e[k]).map(k=>`<span class="ev ${e[k]}">${e[k+1]}</span>`).join('')}</div>`}
+return hd('Calendar','Meetings, reviews and deadlines across the team.','<button class="btn" id="today">▣ Today</button>')+`<div class="cal"><div class="card"><h3>October 2026</h3><div class="cg">${'SUN MON TUE WED THU FRI SAT'.split(' ').map(x=>`<div class="dw">${x}</div>`).join('')}${c}</div></div><div><div class="card"><small style="color:var(--a2)">TODAY · SATURDAY</small><h3 style="font-size:16px;margin:4px 0 8px">October 3</h3><div class="tk" style="border-left:3px solid #4a6fd6;cursor:default"><b>Daily stand-up</b><br><small>10:30 am · Team</small></div><div class="tk" style="border-left:3px solid var(--a2);cursor:default"><b>Check-in with Halcyon Labs</b><br><small>2:30 pm · Meeting</small></div></div><div class="card" style="margin-top:10px"><h3>Coming up</h3>${[['3','Daily stand-up'],['3','Check-in with Halcyon Labs'],['4','Design review – auth flow'],['4','Regression sign-off'],['5','Sprint planning']].map(x=>`<div class="li"><span class="tag t-c" style="margin:0">OCT ${x[0]}</span><b>${x[1]}</b></div>`).join('')}</div></div></div>`},
+analytics(){const R={'7d':[41,'218',' 90%','2.6 d'],'30d':[204,'1,145','88%','2.8 d'],'90d':[646,'3,532','89%','3.0 d']}[S.range];
+return hd('Analytics','How the team is shipping, and where the time goes.',`<span class="rng">${['7d','30d','90d'].map(r=>`<span class="${S.range==r?'on':''}" data-r="${r}">${r}</span>`).join('')}</span> <button class="btn">⇩ Export CSV</button>`)+`<div class="kpi">${[['Tasks completed',R[0]],['Hours tracked',R[1]],['On-time delivery',R[2]],['Avg. cycle time',R[3]]].map(([a,b])=>`<div class="card"><small>${a}</small><b>${b}</b><svg viewBox="0 0 100 14" width="100%" height="14"><path d="M0 9Q10 4 20 8T40 7T60 9T80 5T100 8V14H0Z" fill="var(--a4)" stroke="var(--a2)"/></svg></div>`).join('')}</div>
+<div class="an"><div class="card" id="chc"><h3>Throughput</h3><svg id="ch" viewBox="0 0 400 150" width="100%" height="calc(100% - 20px)" preserveAspectRatio="none"></svg><div class="tip" id="tip"></div></div><div class="card"><h3>Time by project</h3><svg viewBox="0 0 100 100" width="100%" style="max-height:120px">${[[34,'var(--a)'],[26,'var(--a2)'],[20,'var(--a3)'],[12,'#e0a030'],[8,'#c9cfc8']].reduce((a,[v,c])=>{a.s+=`<circle cx="50" cy="50" r="36" fill="none" stroke="${c}" stroke-width="13" pathLength="100" stroke-dasharray="${v-1} 101" stroke-dashoffset="${-a.o}" transform="rotate(-90 50 50)"/>`;a.o+=v;return a},{s:'',o:0}).s}<text x="50" y="52" text-anchor="middle" font-size="12" font-weight="700">${R[1]}h</text><text x="50" y="62" text-anchor="middle" font-size="5" fill="#7d8a82">tracked</text></svg>${PJ.map(p=>`<div class="li"><b>${p[0]}</b></div>`).slice(0,3).join('')}</div></div>`},
+settings(){return hd('Settings','Your profile, notifications and how Femly looks.')+`<div class="set"><div class="card sn"><div class="nav">☺ Profile</div><div class="nav">🔔 Notifications</div><div class="nav on" style="background:var(--a4)">◐ Appearance</div></div><div class="card" style="min-height:240px"><h3 style="font-size:14px">Appearance</h3><div class="sub">The accent re-tints the whole workspace, and is remembered on this device.</div><div class="grp" style="margin-left:0;margin-top:14px">ACCENT</div><div class="sw">${[['forest','Forest','#115130'],['ocean','Ocean','#1e4fa8'],['plum','Plum','#5b2f8f'],['ember','Ember','#a8421a']].map(([k,n,c])=>`<div data-ac="${k}" class="${document.documentElement.dataset.accent==k||(!document.documentElement.dataset.accent&&k=='forest')?'on':''}"><i style="background:${c}"></i>${n}</div>`).join('')}</div><div class="grp" style="margin-left:0">WEEK STARTS ON</div><div class="sw"><div class="on" style="background:var(--a);color:#fff;border-radius:999px">Sunday</div><div style="border-radius:999px">Monday</div></div></div></div>`}};
+const I={
+dashboard(){
+  $$('.cnt').forEach(e=>count(e,+e.dataset.n,0));
+  const arc=$('#arc'),txt=$('#arcTxt');
+  if(arc&&txt){
+    const pct=+arc.dataset.pct;
+    if(motionOK()){
+      arc.style.transition='none';arc.setAttribute('stroke-dasharray','0 100');
+      void arc.getBoundingClientRect();arc.style.transition='';
+      requestAnimationFrame(()=>arc.setAttribute('stroke-dasharray',pct+' 100'));
+      count(txt,+txt.dataset.n,0,'%');
+    }else{arc.setAttribute('stroke-dasharray',pct+' 100');txt.textContent=pct+'%'}
+  }
+  S.first=1;$('#addb').onclick=$('#newb').onclick=openM;$('#tp').onclick=tog;$('#ts2').onclick=()=>{S.timer.run=false;S.timer.s=5048;$('#dig').textContent=fmt(5048);$('#tp').textContent='▶'}},
+tasks(){let d;$$('.tk').forEach(t=>{t.ondragstart=e=>{d=t;t.classList.add('drag');try{e.dataTransfer.setData('text/plain',t.querySelector('p').textContent);e.dataTransfer.effectAllowed='move'}catch{}};t.ondragend=()=>{d=null;t.classList.remove('drag');$$('.col.drop').forEach(c=>c.classList.remove('drop'))}});$$('.col').forEach(c=>{c.ondragover=e=>{e.preventDefault();c.classList.add('drop')};c.ondragleave=e=>{if(!c.contains(e.relatedTarget))c.classList.remove('drop')};c.ondrop=()=>{c.classList.remove('drop');if(d)mv(+d.dataset.c,+d.dataset.t,+c.dataset.c)}})},
+team(){$$('.chip[data-f]').forEach(c=>c.onclick=()=>{S.filter=c.dataset.f;go('team')});$$('[data-pr]').forEach(b=>b.onclick=()=>prof(+b.dataset.pr))},
+calendar(){$('#today').onclick=()=>go('calendar')},
+analytics(){$$('[data-r]').forEach(b=>b.onclick=()=>{S.range=b.dataset.r;go('analytics')});line()},
+settings(){$$('[data-ac]').forEach(b=>b.onclick=()=>{document.documentElement.dataset.accent=b.dataset.ac;go('settings')})}};
+function mv(c,t,to){const [x]=S.tasks[c][2].splice(t,1);S.tasks[to][2].unshift(x);S.dropTo=to;go('tasks')}
+function tog(){S.timer.run=!S.timer.run;$('#tp').textContent=S.timer.run?'❚❚':'▶'}
+setInterval(()=>{if(S.timer.run){S.timer.s++;const d=$('#dig');d&&(d.textContent=fmt(S.timer.s))}},1000);
+function openM(){const ov=$('#ov');clearTimeout(mgrModalTimer);ov.classList.remove('mgr-closing');ov.classList.add('on');setTimeout(()=>$('#pn').focus(),180)}
+function closeM(){const ov=$('#ov');if(!ov.classList.contains('on'))return;ov.classList.add('mgr-closing');ov.classList.remove('on');clearTimeout(mgrModalTimer);mgrModalTimer=setTimeout(()=>ov.classList.remove('mgr-closing'),240)}
+function add(){const n=$('#pn').value.trim()||'Payment Gateway';S.added=n;if(S.proj.t==24){S.proj={t:25,e:10,r:12,p:3,pct:40}}closeM();go('dashboard');toast(`“${n}” added to projects`)}
+$('#cx').onclick=closeM;$('#ad').onclick=add;$('#ov').onclick=e=>e.target.id=='ov'&&closeM();
+function toast(m){const t=$('#ts');t.textContent=m;t.classList.add('on');clearTimeout(t._mgr);t._mgr=setTimeout(()=>t.classList.remove('on'),2200)}
+function prof(i){const m=TEAM[i];$('#pnl').innerHTML=`<span class="x" onclick="closeProf()">✕</span><div class="mc"><div class="ph" style="background:${m[6]};width:48px;height:48px;font-size:15px">${m[0].split(' ').map(x=>x[0]).join('')}</div><b style="font-size:14px">${m[0]}</b><p>${m[1]}</p></div><div class="st3"><div><b>${m[3]}</b>Open</div><div><b>${m[4]}</b>Done</div><div><b>${m[5]}%</b>Load</div></div><div style="text-align:left;font-weight:600;margin:12px 0 6px">Assigned tasks</div>${['Design login & sign-up screens','Monorepo cleanup','Dashboard analytics widgets'].map(t=>`<div class="tl"><i></i>${t}</div>`).join('')}<div class="mc"><div class="row" style="margin-top:14px"><button class="btn">Message</button><button class="btn p">+ Assign task</button></div></div>`;const sc=$('#scrim');sc.classList.add('on');requestAnimationFrame(()=>$('#pnl').classList.add('on'))}
+function closeProf(){$('#pnl').classList.remove('on');$('#scrim').classList.remove('on')}
+$('#scrim').onclick=closeProf;
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeM();closeProf()}});
+function line(){const sv=$('#ch');if(!sv)return;const n=S.range=='7d'?8:S.range=='30d'?30:90,pts=[];let seed=n;const r=()=>(seed=(seed*9301+49297)%233280)/233280;for(let i=0;i<n;i++)pts.push(6.4+Math.sin(i/4)*1+r()*1.2);const X=i=>10+i*(380/(n-1)),Y=v=>140-v*10;
+const p=pts.map((v,i)=>(i?'L':'M')+X(i)+' '+Y(v)).join(''),q=pts.map((v,i)=>(i?'L':'M')+X(i)+' '+Y(v*.88-.3+Math.cos(i/3)*.6)).join('');
+const step=n<=8?1:6;
+const dots=pts.map((v,i)=>i%step?null:`<circle class="mgr-dot" cx="${X(i)}" cy="${Y(v)}" r="2.6" fill="#fff" stroke="var(--a2)" stroke-width="1.6" style="--di:${i/step}"/>`).filter(Boolean).join('');
+sv.innerHTML=[0,3,6,9,12].map((g,gi)=>`<line class="mgr-grid" x1="10" x2="390" y1="${Y(g)}" y2="${Y(g)}" stroke="#e6e9e2" style="--gi:${gi}"/>`).join('')+`<path class="mgr-area" d="${p}L390 140H10Z" fill="var(--a4)" opacity=".8"/><path class="mgr-ghost" d="${q}" fill="none" stroke="#9aa59e" stroke-dasharray="3 3"/><path class="mgr-line" d="${p}" fill="none" stroke="var(--a2)" stroke-width="2" stroke-dasharray="1200" stroke-dashoffset="1200"><animate attributeName="stroke-dashoffset" to="0" dur="1.2s" fill="freeze"/></path>${dots}<circle id="dot" r="4" fill="#fff" stroke="var(--a2)" stroke-width="2" opacity="0"/>`;
+const c=$('#chc'),tip=$('#tip');const hide=()=>{tip.classList.remove('on');tip.style.opacity=0;const d=$('#dot');if(d)d.setAttribute('opacity',0)};
+sv.onmousemove=e=>{const b=sv.getBoundingClientRect(),i=Math.max(0,Math.min(n-1,Math.round((((e.clientX-b.left)/b.width*400)-10)/(380/(n-1)))));hover(i)};
+sv.onmouseleave=hide;window.hover=i=>{const b=sv.getBoundingClientRect(),cb=c.getBoundingClientRect(),d=$('#dot');if(!d)return;d.setAttribute('cx',X(i));d.setAttribute('cy',Y(pts[i]));d.setAttribute('opacity',1);tip.innerHTML=`<b>${Math.round(pts[i])} tasks</b><br>7-day avg ${pts[i].toFixed(1)}`;tip.style.left=(b.left-cb.left+X(i)/400*b.width-30)+'px';tip.style.top=(b.top-cb.top+Y(pts[i])/150*b.height-48)+'px';tip.style.opacity=1;tip.classList.add('on')}}
+document.addEventListener('click',e=>{const n=e.target.closest('.nav[data-p]');if(n)go(n.dataset.p)});
+document.addEventListener('pointerdown',e=>{if(e.isTrusted&&S.demo){S.demo=false;$('#cur').style.display='none';$('#cap').classList.remove('on')}},true);
+/* ---- scripted sequence (mirrors the 33 s reference) ---- */
+async function pt(sel,ms=900){if(!S.demo)throw 0;const e=typeof sel=='string'?$(sel):sel;if(!e)return;const b=e.getBoundingClientRect(),c=$('#cur');c.style.left=b.left+b.width/2+'px';c.style.top=b.top+b.height/2+'px';await sleep(ms)}
+async function clk(sel){await pt(sel);if(!S.demo)throw 0;const e=typeof sel=='string'?$(sel):sel;e&&e.click()}
+function zoomTo(sel,k){const st=$('#stage'),a=st.getBoundingClientRect(),b=$(sel).getBoundingClientRect();const cx=b.left-a.left+b.width/2,cy=b.top-a.top+b.height/2;st.style.transformOrigin=cx+'px '+cy+'px';st.style.setProperty('--zt',`translate(${a.width/2-cx}px,${a.height/2-cy}px) scale(${k})`);st.classList.add('zoom')}
+async function cap(t,ms){$('#cap').textContent=t;$('#cap').classList.add('on');await sleep(ms);$('#cap').classList.remove('on')}
+async function type(el,s){for(const ch of s){el.value+=ch;await sleep(60)}}
+async function demo(){while(S.demo){try{
+document.documentElement.dataset.accent='';S.proj={t:24,e:10,r:12,p:2,pct:42};S.timer={s:5048,run:false};S.tasks=mkT();S.filter='All';S.range='30d';S.first=0;
+go('dashboard');await sleep(1000);
+await clk('#addb');await sleep(500);$('#pn').value='';await type($('#pn'),'Payment Gateway');await sleep(300);cap('Add a project — every number follows',2600);await clk('#ad');await sleep(1200);
+await pt('#tp',700);zoomTo('#tmc',2.4);await sleep(1300);$('#tp').click();await sleep(1700);$('#stage').classList.remove('zoom');await sleep(1200);
+await clk('.nav[data-p=tasks]');await sleep(1200);cap('Drag work across the board',2200);const tk=$('.tk');await pt(tk,700);tk.classList.add('drag');await pt('.col[data-c="3"]',900);mv(0,0,3);await sleep(1000);
+await clk('.nav[data-p=team]');await sleep(1100);cap('Filter the team — cards find their place',2000);await clk('.chip[data-f=Design]');await sleep(1100);await clk('[data-pr="1"]');await sleep(1800);closeProf();await sleep(700);
+await clk('.nav[data-p=calendar]');await sleep(1000);await clk('#today');await sleep(900);
+await clk('.nav[data-p=analytics]');await sleep(1200);await pt('#ch',800);hover(10);await sleep(900);hover(24);await sleep(900);await clk('[data-r="90d"]');await sleep(900);
+await clk('.nav[data-p=settings]');await sleep(900);await clk('[data-ac=ocean]');await sleep(900);cap('One accent re-tints everything',2000);
+await clk('.nav[data-p=dashboard]');await sleep(2500);
+$('#app').style.transition='opacity .6s';$('#app').style.opacity=.1;await sleep(900);$('#app').style.opacity=1;
+}catch(e){return}}}
+go('dashboard');requestAnimationFrame(()=>{const app=$('#app');app.classList.add('mgr-intro');setTimeout(()=>app.classList.remove('mgr-intro'),950)});if(S.demo)setTimeout(demo,950);
+</script></body></html>
