@@ -11,6 +11,7 @@ import "./RoleLayout.css";
 import "./CeoDark.css";
 import "./CeoMotion.css";
 import "./ManagerMotion.css";
+import "../styles/manager-femly.css";
 
 export default function RoleLayout({role}){
   let user={};

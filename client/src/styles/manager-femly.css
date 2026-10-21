@@ -1,0 +1,418 @@
+/* =========================================================
+   FEMLY THEME — Manager portal only
+   Every rule is scoped under .role-layout.manager-motion so
+   it cannot leak into the CEO or student portals.
+   ========================================================= */
+
+/* ---- App window + canvas ---- */
+.role-layout.manager-motion {
+  background: radial-gradient(120% 90% at 30% 20%, var(--bg1), var(--bg0));
+  color: var(--ink);
+  min-height: 100vh;
+  font-family: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: -0.02em;
+}
+
+/* App window: the scrolling content card */
+.role-layout.manager-motion .role-content {
+  background: var(--app);
+  border-radius: 18px;
+  box-shadow: 0 20px 60px #0007;
+  min-height: calc(100vh - 120px);
+  margin: 24px auto 0;
+  padding: 32px !important;
+  position: relative;
+  z-index: 1;
+}
+.role-layout.manager-motion .role-main { padding-top: 0; }
+
+/* Topbar */
+.role-layout.manager-motion .role-topbar {
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  box-shadow: 0 1px 3px #0001;
+}
+.role-layout.manager-motion .role-eyebrow { color: var(--a); }
+.role-layout.manager-motion .role-topbar h1,
+.role-layout.manager-motion .role-topbar h1 { color: var(--ink); font-weight: 700; }
+.role-layout.manager-motion .role-top-user span { color: var(--ink); }
+.role-layout.manager-motion .role-top-user small { color: var(--mut); }
+
+/* Hamburger */
+.role-layout.manager-motion .navbar-hamburger {
+  border: 1px solid var(--line);
+  background: var(--card);
+  box-shadow: 0 1px 3px #0001;
+}
+.role-layout.manager-motion .navbar-hamburger span { background: var(--ink) !important; }
+.role-layout.manager-motion .navbar-hamburger:hover {
+  border-color: var(--a);
+  background: #e6e9e2;
+}
+.role-layout.manager-motion .navbar-hamburger:hover span { background: var(--a) !important; }
+
+/* Drawer */
+.role-layout.manager-motion .navbar-menu {
+  background: var(--card);
+  border-right: 1px solid var(--line);
+  color: var(--ink);
+  box-shadow: 0 1px 3px #0001;
+}
+.role-layout.manager-motion .navbar-close {
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+}
+.role-layout.manager-motion .navbar-close:hover {
+  border-color: var(--a);
+  color: var(--a);
+  background: #e6e9e2;
+}
+.role-layout.manager-motion .navbar-brand img { background: var(--card); border: 1px solid var(--line); }
+.role-layout.manager-motion .navbar-brand strong { color: var(--ink); }
+.role-layout.manager-motion .navbar-brand small { color: var(--a); }
+.role-layout.manager-motion .navbar-profile {
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+.role-layout.manager-motion .navbar-profile strong { color: var(--ink); }
+.role-layout.manager-motion .navbar-profile span { color: var(--mut); }
+.role-layout.manager-motion .navbar-avatar {
+  background: var(--a4);
+  color: var(--a);
+  border: 1px solid var(--line);
+  box-shadow: none;
+}
+
+/* Nav links */
+.role-layout.manager-motion .navbar-links p { color: var(--mut); }
+.role-layout.manager-motion .navbar-links a {
+  color: var(--mut);
+  border-left: 3px solid transparent;
+}
+.role-layout.manager-motion .navbar-links a:hover {
+  background: #e6e9e2;
+  color: var(--ink);
+  border-left-color: transparent;
+}
+.role-layout.manager-motion .navbar-links a.active,
+.role-layout.manager-motion .navbar-links a[aria-current="page"] {
+  border-left: 3px solid var(--a);
+  background: var(--a4);
+  color: var(--a);
+  font-weight: 700;
+  box-shadow: none;
+}
+.role-layout.manager-motion .navbar-links a span { color: var(--a); }
+.role-layout.manager-motion .navbar-links a.active span { color: var(--a); }
+.role-layout.manager-motion .navbar-logout {
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+}
+.role-layout.manager-motion .navbar-logout:hover {
+  border-color: var(--a);
+  color: var(--a);
+  background: #e6e9e2;
+}
+.role-layout.manager-motion .navbar-logout span { color: var(--a); }
+
+/* ---- Cards ---- */
+.role-layout.manager-motion .panel,
+.role-layout.manager-motion .admin-stat,
+.role-layout.manager-motion .femly-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 1px 3px #0001;
+}
+.role-layout.manager-motion .panel { padding: 10px 12px; }
+.role-layout.manager-motion .admin-stat { padding: 10px 12px; overflow: hidden; }
+.role-layout.manager-motion .panel h3,
+.role-layout.manager-motion .panel-head h3 {
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+}
+.role-layout.manager-motion .panel p { color: var(--mut); }
+
+/* Section kicker */
+.role-layout.manager-motion .section-kicker {
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  color: var(--a);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* ---- Buttons (pills) ---- */
+.role-layout.manager-motion .femly-btn,
+.role-layout.manager-motion button.femly-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 0 14px;
+  height: 34px;
+  transition-property: background-color, border-color, color, box-shadow, transform;
+  transition-duration: .2s;
+  transition-timing-function: ease;
+}
+.role-layout.manager-motion .femly-btn--primary {
+  background: var(--a);
+  color: #fff;
+}
+.role-layout.manager-motion .femly-btn--primary:hover { background: var(--a2); }
+.role-layout.manager-motion .femly-btn--secondary {
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.role-layout.manager-motion .femly-btn--secondary:hover { background: #e6e9e2; }
+.role-layout.manager-motion .femly-btn--danger {
+  background: var(--red);
+  color: #fff;
+}
+.role-layout.manager-motion .femly-btn--danger:hover { filter: brightness(1.15); }
+
+/* Existing gold-btn restyle under manager scope */
+.role-layout.manager-motion .gold-btn {
+  background: var(--a);
+  border: none;
+  color: #fff;
+  border-radius: 999px;
+  box-shadow: none;
+  transition: background-color .2s ease;
+}
+.role-layout.manager-motion .gold-btn:hover { background: var(--a2); }
+
+/* Panel head buttons (secondary pills) */
+.role-layout.manager-motion .panel-head button {
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.role-layout.manager-motion .panel-head button:hover { background: #e6e9e2; border-color: var(--a); color: var(--a); }
+
+/* ---- Status tags ---- */
+.role-layout.manager-motion .femly-tag,
+.role-layout.manager-motion .tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+.role-layout.manager-motion .femly-tag--completed,
+.role-layout.manager-motion .pill.completed,
+.role-layout.manager-motion .pill.approved {
+  background: #e3f1e8;
+  color: #1a7045;
+}
+.role-layout.manager-motion .femly-tag--in-progress,
+.role-layout.manager-motion .pill.in_progress,
+.role-layout.manager-motion .pill.in-progress {
+  background: #fbf0dd;
+  color: #c4801c;
+}
+.role-layout.manager-motion .femly-tag--pending,
+.role-layout.manager-motion .pill.pending {
+  background: #fbe6e6;
+  color: #b04a4a;
+}
+.role-layout.manager-motion .pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+  border: 1px solid var(--line);
+  background: var(--a4);
+  color: var(--a);
+}
+.role-layout.manager-motion .pill:hover { background: #e6e9e2; }
+
+/* ---- Inputs & selects ---- */
+.role-layout.manager-motion input,
+.role-layout.manager-motion select,
+.role-layout.manager-motion textarea {
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  min-height: 36px;
+}
+.role-layout.manager-motion input::placeholder,
+.role-layout.manager-motion textarea::placeholder { color: var(--mut); opacity: 1; }
+.role-layout.manager-motion input:focus-visible,
+.role-layout.manager-motion select:focus-visible,
+.role-layout.manager-motion textarea:focus-visible {
+  outline: none;
+  border-color: var(--a3);
+  box-shadow: 0 0 0 2px var(--a4);
+}
+.role-layout.manager-motion .field-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--mut);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+  display: block;
+}
+
+/* ---- Tables ---- */
+.role-layout.manager-motion .table-wrap table { border-collapse: collapse; width: 100%; }
+.role-layout.manager-motion .table-wrap th,
+.role-layout.manager-motion .table-wrap td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  vertical-align: top;
+  color: var(--ink);
+}
+.role-layout.manager-motion .table-wrap th {
+  background: var(--card);
+  color: var(--mut);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+.role-layout.manager-motion .table-wrap tbody tr:hover { background: #e6e9e2; }
+
+/* ---- Messages ---- */
+.role-layout.manager-motion .error-msg,
+.role-layout.manager-motion .success-msg,
+.role-layout.manager-motion .info-msg {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin: 8px 0;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+}
+.role-layout.manager-motion .error-msg { color: var(--red); border-color: var(--red); }
+.role-layout.manager-motion .success-msg { color: var(--a); border-color: var(--a); }
+
+/* ---- Empty state ---- */
+.role-layout.manager-motion .empty-state {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--mut);
+  border: 1px dashed var(--line);
+  background: var(--card);
+  border-radius: 14px;
+}
+
+/* ---- Modals ---- */
+.role-layout.manager-motion .femly-modal-overlay,
+.role-layout.manager-motion .review-modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(16, 35, 26, 0.4);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  padding: 24px;
+  z-index: 600;
+}
+.role-layout.manager-motion .femly-modal-dialog,
+.role-layout.manager-motion .review-modal .panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px #0007;
+  width: min(480px, 92vw);
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 18px 22px;
+  position: relative;
+}
+.role-layout.manager-motion .review-modal .panel { max-width: 600px; }
+.role-layout.manager-motion .femly-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.role-layout.manager-motion .femly-modal-head h3 {
+  margin: 0; font-size: 18px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em;
+}
+.role-layout.manager-motion .femly-modal-body { display: flex; flex-direction: column; gap: 12px; }
+
+/* ---- Toasts ---- */
+.role-layout.manager-motion .femly-toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--a);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 1px 3px #0001;
+  pointer-events: auto;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .role-layout.manager-motion .femly-toast--show {
+    animation: femly-toast-up 350ms cubic-bezier(.2,.8,.2,1) both;
+  }
+}
+@keyframes femly-toast-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- Theme transition targets ---- */
+.role-layout.manager-motion .panel,
+.role-layout.manager-motion .femly-card,
+.role-layout.manager-motion .femly-btn,
+.role-layout.manager-motion .gold-btn,
+.role-layout.manager-motion .navbar-links a,
+.role-layout.manager-motion .navbar-hamburger,
+.role-layout.manager-motion svg,
+.role-layout.manager-motion .techins-icon {
+  transition: background-color .3s ease, color .3s ease, border-color .3s ease, fill .3s ease, stroke .3s ease;
+}
+
+/* ---- Reduced motion: disable all motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  .role-layout.manager-motion *,
+  .role-layout.manager-motion *:before,
+  .role-layout.manager-motion *:after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .role-layout.manager-motion .femly-toast--show { animation: none !important; }
+}

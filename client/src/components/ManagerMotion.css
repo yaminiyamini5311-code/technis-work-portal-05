@@ -1,277 +1,124 @@
 /**
- * MANAGER PORTAL — motion layer (light theme preserved).
+ * MANAGER PORTAL — Femly motion layer.
  *
- * Recreates the reference film's motion language (Screen Recording
- * 2026-10-13, 48s property-dashboard promo) for the manager workspace:
- * a shallow 3D assemble on page entry, staggered tile pops with counting
- * numbers, cascading rows, pill-tab settle, and soft hover lifts.
+ * Replaces the previous 3D assemble effect with the Femly motion spec:
+ *   • Page change:     opacity 0->1, y 8->0, 450ms, cubic-bezier(.2,.8,.2,1)
+ *   • Modal overlay:   fade 300ms (rgba(16,35,26,.4) + blur 3px)
+ *   • Modal dialog:    scale .92 + y10 -> 1, cubic-bezier(.2,.9,.3,1), 300ms
+ *   • Toast:           slide up 20px + fade 350ms (see manager-femly.css)
+ *   • Profile panel:   translateX(110%) -> 0, 500ms
+ *   • Bar pills:       scaleY .1->1 from bottom, 800ms, 70ms stagger
+ *   • Gauge:           stroke-dasharray to percentage over 1000ms (inline)
+ *   • Theme switch:    .3s on background-color, color, border-color, fill, stroke
  *
- * Unlike CeoDark.css/CeoMotion.css this file changes NO colors, surfaces
- * or typography — the manager portal keeps its existing light theme.
- * Every rule is scoped under `.role-layout.manager-motion`, so nothing
- * here can affect the CEO, student, or login views.
- * Everything is transform/opacity only (compositor) and uses transform
- * FUNCTIONS (never the individual `translate`/`scale` properties, which
- * the production minifier has been observed to drop).
- *
- * Hidden states apply only under `.ceo-motion-ready`, which useCeoReveal
- * adds once it is running — a slow or failed script renders visible.
+ * Scoped under `.role-layout.manager-motion` so nothing leaks to the CEO or
+ * student portals. Honours `prefers-reduced-motion: reduce`.
  */
 
 .role-layout.manager-motion {
-  --m-fast: 260ms;
-  --m-base: 520ms;
-  --m-slow: 900ms;
-  --m-step: 60ms;
-  --m-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-  --m-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --d-card: 16px;
-  --d-row: 8px;
-  --d-chrome: 10px;
+  --femly-ease-entrance: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --femly-ease-zoom: cubic-bezier(0.65, 0, 0.35, 1);
+  --femly-ease-modal: cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
-/* Single ownership of entrance motion: neutralise the two pre-existing
-   global entrance systems inside the manager scope only, so the reveal
-   system below is the one owner (same rationale as CeoMotion.css). */
-.role-layout.manager-motion.ceo-motion-ready .dash-stat,
-.role-layout.manager-motion.ceo-motion-ready .dash-card,
-.role-layout.manager-motion.ceo-motion-ready .admin-stat,
-.role-layout.manager-motion.ceo-motion-ready .panel,
-.role-layout.manager-motion.ceo-motion-ready .summary-card,
-.role-layout.manager-motion.ceo-motion-ready .mission-card,
-.role-layout.manager-motion.ceo-motion-ready .task-card,
-.role-layout.manager-motion.ceo-motion-ready .activity-admin,
-.role-layout.manager-motion.ceo-motion-ready .manager-stats > div,
-.role-layout.manager-motion.ceo-motion-ready .role-content > *,
-.role-layout.manager-motion.ceo-motion-ready .role-topbar {
-  animation-name: none;
+/* ── Page change ────────────────────────────────────────────────────── */
+.role-layout.manager-motion .role-content {
+  animation: femly-page-in 450ms var(--femly-ease-entrance) both;
 }
-
-/* ── Page assemble (reference: tilted cards flatten into the dashboard) ── */
-.role-layout.manager-motion .role-main {
-  perspective: 1400px;
-}
-
-@keyframes mgr-page-in {
-  from { opacity: 0; transform: translate3d(0, 26px, -60px) rotateX(7deg); }
+@keyframes femly-page-in {
+  from { opacity: 0; transform: translate3d(0, 8px, 0); }
   to   { opacity: 1; transform: none; }
 }
 
-.role-layout.manager-motion.ceo-motion-ready .role-content {
-  animation: mgr-page-in var(--m-slow) var(--m-ease) both;
-  transform-origin: 50% 0;
-  will-change: transform, opacity;
-}
-
-/* ── Chrome entry ─────────────────────────────────────────────────────── */
-.role-layout.manager-motion.ceo-motion-ready .role-topbar {
-  animation: mgr-chrome-drop var(--m-slow) var(--m-ease) both;
-}
-
-@keyframes mgr-chrome-drop {
-  from { opacity: 0; transform: translate3d(0, calc(var(--d-chrome) * -1), 0); }
+/* ── Grid/list cards: fade + rise, 60ms stagger, re-run on filter ───── */
+@keyframes femly-card-in {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
   to   { opacity: 1; transform: none; }
 }
 
-/* Sidebar only animates when open - prevents it from showing by default */
-.role-layout.manager-motion.ceo-motion-ready .navbar-menu.open {
-  animation: mgr-slide-left var(--m-slow) var(--m-ease) both;
+/* ── Bar pills: scaleY .1 -> 1 from bottom, 800ms, 70ms stagger ─────── */
+@keyframes femly-bar-fill {
+  from { transform: scaleY(0.1); transform-origin: bottom; opacity: 0.6; }
+  to   { transform: scaleY(1); transform-origin: bottom; opacity: 1; }
+}
+.role-layout.manager-motion .bar-pill-active {
+  transform-origin: bottom;
 }
 
-@keyframes mgr-slide-left {
-  from { opacity: 0; transform: translate3d(-14px, 0, 0); }
-  to   { opacity: 1; transform: none; }
-}
+/* ── Modal overlay + dialog ─────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  .role-layout.manager-motion .femly-modal-overlay--show,
+  .role-layout.manager-motion .review-modal--show {
+    animation: femly-overlay-fade 300ms ease both;
+  }
+  @keyframes femly-overlay-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
 
-.role-layout.manager-motion.ceo-motion-ready .navbar-links a,
-.role-layout.manager-motion.ceo-motion-ready .navbar-links button {
-  animation: mgr-rise var(--m-base) var(--m-ease) both;
-  animation-delay: calc(120ms + var(--ceo-nav-i, 0) * var(--m-step));
-}
-
-.role-layout.manager-motion.ceo-motion-ready .navbar-links > *:nth-child(1) { --ceo-nav-i: 0; }
-.role-layout.manager-motion.ceo-motion-ready .navbar-links > *:nth-child(2) { --ceo-nav-i: 1; }
-.role-layout.manager-motion.ceo-motion-ready .navbar-links > *:nth-child(3) { --ceo-nav-i: 2; }
-.role-layout.manager-motion.ceo-motion-ready .navbar-links > *:nth-child(4) { --ceo-nav-i: 3; }
-.role-layout.manager-motion.ceo-motion-ready .navbar-links > *:nth-child(5) { --ceo-nav-i: 4; }
-.role-layout.manager-motion.ceo-motion-ready .navbar-links > *:nth-child(6) { --ceo-nav-i: 5; }
-.role-layout.manager-motion.ceo-motion-ready .navbar-links > *:nth-child(7) { --ceo-nav-i: 6; }
-.role-layout.manager-motion.ceo-motion-ready .navbar-links > *:nth-child(8) { --ceo-nav-i: 7; }
-.role-layout.manager-motion.ceo-motion-ready .navbar-links > *:nth-child(9) { --ceo-nav-i: 8; }
-
-.role-layout.manager-motion.ceo-motion-ready .navbar-brand,
-.role-layout.manager-motion.ceo-motion-ready .navbar-profile {
-  animation: mgr-rise var(--m-slow) var(--m-ease) both;
-}
-
-/* ── Reveal variants (driven by useCeoReveal + MANAGER_REVEAL_CONFIG) ──── */
-@keyframes mgr-rise {
-  from { opacity: 0; transform: translate3d(0, var(--d-card), 0); }
-  to   { opacity: 1; transform: none; }
-}
-
-@keyframes mgr-rise-row {
-  from { opacity: 0; transform: translate3d(0, var(--d-row), 0); }
-  to   { opacity: 1; transform: none; }
-}
-
-@keyframes mgr-pop {
-  from { opacity: 0; transform: translate3d(0, var(--d-card), -30px) scale(0.96) rotateX(4deg); }
-  to   { opacity: 1; transform: none; }
-}
-
-/* Pin-settle uses the independent `scale` property so it composes with the
-   rise animation's `transform` (two animations cannot share `transform`). */
-@keyframes mgr-pin-settle {
-  from { scale: 0.985; }
-  to   { scale: 1; }
-}
-
-.role-layout.manager-motion.ceo-motion-ready .ceo-r-panel:not(.ceo-in),
-.role-layout.manager-motion.ceo-motion-ready .ceo-r-head:not(.ceo-in),
-.role-layout.manager-motion.ceo-motion-ready .ceo-r-tile:not(.ceo-in),
-.role-layout.manager-motion.ceo-motion-ready .ceo-r-row:not(.ceo-in) {
-  opacity: 0;
-}
-
-.role-layout.manager-motion.ceo-motion-ready .ceo-r-panel.ceo-in {
-  animation: mgr-rise var(--m-base) var(--m-ease) both;
-}
-.role-layout.manager-motion.ceo-motion-ready .ceo-r-head.ceo-in {
-  animation: mgr-rise var(--m-base) var(--m-ease) both;
-}
-.role-layout.manager-motion.ceo-motion-ready .ceo-r-tile.ceo-in {
-  animation: mgr-pop var(--m-base) var(--m-ease-out) both;
-  animation-delay: calc(var(--ceo-i, 0) * var(--m-step));
-}
-.role-layout.manager-motion.ceo-motion-ready .ceo-r-row.ceo-in {
-  animation:
-    mgr-rise-row var(--m-base) var(--m-ease) both,
-    mgr-pin-settle var(--m-base) var(--m-ease-out) both;
-  animation-delay:
-    calc(var(--ceo-i, 0) * var(--m-step)),
-    calc(var(--ceo-i, 0) * var(--m-step));
-}
-
-/* Section kickers settle their tracking as they arrive. */
-.role-layout.manager-motion.ceo-motion-ready .ceo-r-head.ceo-in .section-kicker,
-.role-layout.manager-motion.ceo-motion-ready .ceo-r-head.ceo-in .role-eyebrow {
-  animation: mgr-track var(--m-slow) var(--m-ease) both;
-}
-
-@keyframes mgr-track {
-  from { opacity: 0; letter-spacing: 4px; }
-  to   { opacity: 1; }
-}
-
-/* Count-up figures hold a fixed width so ticking never shifts layout. */
-.role-layout.manager-motion .stat-count {
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
-}
-
-/* ── Hover / focus (transform + opacity only, theme untouched) ─────────── */
-.role-layout.manager-motion .panel,
-.role-layout.manager-motion .admin-stat,
-.role-layout.manager-motion .mission-card,
-.role-layout.manager-motion .task-card,
-.role-layout.manager-motion .summary-card,
-.role-layout.manager-motion .manager-stats > div {
-  transition:
-    transform var(--m-fast) var(--m-ease),
-    border-color var(--m-fast) var(--m-ease),
-    box-shadow var(--m-fast) var(--m-ease);
-}
-
-.role-layout.manager-motion .panel:hover,
-.role-layout.manager-motion .admin-stat:hover,
-.role-layout.manager-motion .mission-card:hover,
-.role-layout.manager-motion .task-card:hover,
-.role-layout.manager-motion .summary-card:hover,
-.role-layout.manager-motion .manager-stats > div:hover {
-  transform: translate3d(0, -3px, 0);
-}
-
-.role-layout.manager-motion .submission-manager,
-.role-layout.manager-motion .submission-row,
-.role-layout.manager-motion .table-wrap tbody tr {
-  transition:
-    transform var(--m-fast) var(--m-ease),
-    background-color var(--m-fast) var(--m-ease);
-}
-
-.role-layout.manager-motion .table-wrap tbody tr:hover {
-  transform: translate3d(3px, 0, 0);
-}
-
-.role-layout.manager-motion a:focus-visible,
-.role-layout.manager-motion button:focus-visible,
-.role-layout.manager-motion input:focus-visible,
-.role-layout.manager-motion select:focus-visible,
-.role-layout.manager-motion textarea:focus-visible {
-  outline: 2px solid #FA9A02;
-  outline-offset: 2px;
-}
-
-/* Overlay unfold for dropdowns/popovers. */
-.role-layout.manager-motion .notification-pop {
-  transform-origin: top right;
-  animation: mgr-unfold var(--m-base) var(--m-ease) both;
-}
-
-@keyframes mgr-unfold {
-  from { opacity: 0; transform: translate3d(0, -8px, 0) scale(0.97); }
-  to   { opacity: 1; transform: none; }
-}
-
-.role-layout.manager-motion .portal-loading {
-  animation: mgr-fade var(--m-base) var(--m-ease) both;
-}
-
-@keyframes mgr-fade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-.role-layout.manager-motion .empty-state {
-  animation: mgr-rise var(--m-base) var(--m-ease) both;
-}
-
-/* Small screens: flatten the 3D assemble so entry stays cheap and exact. */
-@media (max-width: 800px) {
-  @keyframes mgr-page-in {
-    from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  .role-layout.manager-motion .femly-modal-dialog--show,
+  .role-layout.manager-motion .review-modal .panel--show {
+    animation: femly-dialog-in 300ms var(--femly-ease-modal) both;
+  }
+  @keyframes femly-dialog-in {
+    from { opacity: 0; transform: scale(0.92) translate3d(0, 10px, 0); }
     to   { opacity: 1; transform: none; }
   }
-  @keyframes mgr-pop {
-    from { opacity: 0; transform: translate3d(0, var(--d-card), 0) scale(0.97); }
-    to   { opacity: 1; transform: none; }
-  }
-  .role-layout.manager-motion .role-main { perspective: none; }
 }
 
-/* Reduced motion: keep the look, drop the movement. */
+/* ── Profile panel: translateX(110%) -> 0 over 500ms ────────────────── */
+.role-layout.manager-motion .femly-profile-panel {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: min(360px, 90vw);
+  background: var(--card);
+  border-left: 1px solid var(--line);
+  box-shadow: 0 20px 60px #0007;
+  z-index: 700;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  transform: translate3d(110%, 0, 0);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .role-layout.manager-motion .femly-profile-panel--open {
+    animation: femly-panel-slide 500ms var(--femly-ease-entrance) both;
+  }
+  @keyframes femly-panel-slide {
+    from { transform: translate3d(110%, 0, 0); }
+    to   { transform: none; }
+  }
+}
+.role-layout.manager-motion .femly-profile-backdrop {
+  position: fixed; inset: 0; background: rgba(16, 35, 26, 0.35);
+  backdrop-filter: blur(2px); z-index: 680; opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .role-layout.manager-motion .femly-profile-backdrop--show {
+    animation: femly-overlay-fade 300ms ease both;
+  }
+}
+
+/* ── Toast: slide up 20px + fade 350ms (see manager-femly.css) ──────── */
+@media (prefers-reduced-motion: no-preference) {
+  .role-layout.manager-motion .femly-toast--show {
+    animation: femly-toast-up 350ms var(--femly-ease-entrance) both;
+  }
+}
+
+/* ── Reduced motion: disable all motion ─────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .role-layout.manager-motion.ceo-motion-ready .role-topbar,
-  .role-layout.manager-motion.ceo-motion-ready .navbar-menu.open,
-  .role-layout.manager-motion.ceo-motion-ready .navbar-brand,
-  .role-layout.manager-motion.ceo-motion-ready .navbar-profile,
-  .role-layout.manager-motion.ceo-motion-ready .role-content,
-  .role-layout.manager-motion.ceo-motion-ready .navbar-links a,
-  .role-layout.manager-motion.ceo-motion-ready .navbar-links button,
-  .role-layout.manager-motion.ceo-motion-ready .ceo-r-panel,
-  .role-layout.manager-motion.ceo-motion-ready .ceo-r-head,
-  .role-layout.manager-motion.ceo-motion-ready .ceo-r-tile,
-  .role-layout.manager-motion.ceo-motion-ready .ceo-r-row,
-  .role-layout.manager-motion .portal-loading,
-  .role-layout.manager-motion .notification-pop,
-  .role-layout.manager-motion .empty-state {
+  .role-layout.manager-motion .femly-modal-overlay--show,
+  .role-layout.manager-motion .review-modal--show,
+  .role-layout.manager-motion .femly-modal-dialog--show,
+  .role-layout.manager-motion .review-modal .panel--show,
+  .role-layout.manager-motion .femly-profile-panel--open,
+  .role-layout.manager-motion .femly-profile-backdrop--show,
+  .role-layout.manager-motion .femly-toast--show,
+  .role-layout.manager-motion .bar-pill-active,
+  .role-layout.manager-motion .role-content {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
-  }
-
-  .role-layout.manager-motion * {
-    transition-duration: 0.01ms !important;
   }
 }
