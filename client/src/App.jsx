@@ -29,6 +29,11 @@ import AdminSubmissions from "./pages/admin/Submissions";
 import StudentDetailsPage from "./pages/admin/StudentDetailsPage";
 import TaskReview from "./pages/admin/TaskReview";
 import ManagerSubmissions from "./pages/manager/Submissions";
+import Kanban from "./pages/manager/Kanban";
+import Team from "./pages/manager/Team";
+import Calendar from "./pages/manager/Calendar";
+import Analytics from "./pages/manager/Analytics";
+import Settings from "./pages/manager/Settings";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -148,6 +153,11 @@ export default function App() {
           <Route path="/manager/daily-activities" element={<DailyActivities />} />
           <Route path="/manager/performance" element={<AdminPerformance />} />
           <Route path="/manager/feedback" element={<Feedback />} />
+          <Route path="/manager/board" element={<Kanban />} />
+          <Route path="/manager/team" element={<Team />} />
+          <Route path="/manager/calendar" element={<Calendar />} />
+          <Route path="/manager/analytics" element={<Analytics />} />
+          <Route path="/manager/settings" element={<Settings />} />
         </Route>
 
         <Route element={<Protected role="admin"><RoleLayout role="admin" /></Protected>}>

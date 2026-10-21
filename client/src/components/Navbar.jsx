@@ -110,7 +110,12 @@ export default function Navbar({ role }) {
           { path: "/manager/missions", icon: "target", label: "Missions" },
           { path: "/manager/daily-activities", icon: "notepad", label: "Daily Activity" },
           { path: "/manager/performance", icon: "gauge", label: "Performance" },
-          { path: "/manager/feedback", icon: "comment", label: "Feedback" }
+          { path: "/manager/feedback", icon: "comment", label: "Feedback" },
+          { path: "/manager/board", icon: "target", label: "Kanban" },
+          { path: "/manager/team", icon: "user", label: "Team" },
+          { path: "/manager/calendar", icon: "clock", label: "Calendar" },
+          { path: "/manager/analytics", icon: "chart", label: "Analytics" },
+          { path: "/manager/settings", icon: "comment", label: "Settings" }
         ];
       case "student":
       case "member":
