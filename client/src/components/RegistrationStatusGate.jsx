@@ -5,9 +5,9 @@ import "./RegistrationStatusGate.css";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 /**
- * Gate component that checks student registration status
- * Shows pending/rejected screens for students who haven't been approved yet
- * Only applies to students - other roles pass through immediately
+ * Gate component that checks student/manager registration status
+ * Shows pending/rejected screens for users who haven't been approved yet
+ * Only applies to students and managers - other roles pass through immediately
  */
 export default function RegistrationStatusGate({ children }) {
   const [status, setStatus] = useState(null);
@@ -30,8 +30,8 @@ export default function RegistrationStatusGate({ children }) {
         localUser = JSON.parse(localStorage.getItem("user") || "{}");
       } catch {}
 
-      // Only check for students
-      if (localUser.role !== "student") {
+      // Only check for students and managers
+      if (localUser.role !== "student" && localUser.role !== "manager") {
         setStatus("approved");
         setUser(localUser);
         setLoading(false);

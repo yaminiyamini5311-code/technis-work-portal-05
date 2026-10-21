@@ -5,6 +5,7 @@ import NotificationBell from "./NotificationBell";
 import TechinsIcon from "./TechinsIcon";
 import CeoStars from "./CeoStars";
 import useCeoReveal, { MANAGER_REVEAL_CONFIG } from "./useCeoReveal";
+import RegistrationStatusGate from "./RegistrationStatusGate";
 import "./CeoStars.css";
 import "./RoleLayout.css";
 import "./CeoDark.css";
@@ -38,7 +39,7 @@ export default function RoleLayout({role}){
     return "Workspace";
   };
 
-  return <div ref={isCeoWorkspace || isManagerWorkspace ? rootRef : undefined} className={`role-layout${isCeoWorkspace ? " ceo-dark" : ""}${isManagerWorkspace ? " manager-motion" : ""}`}>
+  const content = <div ref={isCeoWorkspace || isManagerWorkspace ? rootRef : undefined} className={`role-layout${isCeoWorkspace ? " ceo-dark" : ""}${isManagerWorkspace ? " manager-motion" : ""}`}>
     <NavProvider>
     {/* CEO-only starfield: single fixed layer behind content (see CeoStars).
         Manager keeps the plain light theme — no stars, no dark treatment. */}
@@ -80,5 +81,12 @@ export default function RoleLayout({role}){
       <section className="role-content" key={pathname}><Outlet/></section>
     </main>
     </NavProvider>
-  </div>
+  </div>;
+
+  // Wrap managers in RegistrationStatusGate (students already have it in StudentLayout)
+  if (isManagerWorkspace) {
+    return <RegistrationStatusGate>{content}</RegistrationStatusGate>;
+  }
+
+  return content;
 }

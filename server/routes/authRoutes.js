@@ -169,30 +169,30 @@ router.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }), async (r
     // ── Account status checks (after password verification) ──
     // Robust to legacy shapes: NULL, boolean, "1"/"true" strings, casing.
     //
-    // Pending/rejected STUDENTS are allowed to authenticate and receive a
+    // Pending/rejected STUDENTS and MANAGERS are allowed to authenticate and receive a
     // session token, but only so they can reach the dedicated "Waiting for
     // Approval" screen. Every student route is gated by
     // checkStudentRegistrationStatus / requireApprovedStudent (403
     // REGISTRATION_PENDING / REGISTRATION_REJECTED), so the token can never
     // read portal data. The frontend reads registration_status from this
     // response (and /api/auth/me) and renders the matching gate.
-    // Deactivated accounts (and managers awaiting activation) stay blocked.
+    // Deactivated accounts stay blocked unless awaiting approval.
     const registrationStatus = normalizeRegistrationStatus(user.registration_status);
     const role0 = normalizeRole(user.role);
     const awaitingReview =
-      role0 === "student" &&
+      (role0 === "student" || role0 === "manager") &&
       (registrationStatus === "pending" || registrationStatus === "rejected");
 
     if (!isActiveFlag(user.active) && !awaitingReview) {
       console.log("[AUTH] Login blocked: account is deactivated");
       return res.status(401).json({
         success: false,
-        message: "Your account is pending approval or has been deactivated"
+        message: "Your account has been deactivated"
       });
     }
 
     if (awaitingReview) {
-      console.log(`[AUTH] Login granted to ${registrationStatus} student — portal routes remain gated`);
+      console.log(`[AUTH] Login granted to ${registrationStatus} ${role0} — portal routes remain gated`);
     }
 
     const role = normalizeRole(user.role);
