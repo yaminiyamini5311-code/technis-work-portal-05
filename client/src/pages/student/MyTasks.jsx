@@ -199,20 +199,30 @@ export default function MyTasks() {
     // student gets instant feedback instead of a failed upload.
     const allowedExt = new Set([".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".png", ".jpg", ".jpeg"]);
     const maxFiles = 5;
-    // Must match the server's multer limit AND Vercel's ~4.5 MB serverless
-    // request-body cap: anything larger fails at the platform.
-    const maxBytes = 4 * 1024 * 1024;
+    // Must match the server's multer limit (4 MB per file).
+    // Vercel serverless has a ~4.5 MB total request body limit at the platform level.
+    const maxBytesPerFile = 4 * 1024 * 1024; // 4 MB
+    const maxBytesTotal = 4.5 * 1024 * 1024; // 4.5 MB total (Vercel limit)
+    
     if (files.length > maxFiles) {
       setError(`Select at most ${maxFiles} files per submission.`);
       return;
     }
+    
+    // Check total size across all files
+    const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+    if (totalSize > maxBytesTotal) {
+      setError(`Total file size (${formatBytes(totalSize)}) exceeds the 4.5 MB limit. Please reduce the number or size of files.`);
+      return;
+    }
+    
     for (const f of files) {
       const ext = (f.name.match(/\.[^.]+$/) || [""])[0].toLowerCase();
       if (!allowedExt.has(ext)) {
         setError(`Unsupported file type: ${f.name}. Allowed: PDF, DOC, PPT, XLS, ZIP, PNG, JPG.`);
         return;
       }
-      if (f.size > maxBytes) {
+      if (f.size > maxBytesPerFile) {
         setError(`File too large: ${f.name} (max 4 MB each).`);
         return;
       }

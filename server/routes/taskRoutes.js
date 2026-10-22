@@ -2669,7 +2669,7 @@ async function storeSubmissionVersion(db, task, studentId, { files, comment, ver
   let fileIndex = 0;
   for (const file of (files || [])) {
     fileIndex++;
-    const v = validateUpload(file, Number(process.env.GOOGLE_DRIVE_UPLOAD_MAX_BYTES || 5 * 1024 * 1024));
+    const v = validateUpload(file, 4 * 1024 * 1024); // 4 MB per file (matches multer limit)
     if (!v.ok) { uploadError = v.errors.join("; "); break; }
     let driveFile = null;
     try {
