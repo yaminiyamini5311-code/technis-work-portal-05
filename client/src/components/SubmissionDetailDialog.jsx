@@ -121,6 +121,10 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
       setDialogError(`Explain what needs to change — at least ${MIN_FEEDBACK} characters so the student knows what to fix.`);
       return;
     }
+    if (text.length > 500) {
+      setDialogError("Feedback must be 500 characters or less.");
+      return;
+    }
     setBusy(dialogMode);
     setDialogError("");
     try {
@@ -530,16 +534,23 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
               ? "Optional note shown to the student…"
               : "Explain exactly what needs to change so the student can fix it…"}
             rows={4}
+            maxLength={500}
             data-autofocus
             aria-describedby={dialogMode === "revision" ? "sdd-feedback-hint" : undefined}
           />
-          {dialogMode === "revision" && (
-            <small id="sdd-feedback-hint" className={comment.trim().length > 0 && comment.trim().length < MIN_FEEDBACK ? "sdd-hint-warn" : "sdd-hint-ok"}>
-              {comment.trim().length < MIN_FEEDBACK
-                ? `${MIN_FEEDBACK - comment.trim().length} more character${MIN_FEEDBACK - comment.trim().length === 1 ? "" : "s"} needed.`
-                : "Looks good to send."}
-            </small>
-          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', fontSize: '12px' }}>
+            {dialogMode === "revision" && (
+              <small id="sdd-feedback-hint" className={comment.trim().length > 0 && comment.trim().length < MIN_FEEDBACK ? "sdd-hint-warn" : "sdd-hint-ok"}>
+                {comment.trim().length < MIN_FEEDBACK
+                  ? `${MIN_FEEDBACK - comment.trim().length} more character${MIN_FEEDBACK - comment.trim().length === 1 ? "" : "s"} needed (minimum ${MIN_FEEDBACK}).`
+                  : "Looks good to send."}
+              </small>
+            )}
+            {!dialogMode || dialogMode === "approve" ? <span></span> : null}
+            <span style={{ color: comment.length > 480 ? '#DC2626' : '#9aa6c2', fontWeight: comment.length > 480 ? '700' : '400' }}>
+              {comment.length}/500
+            </span>
+          </div>
           {dialogError && <div className="sdd-message sdd-message-error" role="alert">{dialogError}</div>}
         </div>
 

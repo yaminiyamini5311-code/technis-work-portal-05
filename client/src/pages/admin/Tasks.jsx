@@ -779,8 +779,20 @@ export default function Tasks() {
               <button onClick={() => setConfirmDelete(null)} disabled={deleting}>Close</button>
             </div>
 
-            <p style={{ marginTop: '16px' }}>
-              This permanently removes the task and its student assignments and submissions. This cannot be undone.
+            <p style={{ marginTop: '16px', marginBottom: '12px' }}>
+              <strong>This action will permanently delete:</strong>
+            </p>
+            <ul style={{ marginLeft: '24px', marginBottom: '12px', lineHeight: '1.8' }}>
+              <li>The task itself</li>
+              <li>All student task assignments for this task</li>
+              <li>All submissions and files submitted for this task</li>
+              <li>All notifications related to this task</li>
+            </ul>
+            <p style={{ marginTop: '12px', padding: '12px', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px' }}>
+              <strong>✓ Student accounts will NOT be deleted.</strong> Only this specific task and its related data will be removed. All student profiles and other tasks remain intact.
+            </p>
+            <p style={{ marginTop: '12px', color: '#DC2626', fontWeight: '600' }}>
+              This action cannot be undone. Are you sure you want to proceed?
             </p>
 
             <div className="quick-actions">
