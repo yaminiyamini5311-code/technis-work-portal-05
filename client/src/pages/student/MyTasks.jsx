@@ -191,6 +191,25 @@ export default function MyTasks() {
     if (submittingRef.current) return;
     const files = selectedFiles[task.id] || [];
     const comment = String(comments[task.id] || "").trim();
+    
+    // Validate endpoint choice based on submission status
+    const hasExistingSubmission = task.has_submission === true;
+    const needsRevision = task.student_status === "revision_required";
+    const hasOpenRevisionWindow = task.resubmission_available === true;
+    
+    // Correct endpoint routing:
+    // - Use 'submit' for first-time submissions (no prior submission)
+    // - Use 'resubmit' only when there's a prior submission AND an open revision window
+    let actualEndpoint = endpoint;
+    if (endpoint === "resubmit" && !hasExistingSubmission) {
+      // Prevent calling resubmit when there's no prior submission
+      actualEndpoint = "submit";
+    } else if (endpoint === "resubmit" && !hasOpenRevisionWindow) {
+      // Resubmit requested but no open window
+      setError("No open revision window. Cannot resubmit at this time.");
+      return;
+    }
+    
     if (!files.length && !comment) {
       setError("Add at least one file or a submission comment before submitting.");
       return;
@@ -226,22 +245,44 @@ export default function MyTasks() {
       // Only the files and the comment are sent. Status, feedback and
       // deadlines are never accepted from a student (the server strips them
       // too), so they cannot be forged from here.
-      const response = await axios.post(`${API_URL}/api/tasks/${task.id}/${endpoint}`, form, { headers: auth() });
+      const response = await axios.post(`${API_URL}/api/tasks/${task.id}/${actualEndpoint}`, form, { headers: auth() });
       setSelectedFiles((value) => ({ ...value, [task.id]: [] }));
       setComments((value) => ({ ...value, [task.id]: "" }));
       // Show professional success popup with actual submission details
       const submissionData = response.data?.data || response.data || {};
+      const isResubmission = actualEndpoint === "resubmit";
       setSubmitSuccess({
         taskTitle: task.title,
         submissionCode: submissionData.submissionCode,
         version: submissionData.version,
         submittedAt: submissionData.submittedAt,
-        status: "Submitted"
+        status: isResubmission ? "Resubmitted" : "Submitted",
+        message: isResubmission ? "Task resubmitted successfully!" : "Task submitted successfully!"
       });
       setError("");
       await load();
     } catch (err) {
-      setError(err.response?.data?.error?.message || err.response?.data?.message || "Unable to submit the task.");
+      const errorCode = err.response?.data?.error?.code || err.response?.data?.code;
+      const errorMessage = err.response?.data?.error?.message || err.response?.data?.message;
+      
+      // Provide user-friendly error messages
+      let displayMessage = errorMessage || "Unable to submit the task.";
+      
+      if (errorCode === "NO_PRIOR_SUBMISSION") {
+        displayMessage = "You haven't submitted this task yet. Please use the Submit button instead of Resubmit.";
+      } else if (errorCode === "ALREADY_SUBMITTED") {
+        displayMessage = "You have already submitted this task. If you need to make changes, wait for a revision request.";
+      } else if (errorCode === "RESUBMISSION_EXPIRED") {
+        displayMessage = "The 24-hour resubmission window has expired. Please contact your instructor for a new revision.";
+      } else if (errorCode === "NO_OPEN_REVISION") {
+        displayMessage = "No revision was requested for this submission. You cannot resubmit at this time.";
+      } else if (errorCode === "DEADLINE_PASSED") {
+        displayMessage = "The task deadline has passed. Please contact your instructor if you need to submit late work.";
+      }
+      
+      setError(displayMessage);
+      console.error("Submission error:", { code: errorCode, message: errorMessage, response: err.response?.data });
+      
       // The window may have closed while the form was open: reload so the
       // button state matches the server.
       if (err.response?.status === 409) await load();
@@ -546,11 +587,11 @@ export default function MyTasks() {
             <div className="submit-success-icon">
               <TechinsIcon name="check" size={40} variant="light" />
             </div>
-            <h2>You have submitted successfully!</h2>
-            <p>Your task submission has been saved successfully.</p>
+            <h2>{submitSuccess.message || "Task submitted successfully!"}</h2>
+            <p>Your work has been saved and will be reviewed.</p>
             <div className="submit-success-details">
               <div><strong>Task:</strong> {submitSuccess.taskTitle}</div>
-              <div><strong>Submission Status:</strong> {submitSuccess.status}</div>
+              <div><strong>Status:</strong> {submitSuccess.status}</div>
               <div><strong>Submission Code:</strong> {submitSuccess.submissionCode}</div>
               <div><strong>Version:</strong> v{submitSuccess.version}</div>
               <div><strong>Submitted At:</strong> {new Date(submitSuccess.submittedAt).toLocaleString()}</div>
