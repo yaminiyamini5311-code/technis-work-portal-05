@@ -2592,10 +2592,14 @@ router.patch("/:id/status", authenticateToken, async (req, res) => {
  * files are rolled back together).
  */
 async function storeSubmissionVersion(db, task, studentId, { files, comment, version, actorId, revisionCycle = null }) {
+  const startTime = Date.now();
   const { ensureTaskFolder, validateUpload, uploadToDrive, deleteFromDrive } = require("../utils/driveStorage");
   const crypto = require("crypto");
 
+  const t1 = Date.now();
   const submissionCode = await nextSubmissionCode(db);
+  console.log(`[STORE TIMING] nextSubmissionCode: ${Date.now() - t1}ms`);
+  
   const submittedAt = new Date().toISOString();
 
   // Snapshot critical task fields so submissions remain viewable even if the task is deleted
@@ -2615,6 +2619,7 @@ async function storeSubmissionVersion(db, task, studentId, { files, comment, ver
     task_day_number: task.day_number || null,
   };
 
+  const t2 = Date.now();
   const subResult = await db.collection("submissions").insertOne({
     submission_code: submissionCode,
     task_id: String(task._id),
@@ -2631,6 +2636,7 @@ async function storeSubmissionVersion(db, task, studentId, { files, comment, ver
     // Task snapshot for historical integrity
     ...taskSnapshot,
   });
+  console.log(`[STORE TIMING] submissions.insertOne: ${Date.now() - t2}ms`);
   const sid = String(subResult.insertedId);
 
   let parentFolderId = null;
@@ -2638,6 +2644,7 @@ async function storeSubmissionVersion(db, task, studentId, { files, comment, ver
   // submissions must keep working even if Drive is temporarily unavailable.
   if ((files || []).length) {
     try {
+      const t3 = Date.now();
       const folder = await ensureTaskFolder(
         db,
         studentId,
@@ -2645,9 +2652,11 @@ async function storeSubmissionVersion(db, task, studentId, { files, comment, ver
         task.task_code || String(task._id),
         task.title || "Untitled Task"
       );
+      console.log(`[STORE TIMING] ensureTaskFolder: ${Date.now() - t3}ms`);
       parentFolderId = folder.id;
     } catch (folderErr) {
       console.error("[Submit] Drive folder error:", folderErr.message);
+      console.error("[Submit] Drive folder error stack:", folderErr.stack);
       try { await db.collection("submissions").deleteOne({ _id: subResult.insertedId }); } catch { /* noop */ }
       const err = new Error("Unable to prepare Drive folder: " + folderErr.message);
       err.status = 502; err.code = "DRIVE_FOLDER_FAILED";
@@ -2657,7 +2666,9 @@ async function storeSubmissionVersion(db, task, studentId, { files, comment, ver
 
   const uploadedFiles = [];
   let uploadError = null;
+  let fileIndex = 0;
   for (const file of (files || [])) {
+    fileIndex++;
     const v = validateUpload(file, Number(process.env.GOOGLE_DRIVE_UPLOAD_MAX_BYTES || 5 * 1024 * 1024));
     if (!v.ok) { uploadError = v.errors.join("; "); break; }
     let driveFile = null;
@@ -2666,9 +2677,13 @@ async function storeSubmissionVersion(db, task, studentId, { files, comment, ver
       const datePart = submittedAt.slice(0, 10);
       const taskPart = "TASK_" + String(task.task_code || task._id).replace(/[^a-zA-Z0-9]/g, "_");
       const overrideName = taskPart + "_SUBMISSION_" + datePart + "_v" + version + ext;
+      
+      const t4 = Date.now();
       driveFile = await uploadToDrive(file.buffer, file.originalname, file.mimetype, parentFolderId, overrideName);
+      console.log(`[STORE TIMING] uploadToDrive file ${fileIndex}/${files.length}: ${Date.now() - t4}ms`);
     } catch (upErr) {
-      console.error("[Submit] Drive upload error:", upErr.message);
+      console.error(`[Submit] Drive upload error for file ${fileIndex}:`, upErr.message);
+      console.error("[Submit] Drive upload error stack:", upErr.stack);
       uploadError = "Drive upload failed: " + upErr.message;
       break;
     }
@@ -2894,11 +2909,23 @@ router.get("/:id/session", authenticateToken, checkStudentRegistrationStatus, au
  * before it reaches the database.
  */
 router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, authorizeRoles("student", "member"), upload.array("files", 5), async (req, res) => {
+  const startTime = Date.now();
+  const timings = {};
+  
   try {
     const db = req.db;
+    
+    console.log(`[SUBMIT TIMING] Request started - task: ${req.params.id}, student: ${req.user.id}`);
+    const t1 = Date.now();
+    
     const loaded = await loadStudentTask(db, req, res);
+    timings.loadStudentTask = Date.now() - t1;
+    console.log(`[SUBMIT TIMING] loadStudentTask took ${timings.loadStudentTask}ms`);
+    
     if (!loaded) return;
     const { task, assignment } = loaded;
+    
+    console.log(`[SUBMIT TIMING] Task loaded - has assignment: ${!!assignment}, legacy: ${String(task.assigned_to) === String(req.user.id)}`);
     if (["Approved", "Cancelled", "Archived"].includes(task.workflow_status)) {
       return fail(res, 409, "TASK_CLOSED", "This task cannot accept a submission.");
     }
@@ -2934,15 +2961,28 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
       return fail(res, 400, "COMMENT_TOO_LONG", "Comment must be 500 characters or less.");
     }
 
+    const t2 = Date.now();
+    console.log(`[SUBMIT TIMING] Starting storeSubmissionVersion with ${(req.files || []).length} files`);
+    
     const stored = await storeSubmissionVersion(db, task, req.user.id, {
       files: req.files || [],
       comment: commentText,
       version: 1,
       actorId: req.user.id,
     });
+    
+    timings.storeSubmissionVersion = Date.now() - t2;
+    console.log(`[SUBMIT TIMING] storeSubmissionVersion took ${timings.storeSubmissionVersion}ms`);
 
+    const t3 = Date.now();
     await transition(db, task, "Submitted", req.user.id, "Submission received");
+    timings.transition = Date.now() - t3;
+    
+    const t4 = Date.now();
     await syncTaskWorkflowFromStudents(db, task);
+    timings.syncTaskWorkflow = Date.now() - t4;
+    
+    const t5 = Date.now();
     await notifyAdmins(db, {
       type: "submission_received",
       title: "Submission received",
@@ -2951,6 +2991,11 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
       submissionId: stored.submissionId,
       studentId: req.user.id,
     });
+    timings.notifyAdmins = Date.now() - t5;
+    
+    timings.total = Date.now() - startTime;
+    console.log(`[SUBMIT TIMING] Complete submission flow timings:`, JSON.stringify(timings));
+    
     void assignment;
 
     res.status(201).json({
@@ -2965,7 +3010,11 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
       submittedAt: stored.submittedAt,
     });
   } catch (e) {
-    console.error("Submission error:", e);
+    const errorTime = Date.now() - startTime;
+    console.error(`[SUBMIT TIMING] ERROR after ${errorTime}ms:`, e.message);
+    console.error("[SUBMIT ERROR] Full error:", e);
+    if (e.stack) console.error("[SUBMIT ERROR] Stack:", e.stack);
+    
     // The unique partial index on { student_id, task_id, version: 1 } makes a
     // duplicate FIRST submission impossible even under a race. Translate the
     // database error into the same clear 409 the pre-check returns.
