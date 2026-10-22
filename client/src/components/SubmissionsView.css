@@ -1152,6 +1152,14 @@ textarea:focus {
 
 .sv-dialog-btn-danger:hover:not(:disabled) { background: rgba(255, 77, 109, 0.26); border-color: rgba(255, 77, 109, 0.85); }
 
+.sv-dialog-btn-warning {
+  background: rgba(251, 191, 36, 0.14);
+  border-color: rgba(251, 191, 36, 0.55);
+  color: #fde68a;
+}
+
+.sv-dialog-btn-warning:hover:not(:disabled) { background: rgba(251, 191, 36, 0.26); border-color: rgba(251, 191, 36, 0.85); }
+
 .sv-dialog-btn-primary { background: linear-gradient(135deg, #7c5cff, #6d28d9); border-color: transparent; color: #fff; }
 
 .sv-dialog-text {
@@ -1202,6 +1210,40 @@ textarea:focus {
 .sv-form .field-error { color: #ff9db0; font-size: 12px; font-weight: 700; }
 
 .sv-form-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
+
+/* Delete dialog warning box */
+.sv-dialog-warning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  border-radius: 10px;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  color: #fde68a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Dependencies list */
+.sv-dependencies-list {
+  margin: 12px 0 16px 24px;
+  padding: 0;
+  list-style: disc;
+  color: #e2e8f8;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.sv-dependencies-list li {
+  margin-bottom: 4px;
+}
+
+.sv-dependencies-list strong {
+  color: #fbbf24;
+  font-weight: 700;
+}
 
 @media (max-width: 768px) {
   .sv-group-lead { flex-wrap: wrap; }

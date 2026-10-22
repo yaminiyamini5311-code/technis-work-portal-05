@@ -620,8 +620,9 @@ router.delete("/students/:id", authenticateToken, authorizeRoles("admin", "ceo")
     if (hasRelated) {
       return res.status(409).json({
         success: false,
+        code: "HAS_RELATED_RECORDS",
         message: "Cannot delete: student has related records. Deactivate the account instead to preserve history.",
-        related,
+        counts: related,
       });
     }
 
@@ -631,6 +632,41 @@ router.delete("/students/:id", authenticateToken, authorizeRoles("admin", "ceo")
   } catch (error) {
     console.error("Delete student error:", error);
     res.status(500).json({ success: false, message: "Unable to delete student" });
+  }
+});
+
+/* ─── GET STUDENT DEPENDENCIES ──────────────────────────────
+ * Check for related records before deletion. Returns counts of
+ * all related records (tasks, submissions, assignments, etc.).
+ * Used by the frontend confirmation dialog to show what will be affected.
+ */
+router.get("/students/:id/dependencies", authenticateToken, authorizeRoles("admin", "ceo"), async (req, res) => {
+  try {
+    const db = req.db;
+    const userId = toId(req.params.id);
+    if (!userId) return res.status(400).json({ success: false, message: "Invalid student id" });
+    const user = await db.collection("users").findOne({ _id: userId });
+    if (!user) return res.status(404).json({ success: false, message: "Student not found" });
+
+    const counts = {
+      tasks: await db.collection("tasks").countDocuments({ $or: [{ assigned_to: String(userId) }, { assigned_by: String(userId) }] }),
+      submissions: await db.collection("submissions").countDocuments({ student_id: String(userId) }),
+      assignments: await db.collection("task_assignments").countDocuments({ student_id: String(userId) }),
+      daily_activities: await db.collection("daily_activities").countDocuments({ user_id: String(userId) }),
+      missions: await db.collection("missions").countDocuments({ assigned_to: String(userId) }),
+      notifications: await db.collection("notifications").countDocuments({ user_id: String(userId) }),
+    };
+    const hasRelated = Object.values(counts).some(n => n > 0);
+
+    res.json({
+      success: true,
+      student: { id: String(userId), name: user.name, email: user.email },
+      counts,
+      hasRelated,
+    });
+  } catch (error) {
+    console.error("Get dependencies error:", error);
+    res.status(500).json({ success: false, message: "Unable to check dependencies" });
   }
 });
 
