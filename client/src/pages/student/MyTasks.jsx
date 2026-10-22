@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, Fragment } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
+import SuccessModal from "../../components/SuccessModal";
 import { useScrollReveal } from "../../components/useScrollReveal";
 import { formatISTDateTime, formatISTDate, formatDuration, formatWorkspaceDateTime } from "../../utils/dateHelper";
 import { remainingTime } from "../../utils/api";
@@ -551,25 +552,12 @@ export default function MyTasks() {
     </div>
 
       {submitSuccess && (
-        <div className="submit-success-overlay" onClick={() => setSubmitSuccess(null)}>
-          <div className="submit-success-popup" onClick={(e) => e.stopPropagation()}>
-            <div className="submit-success-icon">
-              <TechinsIcon name="check" size={40} variant="light" />
-            </div>
-            <h2>You have submitted successfully!</h2>
-            <p>Your task submission has been saved successfully.</p>
-            <div className="submit-success-details">
-              <div><strong>Task:</strong> {submitSuccess.taskTitle}</div>
-              <div><strong>Submission Status:</strong> {submitSuccess.status}</div>
-              <div><strong>Submission Code:</strong> {submitSuccess.submissionCode}</div>
-              <div><strong>Version:</strong> v{submitSuccess.version}</div>
-              <div><strong>Submitted At:</strong> {new Date(submitSuccess.submittedAt).toLocaleString()}</div>
-            </div>
-            <button className="gold-btn" onClick={() => setSubmitSuccess(null)}>
-              Done
-            </button>
-          </div>
-        </div>
+        <SuccessModal
+          isOpen={!!submitSuccess}
+          onClose={() => setSubmitSuccess(null)}
+          title="Task Submitted Successfully!"
+          details={submitSuccess}
+        />
       )}
   </Fragment>
   );
