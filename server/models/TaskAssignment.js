@@ -150,17 +150,23 @@ async function updateAssignment(db, taskId, studentId, updates) {
   // This handles "previous tasks" that were assigned via the legacy assigned_to
   // field but don't have a task_assignments record. When the student submits,
   // we need to create the assignment record to properly track the submission status.
+  const setOnInsert = {
+    task_id: String(taskId),
+    student_id: String(studentId),
+    progress: 0,
+    created_at: new Date().toISOString(),
+  };
+  
+  // Only set status in $setOnInsert if it's not in $set (avoid conflict)
+  if (!clean.status) {
+    setOnInsert.status = "pending";
+  }
+  
   const result = await db.collection("task_assignments").updateOne(
     { task_id: String(taskId), student_id: String(studentId) },
     { 
       $set: clean,
-      $setOnInsert: {
-        task_id: String(taskId),
-        student_id: String(studentId),
-        status: clean.status || "pending",
-        progress: 0,
-        created_at: new Date().toISOString(),
-      }
+      $setOnInsert: setOnInsert
     },
     { upsert: true }
   );

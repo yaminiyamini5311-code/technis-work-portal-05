@@ -126,6 +126,13 @@ export default function TaskDetail() {
   const validate = () => {
     if (!files.length && !comment.trim()) return "Add at least one file or a submission comment before submitting.";
     if (files.length > MAX_FILES) return `Select at most ${MAX_FILES} files per submission.`;
+    
+    // Check total size across all files (Vercel 4.5 MB body limit)
+    const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+    if (totalSize > 4.5 * 1024 * 1024) {
+      return `Total file size (${formatBytes(totalSize)}) exceeds the 4.5 MB limit. Please reduce the number or size of files.`;
+    }
+    
     for (const f of files) {
       const ext = (f.name.match(/\.[^.]+$/) || [""])[0].toLowerCase();
       if (!ALLOWED_EXT.has(ext)) return `Unsupported file type: ${f.name}.`;
