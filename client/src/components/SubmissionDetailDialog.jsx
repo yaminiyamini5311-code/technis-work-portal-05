@@ -530,9 +530,13 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
               ? "Optional note shown to the student…"
               : "Explain exactly what needs to change so the student can fix it…"}
             rows={4}
+            maxLength={500}
             data-autofocus
             aria-describedby={dialogMode === "revision" ? "sdd-feedback-hint" : undefined}
           />
+          <small className={comment.length > 480 ? "sdd-hint-warn" : "sdd-hint-ok"} style={{ display: "block", marginTop: 4, textAlign: "right" }}>
+            {comment.length}/500
+          </small>
           {dialogMode === "revision" && (
             <small id="sdd-feedback-hint" className={comment.trim().length > 0 && comment.trim().length < MIN_FEEDBACK ? "sdd-hint-warn" : "sdd-hint-ok"}>
               {comment.trim().length < MIN_FEEDBACK

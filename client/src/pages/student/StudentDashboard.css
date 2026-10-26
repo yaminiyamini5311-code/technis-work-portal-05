@@ -243,6 +243,17 @@
   background:rgba(255,255,255,0.05);
 }
 .professional-task-row:hover{background:rgba(250,154,2,0.1);border-color:rgba(250,154,2,0.3)}
+.task-row-link{
+  display:block;
+  text-decoration:none;
+  color:inherit;
+  border-radius:9px;
+  transition:transform 0.15s ease, box-shadow 0.15s ease;
+}
+.task-row-link:hover .professional-task-row{background:rgba(250,154,2,0.1);border-color:rgba(250,154,2,0.3)}
+.task-row-link:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(250,154,2,0.12)}
+.task-row-link:focus-visible{outline:2px solid #FA9A02;outline-offset:2px;border-radius:9px}
+.task-row-link:active{transform:translateY(0)}
 .task-index,.mission-mark{
   width:35px;height:35px;flex:none;
   display:grid;place-items:center;
