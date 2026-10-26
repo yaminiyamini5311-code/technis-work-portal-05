@@ -3147,35 +3147,42 @@ router.post("/:id/resubmit", authenticateToken, checkStudentRegistrationStatus, 
  * one revision rule, one 24-hour window and one notification per event.
  */
 router.post("/review", authenticateToken, authorizeRoles("admin", "ceo", "manager"), async (req, res) => {
-  const db = req.db;
-  const sub = await db.collection("submissions").findOne({ _id: toId(req.body?.submission_id) });
-  if (!sub) return fail(res, 404, "SUBMISSION_NOT_FOUND", "That submission no longer exists.");
+  try {
+    const db = req.db;
+    const sub = await db.collection("submissions").findOne({ _id: toId(req.body?.submission_id) });
+    if (!sub) return fail(res, 404, "SUBMISSION_NOT_FOUND", "That submission no longer exists.");
 
-  const task = await db.collection("tasks").findOne({ _id: toId(sub.task_id) });
-  if (!task) return fail(res, 404, "TASK_NOT_FOUND", "The task for this submission no longer exists.");
+    const task = await db.collection("tasks").findOne({ _id: toId(sub.task_id) });
+    if (!task) return fail(res, 404, "TASK_NOT_FOUND", "The task for this submission no longer exists.");
 
-  // A manager may only review their own tasks (unchanged pre-existing rule).
-  const effectiveRole = req.user.role === "ceo" ? "admin" : req.user.role;
-  if (effectiveRole === "manager" && String(task.assigned_by) !== String(req.user.id)) {
-    return fail(res, 403, "FORBIDDEN", "You can only review tasks assigned by you.");
+    // A manager may only review their own tasks (unchanged pre-existing rule).
+    const effectiveRole = req.user.role === "ceo" ? "admin" : req.user.role;
+    if (effectiveRole === "manager" && String(task.assigned_by) !== String(req.user.id)) {
+      return fail(res, 403, "FORBIDDEN", "You can only review tasks assigned by you.");
+    }
+
+    const decision = String(req.body?.decision || "").trim().toLowerCase();
+    if (!["approve", "revision"].includes(decision)) {
+      return fail(res, 400, "BAD_DECISION", "Decision must be approve or revision.");
+    }
+
+    // Capture values from the ORIGINAL body before reassigning req.body,
+    // so the spread never reads from the object being constructed.
+    const comment = req.body?.comment ?? req.body?.feedback ?? "";
+    const origScore = req.body?.score;
+    const origMaxMarks = req.body?.max_marks ?? req.body?.maxMarks;
+    req.params = { ...req.params, id: String(task._id) };
+    req.body = {
+      submissionId: String(sub._id),
+      studentId: String(sub.student_id),
+      feedback: comment,
+      ...(decision === "approve" ? { score: origScore, max_marks: origMaxMarks } : {}),
+    };
+    return decision === "approve" ? handleApprove(req, res) : handleRequestRevision(req, res);
+  } catch (e) {
+    console.error("POST /review:", e);
+    fail(res, 500, "REVIEW_FAILED", "Unable to process the review. Please retry.");
   }
-
-  const decision = String(req.body?.decision || "").trim().toLowerCase();
-  if (!["approve", "revision"].includes(decision)) {
-    return fail(res, 400, "BAD_DECISION", "Decision must be approve or revision.");
-  }
-
-  // Rewrite the request into the task-scoped shape the shared handlers expect.
-  // Nothing else differs between the two routes.
-  const comment = req.body?.comment ?? req.body?.feedback ?? "";
-  req.params = { ...req.params, id: String(task._id) };
-  req.body = {
-    submissionId: String(sub._id),
-    studentId: String(sub.student_id),
-    feedback: comment,
-    ...(decision === "approve" ? { score: req.body?.score, max_marks: req.body?.max_marks ?? req.body?.maxMarks } : {}),
-  };
-  return decision === "approve" ? handleApprove(req, res) : handleRequestRevision(req, res);
 });
 
 /* ─── TASK FEEDBACK ─────────────────────────────────────────────────────── */

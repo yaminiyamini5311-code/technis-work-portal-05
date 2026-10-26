@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import TechinsIcon from "../../components/TechinsIcon";
 import { useScrollReveal } from "../../components/useScrollReveal";
 import "./StudentDashboard.css";
@@ -151,7 +152,8 @@ export default function StudentDashboard(){
         </div>
         <div className="task-list">
           {data.tasks.recent.length?data.tasks.recent.map(t=>
-            <div className="professional-task-row" key={t.id}>
+            <Link to={`/student/tasks/${t.id}`} className="task-row-link" key={t.id}>
+            <div className="professional-task-row">
               <div className="task-index"><TechinsIcon name="clipboard" size={18} variant="light" className="portal-icon" /></div>
               <div className="task-row-content"><strong>{t.title}</strong><small>{t.start_date ? `${formatDate(t.start_date)}${t.start_time ? ` ${t.start_time}` : ""} - ` : ""}{t.due_date ? `${formatDate(t.due_date)}${t.due_time ? ` ${t.due_time}` : ""}` : "No deadline"}</small></div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -167,6 +169,7 @@ export default function StudentDashboard(){
                 <span className={`workspace-status-badge ${t.status}`}>{String(t.status).replace("_"," ")}</span>
               </div>
             </div>
+            </Link>
           ):<div className="workspace-empty"><TechinsIcon name="folder" size={40} variant="light" className="icon-sway portal-icon" /><strong>No tasks assigned yet</strong><span>New assignments will appear here.</span></div>}
         </div>
       </section>
