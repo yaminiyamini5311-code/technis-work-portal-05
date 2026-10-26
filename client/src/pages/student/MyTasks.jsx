@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, Fragment } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
+import SuccessModal from "../../components/SuccessModal";
 import { useScrollReveal } from "../../components/useScrollReveal";
 import { formatISTDateTime, formatISTDate, formatDuration, formatWorkspaceDateTime } from "../../utils/dateHelper";
 import { remainingTime } from "../../utils/api";
@@ -218,20 +219,30 @@ export default function MyTasks() {
     // student gets instant feedback instead of a failed upload.
     const allowedExt = new Set([".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".png", ".jpg", ".jpeg"]);
     const maxFiles = 5;
-    // Must match the server's multer limit AND Vercel's ~4.5 MB serverless
-    // request-body cap: anything larger fails at the platform.
-    const maxBytes = 4 * 1024 * 1024;
+    // Must match the server's multer limit (4 MB per file).
+    // Vercel serverless has a ~4.5 MB total request body limit at the platform level.
+    const maxBytesPerFile = 4 * 1024 * 1024; // 4 MB
+    const maxBytesTotal = 4.5 * 1024 * 1024; // 4.5 MB total (Vercel limit)
+    
     if (files.length > maxFiles) {
       setError(`Select at most ${maxFiles} files per submission.`);
       return;
     }
+    
+    // Check total size across all files
+    const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+    if (totalSize > maxBytesTotal) {
+      setError(`Total file size (${formatBytes(totalSize)}) exceeds the 4.5 MB limit. Please reduce the number or size of files.`);
+      return;
+    }
+    
     for (const f of files) {
       const ext = (f.name.match(/\.[^.]+$/) || [""])[0].toLowerCase();
       if (!allowedExt.has(ext)) {
         setError(`Unsupported file type: ${f.name}. Allowed: PDF, DOC, PPT, XLS, ZIP, PNG, JPG.`);
         return;
       }
-      if (f.size > maxBytes) {
+      if (f.size > maxBytesPerFile) {
         setError(`File too large: ${f.name} (max 4 MB each).`);
         return;
       }
@@ -582,25 +593,12 @@ export default function MyTasks() {
     </div>
 
       {submitSuccess && (
-        <div className="submit-success-overlay" onClick={() => setSubmitSuccess(null)}>
-          <div className="submit-success-popup" onClick={(e) => e.stopPropagation()}>
-            <div className="submit-success-icon">
-              <TechinsIcon name="check" size={40} variant="light" />
-            </div>
-            <h2>{submitSuccess.message || "Task submitted successfully!"}</h2>
-            <p>Your work has been saved and will be reviewed.</p>
-            <div className="submit-success-details">
-              <div><strong>Task:</strong> {submitSuccess.taskTitle}</div>
-              <div><strong>Status:</strong> {submitSuccess.status}</div>
-              <div><strong>Submission Code:</strong> {submitSuccess.submissionCode}</div>
-              <div><strong>Version:</strong> v{submitSuccess.version}</div>
-              <div><strong>Submitted At:</strong> {new Date(submitSuccess.submittedAt).toLocaleString()}</div>
-            </div>
-            <button className="gold-btn" onClick={() => setSubmitSuccess(null)}>
-              Done
-            </button>
-          </div>
-        </div>
+        <SuccessModal
+          isOpen={!!submitSuccess}
+          onClose={() => setSubmitSuccess(null)}
+          title="Task Submitted Successfully!"
+          details={submitSuccess}
+        />
       )}
   </Fragment>
   );

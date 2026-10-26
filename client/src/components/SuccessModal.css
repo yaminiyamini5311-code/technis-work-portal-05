@@ -1,0 +1,210 @@
+/* Success Modal - Viewport-Fixed Portal Component
+ * 
+ * Rendered via React Portal to document.body to avoid positioning issues
+ * from parent containers with transform, overflow, or position.
+ * 
+ * Uses position: fixed with inset: 0 for true viewport centering.
+ * Works correctly at any scroll position on mobile, tablet, and desktop.
+ */
+
+.success-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999; /* Above all other content */
+  padding: 20px;
+  animation: successModalFadeIn 0.2s ease;
+  /* Use 100dvh for proper mobile viewport handling */
+  height: 100dvh;
+  overflow-y: auto;
+}
+
+.success-modal-container {
+  background: rgba(10, 18, 40, 0.98);
+  border: 1px solid rgba(250, 154, 2, 0.4);
+  border-radius: 20px;
+  padding: 32px;
+  max-width: 480px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6),
+              0 0 0 1px rgba(250, 154, 2, 0.1);
+  animation: successModalSlideUp 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+  margin: auto; /* Center vertically in flex container */
+}
+
+@keyframes successModalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes successModalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.success-modal-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #10B981, #059669);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 24px;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.5);
+  animation: successModalIconPulse 0.6s ease;
+}
+
+@keyframes successModalIconPulse {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.success-modal-title {
+  margin: 0 0 12px;
+  font-size: 24px;
+  font-weight: 800;
+  color: #FFFFFF;
+  line-height: 1.3;
+}
+
+.success-modal-message {
+  margin: 0 0 24px;
+  color: #C0C0C0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.success-modal-details {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 28px;
+  text-align: left;
+}
+
+.success-modal-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.success-modal-detail-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.success-modal-detail-row:first-child {
+  padding-top: 0;
+}
+
+.success-modal-detail-row strong {
+  color: #9CA3AF;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.success-modal-detail-row span {
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: right;
+  word-break: break-word;
+  flex: 1;
+}
+
+.success-modal-button {
+  width: 100%;
+  padding: 14px 24px;
+  font-size: 16px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .success-modal-overlay {
+    padding: 16px;
+  }
+
+  .success-modal-container {
+    padding: 24px;
+    max-width: 100%;
+  }
+
+  .success-modal-title {
+    font-size: 20px;
+  }
+
+  .success-modal-message {
+    font-size: 14px;
+  }
+
+  .success-modal-icon {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 20px;
+  }
+
+  .success-modal-details {
+    padding: 16px;
+  }
+
+  .success-modal-detail-row {
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+  }
+
+  .success-modal-detail-row span {
+    text-align: left;
+  }
+}
+
+/* Ensure proper stacking above everything */
+.success-modal-overlay {
+  isolation: isolate;
+}
+
+/* Prevent text selection while modal is open */
+.success-modal-overlay * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Allow selection in details */
+.success-modal-details * {
+  user-select: text;
+  -webkit-user-select: text;
+}

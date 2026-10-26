@@ -2592,7 +2592,7 @@ router.patch("/:id/status", authenticateToken, async (req, res) => {
  * files are rolled back together).
  */
 async function storeSubmissionVersion(db, task, studentId, { files, comment, version, actorId, revisionCycle = null }) {
-  const { ensureTaskFolder, validateUpload, uploadToDrive, deleteFromDrive } = require("../utils/driveStorage");
+  const { uploadFile } = require("../utils/fileStorage"); // GridFS storage
   const crypto = require("crypto");
 
   const submissionCode = await nextSubmissionCode(db);
@@ -2633,106 +2633,79 @@ async function storeSubmissionVersion(db, task, studentId, { files, comment, ver
   });
   const sid = String(subResult.insertedId);
 
-  let parentFolderId = null;
-  // Drive is only contacted when files are actually attached: comment-only
-  // submissions must keep working even if Drive is temporarily unavailable.
-  if ((files || []).length) {
-    try {
-      const folder = await ensureTaskFolder(
-        db,
-        studentId,
-        String(task._id),
-        task.task_code || String(task._id),
-        task.title || "Untitled Task"
-      );
-      parentFolderId = folder.id;
-    } catch (folderErr) {
-      console.error("[Submit] Drive folder error:", folderErr.message);
-      try { await db.collection("submissions").deleteOne({ _id: subResult.insertedId }); } catch { /* noop */ }
-      const err = new Error("Unable to prepare Drive folder: " + folderErr.message);
-      err.status = 502; err.code = "DRIVE_FOLDER_FAILED";
-      throw err;
-    }
-  }
-
-  const uploadedFiles = [];
-  let uploadError = null;
+  // GRIDFS-FIRST STRATEGY: Save files to MongoDB GridFS (source of truth)
+  // Drive sync happens later as a secondary backup
+  const savedFiles = [];
+  const failedFiles = [];
+  
   for (const file of (files || [])) {
-    const v = validateUpload(file, Number(process.env.GOOGLE_DRIVE_UPLOAD_MAX_BYTES || 5 * 1024 * 1024));
-    if (!v.ok) { uploadError = v.errors.join("; "); break; }
-    let driveFile = null;
     try {
-      const ext = (file.originalname.match(/\.[^.]+$/) || [""])[0].toLowerCase();
-      const datePart = submittedAt.slice(0, 10);
-      const taskPart = "TASK_" + String(task.task_code || task._id).replace(/[^a-zA-Z0-9]/g, "_");
-      const overrideName = taskPart + "_SUBMISSION_" + datePart + "_v" + version + ext;
-      driveFile = await uploadToDrive(file.buffer, file.originalname, file.mimetype, parentFolderId, overrideName);
-    } catch (upErr) {
-      console.error("[Submit] Drive upload error:", upErr.message);
-      uploadError = "Drive upload failed: " + upErr.message;
-      break;
-    }
+      // Save to GridFS immediately
+      const gridfsId = await uploadFile(db, file.buffer, file.originalname, {
+        mimetype: file.mimetype,
+        size: file.size,
+        submission_id: sid,
+        task_id: String(task._id),
+        student_id: String(studentId),
+        version,
+      });
 
-    let saved = false;
-    let lastErr = null;
-    for (let i = 0; i < 3; i++) {
-      try {
-        const ins = await db.collection("submission_files").insertOne({
-          submission_id: sid,
-          original_name: file.originalname,
-          mime_type: file.mimetype,
-          size: file.size,
-          drive_file_id: driveFile.id,
-          drive_folder_id: parentFolderId,
-          drive_web_view_link: driveFile.webViewLink || null,
-          drive_web_content_link: driveFile.webContentLink || null,
-          storage_type: "drive",
-          idempotency_key: crypto.randomUUID(),
-          created_at: submittedAt,
-        });
-        saved = true;
-        uploadedFiles.push({ driveFile: driveFile, fileId: ins.insertedId, saved: true });
-        break;
-      } catch (dbErr) {
-        lastErr = dbErr;
-        await new Promise((r) => setTimeout(r, Math.pow(2, i) * 300));
-      }
-    }
-    if (!saved) {
-      uploadedFiles.push({ driveFile: driveFile, fileId: null, saved: false, error: (lastErr && lastErr.message) || "DB insert failed" });
-      uploadError = "Database save failed for " + file.originalname + ": " + ((lastErr && lastErr.message) || "unknown");
-      break;
+      // Store file metadata with GridFS ID and pending Drive status
+      const fileRecord = await db.collection("submission_files").insertOne({
+        submission_id: sid,
+        original_name: file.originalname,
+        mime_type: file.mimetype,
+        size: file.size,
+        gridfs_id: gridfsId,
+        storage_type: "gridfs",
+        drive_status: "pending", // Will be synced to Drive later
+        drive_file_id: null,
+        drive_folder_id: null,
+        drive_web_view_link: null,
+        drive_web_content_link: null,
+        idempotency_key: crypto.randomUUID(),
+        created_at: submittedAt,
+      });
+
+      savedFiles.push({
+        id: String(fileRecord.insertedId),
+        name: file.originalname,
+        size: file.size,
+        gridfs_id: gridfsId,
+      });
+    } catch (err) {
+      console.error("[Submit] GridFS save failed for", file.originalname, ":", err.message);
+      failedFiles.push({ name: file.originalname, error: err.message });
     }
   }
 
-  if (uploadError) {
-    // Roll back: never leave a partial submission. Remove DB rows and Drive files.
-    try { await db.collection("submission_files").deleteMany({ submission_id: sid }); } catch (e) { console.error("[Submit] rollback files error:", e.message); }
-    try { await db.collection("submissions").deleteOne({ _id: subResult.insertedId }); } catch (e) { console.error("[Submit] rollback submission error:", e.message); }
-    for (const uf of uploadedFiles) {
-      if (uf.driveFile && uf.driveFile.id) {
-        try { await deleteFromDrive(uf.driveFile.id); } catch (e) { console.error("[Submit] rollback drive delete failed:", e.message); }
+  // If ANY file failed to save to GridFS, roll back the entire submission
+  if (failedFiles.length > 0) {
+    // Delete GridFS files that were successfully uploaded
+    const { deleteFile } = require("../utils/fileStorage");
+    for (const savedFile of savedFiles) {
+      try {
+        if (savedFile.gridfs_id) {
+          await deleteFile(db, savedFile.gridfs_id);
+        }
+      } catch (delErr) {
+        console.error("[Submit] Failed to delete GridFS file during rollback:", delErr.message);
       }
     }
-    for (const uf of uploadedFiles) {
-      if (uf.driveFile && uf.driveFile.id) {
-        try {
-          await db.collection("drive_orphans").insertOne({
-            drive_file_id: uf.driveFile.id, drive_folder_id: parentFolderId, submission_id: sid,
-            task_id: String(task._id), student_id: String(studentId), original_name: uf.driveFile.name || "unknown",
-            created_at: new Date().toISOString(), error: uploadError, rolled_back: true,
-          });
-        } catch (e) { console.error("[Submit] orphan record failed:", e.message); }
-      }
-    }
-    const err = new Error(uploadError);
-    err.status = 502; err.code = "UPLOAD_FAILED";
+    
+    // Delete submission_files records
+    try { await db.collection("submission_files").deleteMany({ submission_id: sid }); } catch (e) { /* noop */ }
+    
+    // Delete submission record
+    try { await db.collection("submissions").deleteOne({ _id: subResult.insertedId }); } catch (e) { /* noop */ }
+    
+    const err = new Error(`Failed to save ${failedFiles.length} file(s): ${failedFiles.map(f => f.name).join(", ")}`);
+    err.status = 500;
+    err.code = "FILE_SAVE_FAILED";
     throw err;
   }
 
-  // Stop the running timer and snapshot the timing onto THIS submission row.
-  // This is deliberately placed after every file upload has succeeded and the
-  // submission row exists: a failed submission must never stop the timer.
+  // Stop the running timer and snapshot the timing onto THIS submission row
   const { timingSnapshot } = require("../utils/taskSession");
   const timing = await timingSnapshot(db, { studentId: String(studentId), taskId: String(task._id), submittedAt });
   await db.collection("submissions").updateOne(
@@ -2763,12 +2736,16 @@ async function storeSubmissionVersion(db, task, studentId, { files, comment, ver
     newValue: { submission_code: submissionCode, task_id: String(task._id), version, submitted_at: submittedAt, revision_cycle: revisionCycle },
   });
 
+  // TODO: Queue Drive sync job for these files (run async via cron or background job)
+  // For now, files are safely stored in GridFS and accessible immediately
+
   return {
     submissionId: sid,
     submissionCode,
     version,
     submittedAt,
-    parentFolderId,
+    files: savedFiles,
+    drive_status: "pending", // Indicates Drive sync is pending
     task_started_at: timing.task_started_at,
     duration_seconds: timing.duration_seconds,
   };
@@ -2951,6 +2928,7 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
       submissionId: stored.submissionId,
       studentId: req.user.id,
     });
+    
     void assignment;
 
     res.status(201).json({
@@ -2965,7 +2943,9 @@ router.post("/:id/submit", authenticateToken, checkStudentRegistrationStatus, au
       submittedAt: stored.submittedAt,
     });
   } catch (e) {
-    console.error("Submission error:", e);
+    console.error("[SUBMIT ERROR]:", e.message);
+    if (e.stack) console.error(e.stack);
+    
     // The unique partial index on { student_id, task_id, version: 1 } makes a
     // duplicate FIRST submission impossible even under a race. Translate the
     // database error into the same clear 409 the pre-check returns.

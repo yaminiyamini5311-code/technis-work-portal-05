@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import axios from "axios";
 import TechinsIcon from "../../components/TechinsIcon";
+import SuccessModal from "../../components/SuccessModal";
 import { formatWorkspaceDateTime, formatDuration } from "../../utils/dateHelper";
 import { remainingTime } from "../../utils/api";
 import "./MyTasks.css";
@@ -126,6 +127,13 @@ export default function TaskDetail() {
   const validate = () => {
     if (!files.length && !comment.trim()) return "Add at least one file or a submission comment before submitting.";
     if (files.length > MAX_FILES) return `Select at most ${MAX_FILES} files per submission.`;
+    
+    // Check total size across all files (Vercel 4.5 MB body limit)
+    const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+    if (totalSize > 4.5 * 1024 * 1024) {
+      return `Total file size (${formatBytes(totalSize)}) exceeds the 4.5 MB limit. Please reduce the number or size of files.`;
+    }
+    
     for (const f of files) {
       const ext = (f.name.match(/\.[^.]+$/) || [""])[0].toLowerCase();
       if (!ALLOWED_EXT.has(ext)) return `Unsupported file type: ${f.name}.`;
@@ -335,27 +343,12 @@ export default function TaskDetail() {
         <Link className="td-back-btn" to="/student/tasks">Back to My Tasks</Link>
       </div>
 
-      {submitSuccess && (
-        <div className="submit-success-overlay" onClick={() => setSubmitSuccess(null)}>
-          <div className="submit-success-popup" onClick={(e) => e.stopPropagation()}>
-            <div className="submit-success-icon">
-              <TechinsIcon name="check" size={40} variant="light" />
-            </div>
-            <h2>{submitSuccess.message || "Task submitted successfully!"}</h2>
-            <p>Your work has been saved and will be reviewed.</p>
-            <div className="submit-success-details">
-              <div><strong>Task:</strong> {submitSuccess.taskTitle}</div>
-              <div><strong>Status:</strong> {submitSuccess.status}</div>
-              <div><strong>Submission Code:</strong> {submitSuccess.submissionCode}</div>
-              <div><strong>Version:</strong> v{submitSuccess.version}</div>
-              <div><strong>Submitted At:</strong> {new Date(submitSuccess.submittedAt).toLocaleString()}</div>
-            </div>
-            <button className="gold-btn" onClick={() => setSubmitSuccess(null)}>
-              Done
-            </button>
-          </div>
-        </div>
-      )}
+      <SuccessModal
+        isOpen={!!submitSuccess}
+        onClose={() => setSubmitSuccess(null)}
+        title="Task Submitted Successfully!"
+        details={submitSuccess}
+      />
     </div>
   );
 }

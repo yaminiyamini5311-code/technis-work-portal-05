@@ -72,6 +72,8 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
   const [sortBy, setSortBy] = useState("newest");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [dependencies, setDependencies] = useState(null);
+  const [loadingDeps, setLoadingDeps] = useState(false);
   const [requirementTarget, setRequirementTarget] = useState(null);
   const [requirementDesc, setRequirementDesc] = useState("");
   const [requirementError, setRequirementError] = useState("");
@@ -90,6 +92,28 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
+
+  const openDeleteDialog = async (item) => {
+    setDeleteTarget(item);
+    setDependencies(null);
+    setLoadingDeps(true);
+    setError("");
+    try {
+      const routeId = getStudentRouteId(item);
+      if (!routeId) {
+        setError("This submission has no linked student record.");
+        setDeleteTarget(null);
+        return;
+      }
+      const res = await apiFetch(`/api/admin/students/${encodeURIComponent(routeId)}/dependencies`);
+      setDependencies(res);
+    } catch (e) {
+      setError(e.message || "Unable to check dependencies.");
+      setDeleteTarget(null);
+    } finally {
+      setLoadingDeps(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -231,14 +255,41 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
       if (!routeId) {
         setError("This submission has no linked student record.");
         setDeleteTarget(null);
+        setDependencies(null);
         return;
       }
       await apiFetch(`/api/admin/students/${encodeURIComponent(routeId)}`, { method: "DELETE" });
       setNotice(`${deleteTarget.student_name} deleted.`);
       setDeleteTarget(null);
+      setDependencies(null);
       await load();
     } catch (e) {
+      // On 409, the error will show the "Deactivate" option in the dialog
       setError(e.message || "An error occurred");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const confirmDeactivate = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setError("");
+    try {
+      const routeId = getStudentRouteId(deleteTarget);
+      if (!routeId) {
+        setError("This submission has no linked student record.");
+        setDeleteTarget(null);
+        setDependencies(null);
+        return;
+      }
+      await apiFetch(`/api/admin/students/${encodeURIComponent(routeId)}/deactivate`, { method: "PATCH" });
+      setNotice(`${deleteTarget.student_name} deactivated. The account is now hidden from active lists and the student cannot log in. All history is preserved.`);
+      setDeleteTarget(null);
+      setDependencies(null);
+      await load();
+    } catch (e) {
+      setError(e.message || "Unable to deactivate student");
     } finally {
       setDeleting(false);
     }
@@ -564,7 +615,7 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
                               <button type="button" className="ui-btn ui-btn--info" onClick={() => setRequirementTarget(item)}>
                                 Requirement
                               </button>
-                              <button type="button" className="ui-btn ui-btn--danger" onClick={() => setDeleteTarget(item)}>
+                              <button type="button" className="ui-btn ui-btn--danger" onClick={() => openDeleteDialog(item)}>
                                 <TechinsIcon name="trash" size={13} variant="light" ariaHidden />
                                 Delete
                               </button>
@@ -599,34 +650,86 @@ export default function SubmissionsView({ eyebrow, title, subtitle }) {
 
       {previewFile && <FilePreview file={previewFile} onClose={() => setPreviewFile(null)} />}
 
-      {/* Delete confirmation — danger outlined, names exactly what will go. */}
+      {/* Delete confirmation — shows dependency counts, offers deactivation if records exist */}
       <FixedOverlay
         open={Boolean(deleteTarget)}
-        onClose={() => setDeleteTarget(null)}
+        onClose={() => { setDeleteTarget(null); setDependencies(null); }}
         label="Confirm delete student"
         panelClassName="fixed-overlay-panel sv-dialog"
         zIndex={1200}
       >
         <div className="panel-head">
           <h3>Delete Student</h3>
-          <button type="button" className="sv-dialog-btn" onClick={() => setDeleteTarget(null)}>Close</button>
+          <button type="button" className="sv-dialog-btn" onClick={() => { setDeleteTarget(null); setDependencies(null); }} disabled={deleting}>Close</button>
         </div>
         <div className="panel-body">
-          <p className="sv-dialog-text">
-            Are you sure you want to delete <strong>{deleteTarget?.student_name}</strong>
-            {deleteTarget?.student_id ? ` (${deleteTarget.student_id})` : ""}?
-            {" "}This action cannot be undone.
-          </p>
-          <p className="sv-dialog-text sv-dialog-muted">
-            If the student has related records (tasks, submissions, missions), deletion will be blocked and you
-            will be asked to deactivate instead.
-          </p>
+          {loadingDeps ? (
+            <p className="sv-dialog-text">Checking related records…</p>
+          ) : dependencies ? (
+            <>
+              <p className="sv-dialog-text">
+                Are you sure you want to delete <strong>{deleteTarget?.student_name}</strong>
+                {deleteTarget?.student_id ? ` (${deleteTarget.student_id})` : ""}?
+              </p>
+              
+              {dependencies.hasRelated ? (
+                <>
+                  <div className="sv-dialog-warning">
+                    <TechinsIcon name="alert" size={16} variant="light" ariaHidden />
+                    <strong>This student has related records:</strong>
+                  </div>
+                  <ul className="sv-dependencies-list">
+                    {dependencies.counts.submissions > 0 && <li><strong>{dependencies.counts.submissions}</strong> submission{dependencies.counts.submissions !== 1 ? 's' : ''}</li>}
+                    {dependencies.counts.assignments > 0 && <li><strong>{dependencies.counts.assignments}</strong> task assignment{dependencies.counts.assignments !== 1 ? 's' : ''}</li>}
+                    {dependencies.counts.tasks > 0 && <li><strong>{dependencies.counts.tasks}</strong> task{dependencies.counts.tasks !== 1 ? 's' : ''}</li>}
+                    {dependencies.counts.missions > 0 && <li><strong>{dependencies.counts.missions}</strong> mission{dependencies.counts.missions !== 1 ? 's' : ''}</li>}
+                    {dependencies.counts.daily_activities > 0 && <li><strong>{dependencies.counts.daily_activities}</strong> daily activit{dependencies.counts.daily_activities !== 1 ? 'ies' : 'y'}</li>}
+                    {dependencies.counts.notifications > 0 && <li><strong>{dependencies.counts.notifications}</strong> notification{dependencies.counts.notifications !== 1 ? 's' : ''}</li>}
+                  </ul>
+                  <p className="sv-dialog-text sv-dialog-muted">
+                    Deletion is not allowed because it would orphan or remove these records. 
+                    <strong> Deactivate the account instead</strong> to preserve all history while preventing login and hiding the student from active lists.
+                  </p>
+                </>
+              ) : (
+                <p className="sv-dialog-text sv-dialog-muted">
+                  This student has no related records. Deletion will permanently remove the account and cannot be undone.
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="sv-dialog-text">Loading…</p>
+          )}
         </div>
         <div className="panel-foot">
-          <button type="button" className="sv-dialog-btn" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</button>
-          <button type="button" className="sv-dialog-btn sv-dialog-btn-danger" onClick={confirmDelete} disabled={deleting}>
-            {deleting ? "Deleting…" : "Delete student"}
+          <button 
+            type="button" 
+            className="sv-dialog-btn" 
+            onClick={() => { setDeleteTarget(null); setDependencies(null); }} 
+            disabled={deleting || loadingDeps}
+          >
+            Cancel
           </button>
+          
+          {dependencies?.hasRelated ? (
+            <button 
+              type="button" 
+              className="sv-dialog-btn sv-dialog-btn-warning" 
+              onClick={confirmDeactivate} 
+              disabled={deleting || loadingDeps}
+            >
+              {deleting ? "Deactivating…" : "Deactivate Student"}
+            </button>
+          ) : (
+            <button 
+              type="button" 
+              className="sv-dialog-btn sv-dialog-btn-danger" 
+              onClick={confirmDelete} 
+              disabled={deleting || loadingDeps || !dependencies}
+            >
+              {deleting ? "Deleting…" : "Delete Student"}
+            </button>
+          )}
         </div>
       </FixedOverlay>
 
