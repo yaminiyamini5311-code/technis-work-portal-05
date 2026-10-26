@@ -71,18 +71,20 @@ export default function FixedOverlay({
 
   // Escape to close, and focus the dialog once it exists.
   useEffect(() => {
-    if (!open || !onClose) return undefined;
+    if (!open) return undefined;
     const onKey = (e) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        onClose?.();
       }
     };
     document.addEventListener("keydown", onKey);
     const focusTarget = dialogRef.current;
     if (focusTarget) {
       const previous = document.activeElement;
-      const first = focusTarget.querySelector("[data-autofocus], button, [href], input, select, textarea");
+      // Prioritize [data-autofocus] first, then fall back to focusable elements
+      const autofocus = focusTarget.querySelector("[data-autofocus]");
+      const first = autofocus || focusTarget.querySelector("button, [href], input, select, textarea");
       (first || focusTarget).focus?.({ preventScroll: true });
       return () => {
         document.removeEventListener("keydown", onKey);
@@ -90,7 +92,7 @@ export default function FixedOverlay({
       };
     }
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose, host]);
+  }, [open, host]); // Removed onClose from dependencies since it's captured in closure
 
   if (!open || !host) return null;
 

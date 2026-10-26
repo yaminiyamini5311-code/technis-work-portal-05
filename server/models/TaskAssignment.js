@@ -153,13 +153,15 @@ async function updateAssignment(db, taskId, studentId, updates) {
   const setOnInsert = {
     task_id: String(taskId),
     student_id: String(studentId),
-    progress: 0,
     created_at: new Date().toISOString(),
   };
   
-  // Only set status in $setOnInsert if it's not in $set (avoid conflict)
+  // Only add fields to $setOnInsert if they're NOT in $set (avoid MongoDB conflict)
   if (!clean.status) {
     setOnInsert.status = "pending";
+  }
+  if (!clean.progress && clean.progress !== 0) {
+    setOnInsert.progress = 0;
   }
   
   const result = await db.collection("task_assignments").updateOne(

@@ -2085,6 +2085,7 @@ async function handleApprove(req, res) {
 
     await notifyOnce(db, {
       userId: studentId,
+      studentId: studentId,
       type: "task_approved",
       title: "Submission approved",
       message: `Your submission for ${task.title} has been approved.${feedback && feedback !== "Approved" ? ` Reviewer note: ${feedback}` : ""}`,

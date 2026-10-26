@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import FixedOverlay from "./FixedOverlay";
 import FilePreview, { isPreviewable } from "./FilePreview";
 import TechinsIcon from "./TechinsIcon";
+import ApprovalSuccessModal from "./ApprovalSuccessModal";
 import { formatWorkspaceDateTime, formatDuration } from "../utils/dateHelper";
 import { STATUS_LABEL, apiFetch, downloadFile, formatBytes, statusClass, taskTitle } from "../utils/api";
 import "./SubmissionDetailDialog.css";
@@ -60,6 +61,8 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
   const [dialogMode, setDialogMode] = useState(null); // "approve" | "revision"
   const [comment, setComment] = useState("");
   const [dialogError, setDialogError] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successReviewedAt, setSuccessReviewedAt] = useState(null);
   
   // Edit comment state
   const [editingComment, setEditingComment] = useState(false);
@@ -107,11 +110,11 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
     setError("");
   }
 
-  function closeDecision() {
+  const closeDecision = useCallback(() => {
     setDialogMode(null);
     setComment("");
     setDialogError("");
-  }
+  }, []);
 
   async function submitDecision() {
     if (!dialogMode || busy) return;
@@ -134,12 +137,19 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
       });
       const payload = res?.data ?? res;
       const deadline = payload?.resubmission_deadline;
-      setNotice(
-        dialogMode === "approve"
-          ? (payload?.message || "Submission approved.")
-          : `${payload?.message || "Revision requested."}${deadline ? ` Resubmit by ${formatWorkspaceDateTime(deadline)}.` : ""}`,
-      );
-      closeDecision();
+      
+      // Show success modal for approval
+      if (dialogMode === "approve") {
+        setSuccessReviewedAt(payload?.reviewed_at || new Date().toISOString());
+        closeDecision();
+        setShowSuccessModal(true);
+      } else {
+        setNotice(
+          `${payload?.message || "Revision requested."}${deadline ? ` Resubmit by ${formatWorkspaceDateTime(deadline)}.` : ""}`,
+        );
+        closeDecision();
+      }
+      
       // Refresh in place: the dialog and the list behind it both re-read.
       await load();
       onChanged?.();
@@ -199,7 +209,7 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
     setEditCommentError("");
     
     try {
-      const res = await apiFetch(`/api/tasks/submissions/${encodeURIComponent(submissionId)}/review-comment`, {
+      await apiFetch(`/api/tasks/submissions/${encodeURIComponent(submissionId)}/review-comment`, {
         method: "PATCH",
         body: { review_comment: text },
       });
@@ -494,6 +504,16 @@ export default function SubmissionDetailDialog({ submissionId, onClose, onChange
       {previewFile && (
         <FilePreview file={previewFile} onClose={() => setPreviewFile(null)} />
       )}
+
+      {/* Approval success modal */}
+      <ApprovalSuccessModal
+        open={showSuccessModal}
+        reviewedAt={successReviewedAt}
+        onClose={() => {
+          setShowSuccessModal(false);
+          setSuccessReviewedAt(null);
+        }}
+      />
 
       {/* Decision dialog */}
       <FixedOverlay
